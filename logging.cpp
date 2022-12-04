@@ -1,3 +1,21 @@
+/*
+
+Logging.cpp
+
+Implements logging.h
+
+if MNDEBUG is defined then output is sent to the Serial port else it is not compiled.
+
+When outputting the Log commands repace Serial.print(ln) output
+
+There are also functions to send ANSI escape sequences to allow output in colour and at specific screen locations
+The serial monitor needs to be able to support these ANSI sequences. A free example is PuTTY.
+
+Author: (c) M. Naylor 2022
+
+History:
+	Ver 1.0			Initial version
+*/
 #include "logging.h"
 
 #ifdef ARDUINO_AVR_UNO

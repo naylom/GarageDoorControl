@@ -146,12 +146,6 @@ String	WiFiService::ToIPString ( const IPAddress& address )
 	return String(address[0]) + "." + address[1] + "." + address[2] + "." + address[3];
 }
 
-// Valid message parts
-const char 	m_cVer1[] = "V001";
-const char 	m_cMsg1[] = "M001";
-const char 	m_cMsg2[] = "M002";
-const char 	m_cMsg3[] = "M003";	
-		
 		UDPWiFiService::UDPWiFiService(){}
 
 bool	UDPWiFiService::Begin ( UDPWiFiServiceCallback  pHandleReqData, const char *WiFissid, const char *WiFipwd, const char * HostName, const uint16_t portUDP, MNRGBLEDBaseLib * pLED )

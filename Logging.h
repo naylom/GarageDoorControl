@@ -36,7 +36,7 @@ constexpr auto BAUD_RATE = 115200;
 #define Log2(x, y)
 #define Logln(x)
 #define LogFlush
-#define LogStart
+#define LogStart()
 #endif
 
 

@@ -1,11 +1,31 @@
 #include <MNTimerLib.h>
 #include "DoorState.h"
+/*
 
+DoorState.cpp
+
+Implments DoorState.h
+
+DoorState is a class that handles a garage door and uses the StateTable library to maintain the door state and execute actions as
+events occur. External events come from a transitory switch which is used to open / close and stop the door. 
+
+Further external events comne from a hormann UAP 1 controller that is used to get changes in door information (is closed / is open / light on)
+
+The hormann UAP 1 is also used to control the door with commands to start opening, start closing, stop the door and to turn on the light. These are
+sent as 1 second pulses. The timing function relies on the MNTimerLib library.
+
+The class also sets a colour RGB LED to indicate the door status. The LED depends on the MNRGBLEDBaseLib library.
+
+Author: (c) M. Naylor 2022
+
+History:
+	Ver 1.0			Initial version
+*/
 
 constexpr 	auto 					DOOR_FLASHTIME 	= 10;					// every 2 seconds
-const 		int16_t 				SIGNAL_PULSE	= 10000;				// 2000 per sec, so every 5 secs
+const 		int16_t 				SIGNAL_PULSE	= 2000 / 5;				// 2000 per sec, so every 1/5 sec, 200 ms
 
-					DoorState::DoorState ( Pin OpenPin, Pin ClosePin, Pin StopPin, Pin LightPin ) : m_State ( &m_DoorStateTable [ 0 ], ( sizeof ( m_DoorStateTable ) / sizeof ( m_DoorStateTable [ 0 ] ) ), State::Closed )
+					DoorState::DoorState ( Pin OpenPin, Pin ClosePin, Pin StopPin, Pin LightPin, State initialState ) : m_State ( &m_DoorStateTable [ 0 ], ( sizeof ( m_DoorStateTable ) / sizeof ( m_DoorStateTable [ 0 ] ) ), initialState )
 {
 	m_OpenPin = OpenPin;
 	m_ClosePin = ClosePin;
@@ -31,7 +51,7 @@ const 		int16_t 				SIGNAL_PULSE	= 10000;				// 2000 per sec, so every 5 secs
 /// <summary>
 /// DoNowt - Called when no action needed
 /// </summary>
-/// <param name="ulParam">simply used un return value
+/// <param name="ulParam">simply used in return value
 /// <returns>lower 16 bits of ulParam
 uint16_t			DoorState::DoNowt ( uint32_t ulParam )
 {
@@ -87,7 +107,7 @@ uint16_t				DoorState::DoStop ( uint32_t ulParam )
 /// SetState - Called to set door state
 /// </summary>
 /// <param name="ulParam">Low word contains new state
-/// <returns>new state
+/// <returns>lower 16 bits of ulParam
 uint16_t				DoorState::SetState ( uint32_t ulParam )
 {
 	TurnOffControlPins();
@@ -110,6 +130,26 @@ uint16_t				DoorState::DoReverse ( uint32_t ulParam )
 		default:
 			return GetState();
 	}
+}
+/// <summary>
+/// DoLightOn - Called to set the light status On
+/// </summary>
+/// <param name="ulParam">simply used in return value
+/// <returns>lower 16 bits of ulParam
+uint16_t				DoorState::DoLightOn ( uint32_t ulParam )
+{
+	m_LightState = Light::On;
+	return ulParam & 0xFFFF;
+}
+/// <summary>
+/// DoLightOff - Called to set the light status Off
+/// </summary>
+/// <param name="ulParam">simply used in return value
+/// <returns>lower 16 bits of ulParam
+uint16_t				DoorState::DoLightOff ( uint32_t ulParam )
+{
+	m_LightState = Light::Off;
+	return ulParam & 0xFFFF;
 }
 void DoorState::ResetTimer ()
 {
