@@ -25,14 +25,14 @@ extern "C"
 }
 void ResetBoard ( const __FlashStringHelper* pErrMsg )
 {
-	Logln ( pErrMsg );
+	Error ( pErrMsg );
 	LogFlush;
 	SWResetBoard ();
 }
 #else
 void ResetBoard ( const __FlashStringHelper* pErrMsg )
 {
-	Logln ( pErrMsg );
+	Error ( pErrMsg );
 	LogFlush;
 	NVIC_SystemReset ();										// processor software reset for ARM SAMD processor
 }
@@ -100,5 +100,5 @@ void Error ( String s )
 	// Clear error line
 	ClearLine ( ERROR_ROW );
 	// Output new error
-	COLOUR_AT ( FG_WHITE, BG_RED, ERROR_ROW, ERROR_COL, s.substring( 0, min ( s.length() ,80 ) ) );
+	COLOUR_AT ( FG_WHITE, BG_RED, ERROR_ROW, ERROR_COL, s.substring( 0, min ( s.length() ,(unsigned int)MAX_COLS ) ) );
 }

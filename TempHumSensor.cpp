@@ -9,11 +9,11 @@
 
 float TempHumSensorClass::CalcDewPoint ( float fTemperature, float fHumidity )
 {
-  const float a = 17.271;
-  const float b = 237.7;
-  float fTemp = ( a * fTemperature ) / ( b + fTemperature ) + log ( fHumidity / 100.0 );
-  float Td = ( b * fTemp ) / ( a - fTemp );
-  return Td;
+	const float a = 17.271;
+	const float b = 237.7;
+	float fTemp = ( a * fTemperature ) / ( b + fTemperature ) + log ( fHumidity / 100.0 );
+	float Td = ( b * fTemp ) / ( a - fTemp );
+	return Td;
 }
 
 TempHumSensorClass::TempHumSensorClass ()
@@ -31,42 +31,42 @@ void TempHumSensorClass::init()
   SetSensorTimeoutms ( SENSOR_TIMEOUT_MS );
 }
 
-void TempHumSensorClass::SetShelfLifems (unsigned long ulShelfLife)
+void 			TempHumSensorClass::SetShelfLifems (unsigned long ulShelfLife)
 {
-  m_ulShelfLifems = ulShelfLife;
+	m_ulShelfLifems = ulShelfLife;
 }
 
-unsigned long TempHumSensorClass::GetShelfLifems ()
+unsigned long 	TempHumSensorClass::GetShelfLifems ()
 {
-  return m_ulShelfLifems;
+	return m_ulShelfLifems;
 }
 
-void TempHumSensorClass::SetSensorTimeoutms ( unsigned long ulTimeOutms )
+void 			TempHumSensorClass::SetSensorTimeoutms ( unsigned long ulTimeOutms )
 {
-  m_ulSensorTimeoutms = ulTimeOutms;
+	m_ulSensorTimeoutms = ulTimeOutms;
 }
 
-unsigned long TempHumSensorClass::GetSensorTimeoutms ()
+unsigned long 	TempHumSensorClass::GetSensorTimeoutms ()
 {
-  return m_ulSensorTimeoutms;
+	return m_ulSensorTimeoutms;
 }
 
 THSENSOR_RESULT TempHumSensorClass::GetLastReading ()
 {
   THSENSOR_RESULT sResult;
 
-  if (millis () - m_ulTimeOfLastReading > GetShelfLifems ())
-  {
-    // current readings stale so try and get more recent
-    if ( ReadSensor () )
-    {
-      // Got new reading
-      m_ulTimeOfLastReading = millis ();
-    }
-  }
-  sResult.fTemperature = m_fLastTemperatureReading;
-  sResult.fHumidity = m_fLastHumidityReading;
-  sResult.fDewPoint = m_fLastDewPointReading;
-  sResult.ulTimeOfReadingms = m_ulTimeOfLastReading;
-  return sResult;
+	if ( millis () - m_ulTimeOfLastReading > GetShelfLifems () )
+	{
+		// current readings stale so try and get more recent
+		if ( ReadSensor () )
+		{
+			// Got new reading
+			m_ulTimeOfLastReading = millis ();
+		}
+	}
+	sResult.fTemperature		= m_fLastTemperatureReading;
+	sResult.fHumidity			= m_fLastHumidityReading;
+	sResult.fDewPoint			= m_fLastDewPointReading;
+	sResult.ulTimeOfReadingms	= m_ulTimeOfLastReading;
+	return sResult;
 }

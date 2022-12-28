@@ -30,7 +30,7 @@ bool SHTTempHumSensorsClass::ReadSensor ()
 	}
 	else
 	{
-		Error ( String ( result.error ) );
+		Error ( "SHTTempHumSensorsClass::ReadSensor : read error - " + String ( result.error ) );
 	}
   
 	return  bResult;
@@ -42,6 +42,6 @@ void SHTTempHumSensorsClass::init()
 	SHT31D_ErrorCode result = m_mySensor.begin ( m_bAddressDevice );
 	if ( result != SHT3XD_NO_ERROR )
 	{
-		Error ( String ( result ) );
+		Error ( "SHTTempHumSensorsClass::init : begin error - " + String ( result ) );
 	}	
 }

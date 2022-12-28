@@ -8,14 +8,14 @@
 class SHTTempHumSensorsClass : public TempHumSensorClass
 {
  protected:
-   ClosedCube_SHT31D m_mySensor;
-   uint8_t       m_bAddressDevice;
+	ClosedCube_SHT31D m_mySensor;
+	uint8_t       m_bAddressDevice;
 
-   void init ();
-   bool ReadSensor ();
+	void init ();
+	bool ReadSensor ();
  public:
 
-  SHTTempHumSensorsClass (uint8_t bAddressDevice) : m_bAddressDevice{ bAddressDevice }  { init (); }
-  ~SHTTempHumSensorsClass ();
-  uint8_t GetDeviceAddress ();
+	SHTTempHumSensorsClass (uint8_t bAddressDevice) : m_bAddressDevice{ bAddressDevice }  { init (); }
+	~SHTTempHumSensorsClass ();
+	uint8_t GetDeviceAddress ();
 };

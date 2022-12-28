@@ -1,5 +1,6 @@
 #include <MNTimerLib.h>
 #include "DoorState.h"
+#include "Logging.h"
 /*
 
 DoorState.cpp
@@ -21,237 +22,254 @@ Author: (c) M. Naylor 2022
 History:
 	Ver 1.0			Initial version
 */
-
+#define CALL_MEMBER_FN(object,ptrToMember)  ((object)->*(ptrToMember))
 constexpr 	auto 					DOOR_FLASHTIME 	= 10;					// every 2 seconds
-const 		int16_t 				SIGNAL_PULSE	= 2000 / 5;				// 2000 per sec, so every 1/5 sec, 200 ms
-
-					DoorState::DoorState ( Pin OpenPin, Pin ClosePin, Pin StopPin, Pin LightPin, State initialState ) : m_State ( &m_DoorStateTable [ 0 ], ( sizeof ( m_DoorStateTable ) / sizeof ( m_DoorStateTable [ 0 ] ) ), initialState )
+const 		int16_t 				SIGNAL_PULSE	= 2000 * 5;				// 2000 per sec, so every 1/5 sec, 200 ms
+const char* StateNames []= 								// In order of State enums!
+{
+	"Opened",
+	"Opening",
+	"Closed",	
+	"Closing",
+	"Stopped",
+	"Bad",
+	"Unknown"
+};
+					DoorState::DoorState ( Pin OpenPin, Pin ClosePin, Pin StopPin, Pin LightPin, State initialState )
 {
 	m_OpenPin = OpenPin;
 	m_ClosePin = ClosePin;
 	m_StopPin = StopPin;
 	m_LightPin = LightPin;
-	if (  m_OpenPin != NOT_A_PIN )
+    m_theDoorState = initialState;
+	TurnOffControlPins();
+}
+// called to turn relay off
+void				DoorState::ClearRelayPin ( Pin thePin )
+{
+	if (  thePin != NOT_A_PIN && digitalRead ( thePin ) == RELAY_ON )
 	{
-		pinMode ( m_OpenPin, OUTPUT );
-	}
-	if (  m_ClosePin != NOT_A_PIN )
-	{
-		pinMode ( m_ClosePin, OUTPUT );
-	}
-	if (  m_StopPin != NOT_A_PIN )
-	{
-		pinMode ( m_StopPin, OUTPUT );
-	}
-	if (  m_LightPin != NOT_A_PIN )
-	{
-		pinMode ( m_LightPin, OUTPUT );
+		pinMode ( thePin, OUTPUT );
+		digitalWrite ( thePin, RELAY_OFF );
+		Error ( "setting pin " + String ( thePin ) + " to HIGH" );
 	}
 }
-/// <summary>
-/// DoNowt - Called when no action needed
-/// </summary>
-/// <param name="ulParam">simply used in return value
-/// <returns>lower 16 bits of ulParam
-uint16_t			DoorState::DoNowt ( uint32_t ulParam )
+// called to turn relay on
+void				DoorState::SetRelayPin ( Pin thePin )
 {
-	return ulParam & 0xFFFF;
+	if (  thePin != NOT_A_PIN && digitalRead ( thePin ) == RELAY_OFF )
+	{
+		pinMode ( thePin, OUTPUT );
+		digitalWrite ( thePin, RELAY_ON );
+		Error ( "setting pin " + String ( thePin ) + " to LOW" );
+	}
 }
-/// <summary>
-/// DoOpen - Called To instruct door to open
-/// clears all control signals to low and pulls Open Door Pin high
-/// sets last direction to Up
-/// </summary>
-/// <param name="ulParam">unused
-/// <returns>new state of Opening
-uint16_t 			DoorState::DoOpen ( uint32_t ulParam )
+// routines called when event occurs, these are called from within an interrupt and need to be short
+// care to be taken to not invoke WifiNina calls or SPI calls to built in LED.
+void DoorState::NowOpen ( Event  )
 {
-	// pull pin high
-	ResetTimer();
-	digitalWrite ( m_OpenPin, HIGH );
+	// State has changed
+	m_theDoorState = State::Open;
 	m_LastDirection = Direction::Up;
-	TheMKR_RGB_LED.SetLEDColour( DOOR_OPEN_COLOUR, DOOR_MOVING_FLASHTIME );
-	return DoorState::Opening;
+	m_bDoorStateChanged = true;
 }
-/// <summary>
-/// DoClose - Called To instruct door to close
-/// clears all control signals to low and pulls Close Door Pin high
-/// sets last direction to Down
-/// </summary>
-/// <param name="ulParam">unused
-/// <returns>new state of Closing
-uint16_t	 			DoorState::DoClose ( uint32_t ulParam )
+void DoorState::NowClosed ( Event  )
 {
-	// pull pin high
-	ResetTimer();
-	digitalWrite ( m_ClosePin, HIGH );
+	// State has changed
+	m_theDoorState = State::Closed;
 	m_LastDirection = Direction::Down;
-	TheMKR_RGB_LED.SetLEDColour( DOOR_CLOSED_COLOUR, DOOR_MOVING_FLASHTIME );
-	return DoorState::State::Closing;
+	m_bDoorStateChanged = true;
 }
-/// <summary>
-/// DoStop - Called To instruct door to stop
-/// clears all control signals to low and pulls Stop Door Pin high
-/// </summary>
-/// <param name="ulParam">unused
-/// <returns>new state of Stopped
-uint16_t				DoorState::DoStop ( uint32_t ulParam )
+void DoorState::NowClosing ( Event  )
 {
-	// pull pin high
-	ResetTimer();
-	digitalWrite ( m_StopPin, HIGH );
-	TheMKR_RGB_LED.SetLEDColour( DOOR_STOPPED_COLOUR, DOOR_STATIONARY_FLASHTIME );
-	return DoorState::State::Stopped;
+	// State has changed
+	m_theDoorState = State::Closing;
+	m_LastDirection = Direction::Down;
+	m_bDoorStateChanged = true;	
 }
-/// <summary>
-/// SetState - Called to set door state
-/// </summary>
-/// <param name="ulParam">Low word contains new state
-/// <returns>lower 16 bits of ulParam
-uint16_t				DoorState::SetState ( uint32_t ulParam )
+void DoorState::NowOpening ( Event  )
 {
-	TurnOffControlPins();
-	return ulParam & 0xFFFF;
+	// State has changed
+	m_theDoorState = State::Opening;
+	m_LastDirection = Direction::Up;
+	m_bDoorStateChanged = true;
 }
+
 /// <summary>
-/// DoReverse - Called To instruct door to reverse direction
-/// if last direction is not none then calls either DoClose or DoOpen to reverse direction
+/// SwitchPressed - controls action when switch pressed
 /// </summary>
-/// <param name="ulParam">passed to DoOpen/DoClose
-/// <returns>response from DoOpen/DoClose
-uint16_t				DoorState::DoReverse ( uint32_t ulParam )
+/// <param name="Event">event that occurred
+/// <returns>None
+void DoorState::SwitchPressed ( Event  )
 {
-	switch ( m_LastDirection )
+	Error( "Switch Pressed                  ");	
+    switch ( m_theDoorState )
 	{
-		case  Direction::Down:
-			return DoOpen ( ulParam );
-		case  Direction::Up:
-			return DoClose ( ulParam );
-		default:
-			return GetState();
+		case State::Closed:
+			// Open door
+			ResetTimer();
+			// rely on UAP outpins to signal this is happening
+			SetRelayPin ( m_OpenPin );
+			break;
+
+		case  State::Open:
+			// Close Door
+			ResetTimer();
+			// rely on UAP outpins to signal this is happening
+			Error( "Door open - close pin on                  ");
+			SetRelayPin (m_ClosePin );
+			break;
+
+		case State::Opening:
+		case State::Closing:
+			// Stop Door
+			ResetTimer();
+			SetRelayPin ( m_StopPin );
+			// Have to set state since there is no UAP output that signals when this happens
+			m_theDoorState = Stopped;
+			break;
+
+		case State::Stopped:
+			// go in reverse
+			switch ( m_LastDirection )
+			{
+				case  Direction::Down:
+					// Were closing so now open
+					ResetTimer();
+					Error ( "Door stopped, was going down - open pin on");
+					SetRelayPin ( m_OpenPin );
+					break;
+
+				case  Direction::Up:
+					ResetTimer();
+					Error ( "Door stopped, was going up - close pin on");
+					SetRelayPin (m_ClosePin );
+					break;
+
+				default:
+					break;
+			}
+			
+			break;
+
+		case State::Bad:
+		case State::Unknown:
+			break;
 	}
 }
+
 /// <summary>
-/// DoLightOn - Called to set the light status On
+/// ResetTimer - Clears any extant timer and recreates it
 /// </summary>
-/// <param name="ulParam">simply used in return value
-/// <returns>lower 16 bits of ulParam
-uint16_t				DoorState::DoLightOn ( uint32_t ulParam )
+/// <returns>None
+void                DoorState::ResetTimer ()
 {
-	m_LightState = Light::On;
-	return ulParam & 0xFFFF;
-}
-/// <summary>
-/// DoLightOff - Called to set the light status Off
-/// </summary>
-/// <param name="ulParam">simply used in return value
-/// <returns>lower 16 bits of ulParam
-uint16_t				DoorState::DoLightOff ( uint32_t ulParam )
-{
-	m_LightState = Light::Off;
-	return ulParam & 0xFFFF;
-}
-void DoorState::ResetTimer ()
-{
-	TheTimer.RemoveCallBack ( (MNTimerClass*)this, (aMemberFunction)&DoorState::TurnOffControlPins );
 	TurnOffControlPins();
-	TheTimer.AddCallBack (  (MNTimerClass*)this, (aMemberFunction)&DoorState::TurnOffControlPins, SIGNAL_PULSE );
-}
-/// <summary>
-/// Event - Invokes the statetable to execute appropriate action for provided event
-/// if the ulParam is 0 will replace with current state. ulParam is passed to state table
-/// </summary>
-/// <param name="ulParam">passed to statetable unless value is 0 in whcih case current state is passed
-/// <returns>response from StateTable
-bool				DoorState::DoEvent ( DoorState::Event eEvent, uint32_t ulParam )
-{
-	if ( ulParam == 0UL )
+	if ( !TheTimer.AddCallBack (  (MNTimerClass*)this, (aMemberFunction)&DoorState::TurnOffControlPins, SIGNAL_PULSE ) )
 	{
-		ulParam = GetState();
+		Error ( "Timer callback add failed" );
 	}
-	return m_State.ProcessEvent ( this, eEvent, ulParam );
 }
+
+/// <summary>
+/// DoEvent - Invokes the statetable to execute appropriate action for provided event
+/// </summary>
+/// <param name="eEvent">event that occurred
+/// <returns>None
+void				DoorState::DoEvent ( DoorState::Event eEvent )
+{
+    CALL_MEMBER_FN ( this, StateTableFn [ m_theDoorState ][ eEvent ] )( eEvent ) ;
+}
+
+/// <summary>
+/// DoRequest - processes request to manipulate door
+/// </summary>
+/// <param name="eRequest">Request that occurred
+/// <returns>None
+void				DoorState::DoRequest ( Request eRequest )
+{
+	switch ( eRequest )
+	{
+		case Request::LightOn:
+			ResetTimer();
+			SetRelayPin ( m_LightPin );
+			break;
+
+		case Request::LightOff:
+			ClearRelayPin ( m_LightPin );
+			break;
+
+		case Request::CloseDoor:
+			ResetTimer();
+			SetRelayPin ( m_ClosePin );
+			break;
+
+		case Request::OpenDoor:
+			ResetTimer();
+			SetRelayPin ( m_OpenPin );		
+			break;
+
+		case Request::StopDoor:
+			ResetTimer();
+			SetRelayPin ( m_StopPin );		
+			break;
+	}
+}
+
 /// <summary>
 /// GetState - Gets current state
 /// </summary>
-/// <returns> response from StateTable
-DoorState::State	DoorState::GetState ()
+/// <returns> current state
+DoorState::State	DoorState::GetDoorState ()
 {
-	return (DoorState::State)m_State.GetCurrentState();
+	return m_theDoorState;
 }
-String		DoorState::GetDoorState ()
+
+/// <summary>
+/// GetDoorDisplayState - Gets current state
+/// </summary>
+/// <returns> current state as string
+const char *        DoorState::GetDoorDisplayState ()
 {
-	switch ( GetState() )
-	{
-		case State::Closed:
-			return "Closed";
-		case State::Closing:
-			return "Closing";
-		case State::Opened:
-			return "Opened";
-		case State::Opening:
-			return "Opening";
-		case State::Stopped:
-			return "Stopped";
-		default:
-			return "Unknown state";
-	}
+	return StateNames [ m_theDoorState ];
 }
-String 		DoorState::GetLightState ()
-{
-	switch ( m_LightState )
-	{
-		case Light::On:
-			return "On";
-		case Light::Off:
-			return "Off";
-		case Light::Unknown:
-			return "Unknown";
-		default:
-			return "Unexpected State";
-	}
-}
-bool				DoorState::IsLightOn()
-{
-	return m_LightState == DoorState::Light::On ? true : false;
-}
-bool				DoorState::IsLightOff()
-{
-	return m_LightState == DoorState::Light::Off ? true : false;
-}
+
 /// <summary>
 /// IsOpen - checks if door is open
 /// </summary>
 /// <returns> true if Open else false
 bool				DoorState::IsOpen ()
 {
-	return m_State.GetCurrentState() == DoorState::State::Opened ? true : false;
+	return m_theDoorState == DoorState::State::Open ? true : false;
 }
+
 /// <summary>
 /// IsMoving - checks if door is moving
 /// </summary>
 /// <returns> true if opening or closing
 bool				DoorState::IsMoving ()
 {
-	return m_State.GetCurrentState() == DoorState::State::Opening || m_State.GetCurrentState() == DoorState::State::Closing ? true : false;
+	return m_theDoorState == DoorState::State::Opening || m_theDoorState == DoorState::State::Closing ? true : false;
 }
+
 /// <summary>
 /// IsClosed - checks if door is closing
 /// </summary>
 /// <returns> true if Closed else false
 bool				DoorState::IsClosed ()
 {
-	return m_State.GetCurrentState() == DoorState::State::Closed ? true : false;
+	return m_theDoorState == DoorState::State::Closed ? true : false;
 }
+
 /// <summary>
-/// TurnOffControlPins - Sets all control pins low
+/// TurnOffControlPins - Sets all relay control pins
 /// </summary>
 /// <returns>none
 void DoorState::TurnOffControlPins ()
 {
-	//Logln ( F ( "in TurnOffControlPins" ) );
-	digitalWrite ( m_OpenPin, LOW );
-	digitalWrite ( m_ClosePin, LOW );
-	digitalWrite ( m_StopPin, LOW );
-	digitalWrite ( m_LightPin, LOW );
+	TheTimer.RemoveCallBack ( (MNTimerClass*)this, (aMemberFunction)&DoorState::TurnOffControlPins );
+	ClearRelayPin ( m_ClosePin );
+	ClearRelayPin ( m_StopPin );
+	ClearRelayPin ( m_LightPin );
+	ClearRelayPin ( m_OpenPin );
 }

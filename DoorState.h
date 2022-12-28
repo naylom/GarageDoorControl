@@ -20,87 +20,67 @@ typedef uint8_t Pin;
 #ifndef NOT_A_PIN
 const int NOT_A_PIN = -1;
 #endif
-#include <MNBaseStateTable.h>
+
 #include "MNRGBLEDBaseLib.h"
 
 // Colours used on MKR RGB LED to indicate status
-const RGBType STATE_UNKNOWN_COLOUR		= MNRGBLEDBaseLib::WHITE;
-const RGBType DOOR_CLOSED_COLOUR		= MNRGBLEDBaseLib::GREEN;
-const RGBType DOOR_OPEN_COLOUR			= MNRGBLEDBaseLib::RED;
-const RGBType DOOR_STOPPED_COLOUR		= MNRGBLEDBaseLib::MAGENTA;
-const uint8_t DOOR_STATIONARY_FLASHTIME	= 0;
-const uint8_t DOOR_MOVING_FLASHTIME		= 10;
-
+constexpr RGBType STATE_UNKNOWN_COLOUR		= MNRGBLEDBaseLib::WHITE;
+constexpr RGBType DOOR_CLOSED_COLOUR		= MNRGBLEDBaseLib::GREEN;
+constexpr RGBType DOOR_OPEN_COLOUR			= MNRGBLEDBaseLib::RED;
+constexpr RGBType DOOR_STOPPED_COLOUR		= MNRGBLEDBaseLib::DARK_MAGENTA;
+constexpr RGBType DOOR_BAD_COLOUR			= MNRGBLEDBaseLib::DARK_YELLOW;
+constexpr RGBType DOOR_UNKNOWN_COLOUR		= MNRGBLEDBaseLib::BLUE;
+constexpr uint8_t DOOR_STATIONARY_FLASHTIME	= 0;
+constexpr uint8_t DOOR_MOVING_FLASHTIME		= 10;								// 20 = 1 sec
+constexpr uint8_t RELAY_ON					= LOW;
+constexpr uint8_t RELAY_OFF					= HIGH;
 class DoorState
 {
 protected:
 
 public:
-// State table
-	enum State : uint16_t { Opened = 1, Closed, Stopped, Opening, Closing };
-	enum Event : uint16_t { DoorOpened = 1, DoorClosed, SwitchPressed, LightOff, LightOn };
-	enum Light : uint16_t { On, Off, Unknown };
+    enum State : uint8_t { Open = 0, Opening, Closed, Closing, Stopped, Unknown, Bad };
+    enum Event : uint8_t { DoorOpenTrue = 0, DoorOpenFalse, DoorClosedTrue, DoorClosedFalse, SwitchPress };
+	enum Request : uint8_t { LightOn = 0, LightOff, OpenDoor, CloseDoor, StopDoor };
 private:
-	// State table functions
-	uint16_t		DoOpen ( uint32_t ulParam );				// function called to Open door
-	uint16_t		DoClose ( uint32_t ulParam );				// function called to Close door
-	uint16_t		SetState ( uint32_t ulParam );				// function to set the door state
-	uint16_t		DoStop ( uint32_t ulParam );				// function called to Stop door Opening
-	uint16_t		DoNowt ( uint32_t ulParam );				// function called when nothing to be done
-	uint16_t		DoReverse ( uint32_t ulParam );				// function called when we need to reverse direction
-	uint16_t		DoLightOn ( uint32_t ulParam );				// function called to set light status to on
-	uint16_t		DoLightOff ( uint32_t ulParam );			// function called to set light status to off
+	// State table functions called when event occurs
+    void DoNowt ( Event ){};
+    void NowOpen ( Event event );
+    void NowClosed ( Event event );
+    void NowClosing ( Event event );
+    void NowOpening ( Event event );
+    void SwitchPressed ( Event event ); 
 
-	MNBaseStateTable<DoorState>::STATE_TABLE_ENTRY	m_DoorStateTable [25]
-	{
-		{ State::Opened,	Event::DoorOpened,		&DoorState::DoNowt },		// Already open, do nothing
-		{ State::Opened,	Event::DoorClosed,		&DoorState::SetState },		// Set State
-		{ State::Opened,	Event::SwitchPressed,	&DoorState::DoClose },		// Already open, so Close
-		{ State::Opened,	Event::LightOff,		&DoorState::DoLightOn },	// light went off
-		{ State::Opened,	Event::LightOn,			&DoorState::DoLightOff },	// light went on
-		{ State::Opening,	Event::DoorOpened,		&DoorState::SetState },		// Set State
-		{ State::Opening,	Event::DoorClosed,		&DoorState::SetState },		// Set State
-		{ State::Opening,	Event::SwitchPressed,	&DoorState::DoStop },		// Already opening so stop
-		{ State::Opening,	Event::LightOff,		&DoorState::DoLightOn },	// light went off
-		{ State::Opening,	Event::LightOn,			&DoorState::DoLightOff },	// light went on
-		{ State::Closed,	Event::DoorOpened,		&DoorState::SetState },		// Set State
-		{ State::Closed,	Event::DoorClosed,		&DoorState::DoClose },		// Already closed  but be safe and try again
-		{ State::Closed,	Event::SwitchPressed,	&DoorState::DoOpen },		// Already closed so now open		
-		{ State::Closed,	Event::LightOff,		&DoorState::DoLightOn },	// light went off
-		{ State::Closed,	Event::LightOn,			&DoorState::DoLightOff },	// light went on
-		{ State::Closing,	Event::DoorOpened,		&DoorState::SetState },		// Set State
-		{ State::Closing,	Event::DoorClosed,		&DoorState::SetState },		// Set State
-		{ State::Closing,	Event::SwitchPressed,	&DoorState::DoStop },		// Already closing so stop
-		{ State::Closing,	Event::LightOff,		&DoorState::DoLightOn },	// light went off
-		{ State::Closing,	Event::LightOn,			&DoorState::DoLightOff },	// light went on
-		{ State::Stopped,	Event::DoorOpened,		&DoorState::SetState },		// Set State
-		{ State::Stopped,	Event::DoorClosed,		&DoorState::SetState },		// Set State
-		{ State::Stopped,	Event::SwitchPressed,	&DoorState::DoReverse },	// Already stopped so reverse direction
-		{ State::Stopped,	Event::LightOff,		&DoorState::DoLightOn },	// light went off
-		{ State::Stopped,	Event::LightOn,			&DoorState::DoLightOff }	// light went on		
-	};
+    typedef void ( DoorState::*StateFunction )( Event );              	// prototype of function to handle event
+    StateFunction StateTableFn [ 5 ][ 5 ] =
+    {
+        { &DoorState::DoNowt,     	&DoorState::NowClosing,	&DoorState::NowClosed,	&DoorState::DoNowt,		&DoorState::SwitchPressed },	// Actions when current state is Open
+        { &DoorState::NowOpen,    	&DoorState::DoNowt,     &DoorState::NowClosed, 	&DoorState::DoNowt,  	&DoorState::SwitchPressed },	// Actions when current state is Opening
+        { &DoorState::NowOpen,		&DoorState::DoNowt,		&DoorState::DoNowt,		&DoorState::NowOpening,	&DoorState::SwitchPressed },	// Actions when current state is Closed
+        { &DoorState::NowOpen,		&DoorState::DoNowt,		&DoorState::NowClosed, 	&DoorState::DoNowt, 	&DoorState::SwitchPressed },	// Actions when current state is Closing
+        { &DoorState::NowOpen,		&DoorState::DoNowt,		&DoorState::NowClosed,	&DoorState::DoNowt, 	&DoorState::SwitchPressed }	// Actions when current state is Stopped 
+    };
 
-	MNBaseStateTable<DoorState>	m_State;
-	Pin			m_OpenPin;
-	Pin			m_ClosePin;
-	Pin			m_StopPin;
-	Pin			m_LightPin;
-	Light		m_LightState = Unknown;
+    volatile 	State 		m_theDoorState		= State::Unknown;
+    volatile 	bool 		m_bDoorStateChanged = true;
+				Pin			m_OpenPin;
+				Pin			m_ClosePin;
+				Pin			m_StopPin;
+				Pin			m_LightPin;
 	enum		Direction { Up, Down, None };
-	Direction	m_LastDirection = Direction::None;
-
+	volatile 	Direction		m_LastDirection = Direction::None;
+	void		ClearRelayPin ( Pin thePin );
 	void 		ResetTimer ();
+	void		SetRelayPin ( Pin thePin );
 	void 		TurnOffControlPins ();									// bring low all pins controlling garage functions
 	static void TurnOff();
 public:
-				DoorState ( Pin OpenPin, Pin ClosePin, Pin StopPin, Pin LightPin, State initialState );
-	bool 		DoEvent ( Event eEvent, uint32_t ulParam = 0UL );
-	String		GetDoorState ();
-	State 		GetState ();
-	bool		IsOpen ();
-	bool		IsMoving ();
-	bool		IsClosed ();
-	bool		IsLightOn();
-	bool		IsLightOff();
-	String 		GetLightState ();
+				    DoorState ( Pin OpenPin, Pin ClosePin, Pin StopPin, Pin LightPin, State initialState );
+	void 		    DoEvent ( Event eEvent );
+	void			DoRequest ( Request eRequest );
+	const char *    GetDoorDisplayState ();
+	State			GetDoorState();
+	bool		    IsOpen ();
+	bool		    IsMoving ();
+	bool		    IsClosed ();
 };

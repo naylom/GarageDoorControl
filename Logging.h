@@ -30,7 +30,7 @@ constexpr auto BAUD_RATE = 115200;
 #define Log2(x, y)		Serial.print ( x, y )
 #define Logln(x)		Serial.println ( x )
 #define LogFlush		Serial.flush()
-#define LogStart()		Serial.begin ( BAUD_RATE ); while ( !Serial )
+#define LogStart()		Serial.begin ( BAUD_RATE ); /*while ( !Serial )*/
 #else
 #define Log(x) 
 #define Log2(x, y)
@@ -47,42 +47,43 @@ void ResetBoard ( const __FlashStringHelper* pErrMsg );
 /*  ---------------------------------------  */
 
 // code to draw screen
-#define ERROR_ROW			25
-#define ERROR_COL			1
-#define STATUS_LINE			24
-#define STATUS_START_COL	30
-#define STATS_ROW			8
-#define STATS_RESULT_COL	70
-#define MODE_ROW			20
-#define MODE_RESULT_COL		45
-#define MAX_COLS			80
-#define MAX_ROWS			25
+constexpr auto      ERROR_ROW			= 25;
+constexpr auto      ERROR_COL			= 1;
+constexpr auto      STATUS_LINE			= 24;
+constexpr auto      STATUS_START_COL	= 30;
+constexpr auto      STATS_ROW			= 8;
+constexpr auto      STATS_RESULT_COL	= 70;
+constexpr auto      MODE_ROW			= 20;
+constexpr auto      MODE_RESULT_COL		= 45;
+constexpr auto      MAX_COLS			= 80;
+constexpr auto      MAX_ROWS			= 25;
 
 // defines for ansi terminal sequences
-#define CSI				F("\x1b[")
-#define SAVE_CURSOR		F("\x1b[s")
-#define RESTORE_CURSOR	F("\x1b[u")
-#define CLEAR_LINE		F("\x1b[2K")
-#define RESET_COLOURS   F("\x1b[0m")
+//#define CSI				F("\x1b[")
+constexpr auto      CSI	                = F ( "\x1b[" );
+constexpr auto      SAVE_CURSOR		    = F ( "\x1b[s" );
+constexpr auto      RESTORE_CURSOR	    = F ( "\x1b[u" );
+constexpr auto      CLEAR_LINE		    = F ( "\x1b[2K" );
+constexpr auto      RESET_COLOURS       = F ("\x1b[0m" );
 
 // colors
-#define FG_BLACK		30
-#define FG_RED			31
-#define FG_GREEN		32
-#define FG_YELLOW		33
-#define FG_BLUE			34
-#define FG_MAGENTA		35
-#define FG_CYAN			36
-#define FG_WHITE		37
+constexpr auto      FG_BLACK		    = 30;
+constexpr auto      FG_RED			    = 31;
+constexpr auto      FG_GREEN		    = 32;
+constexpr auto      FG_YELLOW		    = 33;
+constexpr auto      FG_BLUE			    = 34;
+constexpr auto      FG_MAGENTA		    = 35;
+constexpr auto      FG_CYAN			    = 36;
+constexpr auto      FG_WHITE		    = 37;
 
-#define BG_BLACK		40
-#define BG_RED			41
-#define BG_GREEN		42
-#define BG_YELLOW		43
-#define BG_BLUE			44
-#define BG_MAGENTA		45
-#define BG_CYAN			46
-#define BG_WHITE		47
+constexpr auto      BG_BLACK		    = 40;
+constexpr auto      BG_RED			    = 41;
+constexpr auto      BG_GREEN		    = 42;
+constexpr auto      BG_YELLOW		    = 43;
+constexpr auto      BG_BLUE			    = 44;
+constexpr auto      BG_MAGENTA		    = 45;
+constexpr auto      BG_CYAN			    = 46;
+constexpr auto      BG_WHITE		    = 47;
 
 
 void ClearScreen ();

@@ -14,7 +14,8 @@ GREEN, flashing  - Door Closing
 RED, no flash	 - Door Open
 RED, flashing    - Door Opening
 PURPLE, no flash - Door Stopped
-
+BLUE, flashing	 - Door unknown state, not open and not closed ie in transit but we cannot determine which
+YELLOW, flashing - Door in a BAD STate, UAP says open and closed at same time.
 an external RGB LED displays the WiFI status
 
 
@@ -23,7 +24,8 @@ Author: (c) M. Naylor 2022
 History:
 	Ver 1.0			Initial version
 */
-#define 	VERSION					"0.4 Beta"
+#define 	VERSION					"1.0.0 Beta"
+#include <time.h>
 #include <ClosedCube_SHT31D.h>
 #include <MNPCIHandler.h>
 #include <MNTimerLib.h>
@@ -32,116 +34,141 @@ History:
 #include "logging.h"
 #include "WiFiService.h"
 
-#ifdef ARDUINO_AVR_UNO              // On UNO, I use the Cytron shield-esp-wifi
-#include <CytronWiFiShield.h>
-#include <CytronWiFiServer.h>
-//#include <CytronWiFiClient.h>
-#else                               // On MKR1010 WIFI with in buiilt wifi use nina libs
 #include <WiFiNINA.h>
 #include <WiFiUdp.h>
-#endif
+
+// debug - remove 
+volatile uint32_t gLightOff 	= 0UL;
+volatile uint32_t gLightOn 		= 0UL;
+volatile uint32_t gDoorOpened 	= 0UL;
+volatile uint32_t gDoorOpening 	= 0UL;
+volatile uint32_t gDoorClosed 	= 0UL;
+volatile uint32_t gDoorClosing 	= 0UL;
+
 /*
     HumiditySensor config
 */
-#define SHT35D                      // Configure to use SHT35D sensor for humidity and temperature
+#define SHT35D                      						// Configure to use SHT35D sensor for humidity and temperature
 
 constexpr auto HUMIDITYSENSOR_READ_INTERVAL = 2000;
 
 #ifdef SHT35D
 #include "SHTTempHumSensors.h"
-constexpr auto SensorDeviceID = 0x44;                               // I2C device id for SHT35-D sensor
+constexpr auto 			SensorDeviceID 				= 0x44;						// I2C device id for SHT35-D sensor
 SHTTempHumSensorsClass * pmyHumidityTempSensor = nullptr;
 #else
 #include "DHTTempHumSensors.h"
-constexpr auto SensorDeviceID = 6;                                  // Data Pin Num for DHT sensor
+constexpr 	auto 		SensorDeviceID 				= 6;						// Data Pin Num for DHT sensor
 DHTTempHumSensorsClass * pmyHumidityTempSensor = nullptr;
 #endif
 
-THSENSOR_RESULT sHTResults;											// Holds temperature and humidity results
+THSENSOR_RESULT sHTResults;														// Holds last temperature and humidity results
 /*
 	WiFi config
 */
-const 		char ssid[] 				= "Naylorfamily";                             // your network SSID (name)
-const 		char pass[] 				= "welcome1";                                 // your network password
-const 		char MyHostName[] 			= "GarageControl";
+constexpr	char 		ssid[] 						= "Naylorfamily";			// your network SSID (name)
+constexpr 	char 		pass[] 						= "welcome1";				// your network password
+constexpr 	char 		MyHostName[] 				= "GarageControl";
 // PIN allocations, input & output from arduino perspective
 
-const uint8_t DOOR_IS_OPEN_INPUT_PIN 	= 0;
-const uint8_t DOOR_IS_CLOSED_INPUT_PIN	= 1;
-const uint8_t LIGHT_IS_ON_INPUT_PIN		= 4;
-const uint8_t DOOR_SWITCH_INPUT_PIN		= 5;
-const uint32_t DEBOUNCE_MS				= 200;		// min ms between consecutive pin interrupts before signal accepted
-const int	  UAP_TRUE					= LOW;		// UAP signals LOW when sensor is TRUE
-const uint8_t TURN_LIGHT_ON_OUTPUT_PIN	= 6;
-const uint8_t CLOSE_DOOR_OUTPUT_PIN		= 7;
-const uint8_t OPEN_DOOR_OUTPUT_PIN		= 8;
-const uint8_t STOP_DOOR_OUTPUT_PIN		= 9;
+constexpr 	uint8_t		DOOR_IS_OPEN_INPUT_PIN 		= 0;
+constexpr 	uint8_t 	DOOR_IS_CLOSED_INPUT_PIN	= 1;
+constexpr	uint8_t 	LIGHT_IS_ON_INPUT_PIN		= 4;
+constexpr	uint8_t 	DOOR_SWITCH_INPUT_PIN		= 5;
+constexpr	uint32_t 	DEBOUNCE_MS					= 75;						// min ms between consecutive pin interrupts before signal accepted
+constexpr	uint32_t	SWITCH_DEBOUNCE_MS			= 200;						// min ms between consecutive pin interrupts before signal accepted from manual switch
+constexpr	int	  		UAP_TRUE					= LOW;						// UAP signals LOW when sensor is TRUE
+constexpr	uint8_t 	TURN_LIGHT_ON_OUTPUT_PIN	= 6;
+constexpr	uint8_t 	CLOSE_DOOR_OUTPUT_PIN		= 7;
+constexpr	uint8_t 	OPEN_DOOR_OUTPUT_PIN		= 8;
+constexpr	uint8_t 	STOP_DOOR_OUTPUT_PIN		= 9;
+
+volatile 	bool 		bLightIsOn 					= false;
 
 // external RGB LED pins
-const uint8_t RED_PIN					= A4;
-const uint8_t GREEN_PIN					= A5;
-const uint8_t BLUE_PIN					= A6;
+constexpr 	uint8_t 	RED_PIN						= A4;
+constexpr 	uint8_t 	GREEN_PIN					= A5;
+constexpr 	uint8_t 	BLUE_PIN					= A6;
 
-DoorState *			pGarageDoor			= nullptr;
-UDPWiFiService* 	pMyUDPService 		= nullptr;
+UDPWiFiService* 		pMyUDPService 				= nullptr;
+DoorState * 			pGarageDoor					= nullptr;
+MNRGBLEDBaseLib * 		pMyLED						= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
+unsigned long			ulLastClientReq				= 0UL;						// millis of last wifi incoming message
+volatile uint32_t		ulSwitchCount				= 0UL;
 
-//bool 				bLightIsOn 			= false;	// LightOn state
-bool				bChange 			= false;	// door open / close state has changed
-unsigned long		ulLastClientReq		= 0UL;		// millis of last wifi incoming message
-volatile bool		bSwitchPressed 		= false;	// door switch has been pressed
-volatile uint32_t	ulCount 			= 0UL;
 
-// following are routines to output ANSI style terminal emulation
-
+// Debug information for ANSI screen with cursor control
 void DisplayStats ( void )
 {
 #ifdef MNDEBUG	
+	static time_t LastTime = 0;
 	String Heading = F ( "Garage Door Control -  ver " );
 	Heading += String ( VERSION );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 0, 20, Heading ) ;
+
+	time_t tNow = (time_t)pMyUDPService->GetTime();
+	if ( tNow > LastTime )
+	{
+		LastTime = tNow;
+		tm* localtm = localtime ( &tNow );
+		char sTime[20];
+		sprintf ( sTime, "%02d/%02d/%02d %02d:%02d:%02d", localtm->tm_mday, localtm->tm_mon, ( localtm->tm_year - 100 ), localtm->tm_hour, localtm->tm_min, localtm->tm_sec );
+		COLOUR_AT ( FG_WHITE, BG_BLACK, 0, 60, sTime ) ;
+	}
+
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 0,  F ("Light is ") );
 	ClearPartofLine ( 4, 10, 8 );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, 4, 10, pGarageDoor->GetLightState() );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 0,  F ("Door is ") );	
-	COLOUR_AT ( FG_CYAN, BG_BLACK, 5, 10, pGarageDoor->IsClosed() ? F ( "Closed    " ) : F ( "Not Closed" ) );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 6, 0,  F ("Door is ") );	
-	COLOUR_AT ( FG_CYAN, BG_BLACK, 6, 10, pGarageDoor->IsMoving() ? F ( "Moving    " ) : F ( "Not Moving" ) );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 7, 0,  F ("Door is ") );	
-	COLOUR_AT ( FG_CYAN, BG_BLACK, 7, 10, pGarageDoor->IsOpen() ? F ( "Open      " ) : F ( "Not Open" ) );		
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 8, 0,  F ("State is ") );
-	ClearPartofLine ( 8, 10, 8 );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, 8, 10, pGarageDoor->GetDoorState() );		
-	if ( bSwitchPressed )
-	{
-		// User has pressed garaghe door switch, determine required action by examining current state
-		bSwitchPressed = false;
-		COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 0,  F ( "Switch Presssed " ) );
-		COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 17, String ( ulCount ) );
-	}
+	COLOUR_AT ( FG_CYAN, BG_BLACK, 4, 10, bLightIsOn ? "On" : "Off" );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 0,  F ("State is ") );
+	ClearPartofLine ( 5, 10, 8 );
+	COLOUR_AT ( FG_CYAN, BG_BLACK, 5, 10, pGarageDoor->GetDoorDisplayState() );
+
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 0,  F ( "Switch Presssed " ) );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 17, String ( ulSwitchCount ) );
+
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 12, 0,  F ("Temperature is ") );
 	ClearPartofLine ( 12, 16, 6 );
 	COLOUR_AT ( FG_RED, BG_BLACK, 12, 16, String ( sHTResults.fTemperature ) );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 13, 0,  F ("Humidity is ") );
 	ClearPartofLine ( 13, 16, 6 );
 	COLOUR_AT ( FG_CYAN, BG_BLACK, 13, 16, String ( sHTResults.fHumidity ) );
+	// debug stats
+	noInterrupts();
+	uint32_t Loff = gLightOff;
+	uint32_t LOn = gLightOn;
+	uint32_t DOpen = gDoorOpened;
+	uint32_t DOpening = gDoorOpening;
+	uint32_t DClose = gDoorClosed;
+	uint32_t DClosing = gDoorClosing;
+	interrupts();
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 40,  F ("Light Off count     ") );
+ 	COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 61, String ( Loff ) );
+ 	COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 40,  F ("Light On count      ") );
+ 	COLOUR_AT ( FG_GREEN, BG_BLACK, 5, 61, String ( LOn ) );
+ 	COLOUR_AT ( FG_WHITE, BG_BLACK, 6, 40,  F ("Door Opened count   ") );
+ 	COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 61, String ( DOpen ) );
+ 	COLOUR_AT ( FG_WHITE, BG_BLACK, 7, 40,  F ("Door Opening count  ") );
+ 	COLOUR_AT ( FG_GREEN, BG_BLACK, 7, 61, String ( DOpening ) );
+ 	COLOUR_AT ( FG_WHITE, BG_BLACK, 8, 40,  F ("Door Closed count   ") );
+ 	COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 61, String ( DClose ) );
+ 	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 40,  F ("Door Closing count  ") );
+ 	COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 61, String ( DClosing ) );
+ 	
 	pMyUDPService->DisplayStatus();
 #endif	
 }
+
 // Find initial state of door
 DoorState::State GetDoorInitialState ()
 {
-	DoorState::State startState;
-
 	//  ensure we can read from pins connected to UAP1 outputs
-	//pinMode ( LIGHT_IS_ON_INPUT_PIN, INPUT_PULLUP );
-	//bLightIsOn = ( digitalRead ( LIGHT_IS_ON_INPUT_PIN ) == UAP_TRUE );
 	pinMode ( DOOR_IS_OPEN_INPUT_PIN, INPUT_PULLUP );
-	int OpenState =  digitalRead ( DOOR_IS_OPEN_INPUT_PIN );
+	int OpenState;
 	pinMode ( DOOR_IS_CLOSED_INPUT_PIN, INPUT_PULLUP );
-	int CloseState = digitalRead ( DOOR_IS_CLOSED_INPUT_PIN );
+	int CloseState;
 
 	uint8_t iCount = 0;
-	while ( digitalRead ( DOOR_IS_CLOSED_INPUT_PIN ) == digitalRead ( DOOR_IS_OPEN_INPUT_PIN ) && iCount < ( 15 * ( 1000 / 500 ) ) )
+	while ( ( CloseState = digitalRead ( DOOR_IS_CLOSED_INPUT_PIN ) ) == ( OpenState = digitalRead ( DOOR_IS_OPEN_INPUT_PIN ) ) && iCount < ( 15 * ( 1000 / 500 ) ) )
 	{
 		// door is either in bad state, stopped or opening / closing, wait for state to change for max 15 seconds which is enough for door to complete normal closing
 		delay ( 500 );
@@ -150,79 +177,138 @@ DoorState::State GetDoorInitialState ()
 	if ( OpenState == CloseState )
 	{
 		// still not resolved, assume stopped
-		TheMKR_RGB_LED.SetLEDColour( DOOR_STOPPED_COLOUR, DOOR_STATIONARY_FLASHTIME );
 		return DoorState::State::Stopped;
 	}
 	else
 	{
 		if ( OpenState == UAP_TRUE )
 		{
-			TheMKR_RGB_LED.SetLEDColour( DOOR_OPEN_COLOUR, DOOR_STATIONARY_FLASHTIME );
-			return DoorState::State::Opened;
+			return DoorState::State::Open;
 		}
 		else
 		{
-			TheMKR_RGB_LED.SetLEDColour( DOOR_CLOSED_COLOUR, DOOR_STATIONARY_FLASHTIME );
 			return DoorState::State::Closed;
 		}			
 	}
 }
-
+/// find initial state oi light
+inline bool GetLightInitialState ()
+{
+	return digitalRead ( LIGHT_IS_ON_INPUT_PIN ) == UAP_TRUE ? true : false;
+}
+// main setup routine
 void setup()
 {
 	LogStart();
-
-	TheMKR_RGB_LED.SetLEDColour( STATE_UNKNOWN_COLOUR, DOOR_STATIONARY_FLASHTIME );
-
+	ClearScreen();
+	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, GetDoorInitialState() );
+	SetLED();
 	pMyUDPService = new UDPWiFiService();
 	
 	// cannot instantiate object as global - causes board to freeze, need to allocate when running
-	pmyHumidityTempSensor = new SHTTempHumSensorsClass(SensorDeviceID);
+	pmyHumidityTempSensor = new SHTTempHumSensorsClass ( SensorDeviceID );
 	// get initial reading
 	sHTResults = pmyHumidityTempSensor->GetLastReading();
 
-	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, GetDoorInitialState() );
-
 	// Setup so we are called if the state of door changes
-	PCIHandler.AddPin ( DOOR_IS_OPEN_INPUT_PIN, DoorOpened, CHANGE, INPUT_PULLUP );
-	PCIHandler.AddPin ( DOOR_IS_CLOSED_INPUT_PIN, DoorClosed, CHANGE, INPUT_PULLUP );
-	PCIHandler.AddPin ( LIGHT_IS_ON_INPUT_PIN, LightChange, FALLING, INPUT_PULLUP );
-	PCIHandler.AddPin ( DOOR_SWITCH_INPUT_PIN, SwitchPressed, FALLING, INPUT_PULLUP );
-
+	PCIHandler.AddPin ( DOOR_SWITCH_INPUT_PIN, SwitchPressedISR, HIGH, INPUT_PULLDOWN );
+	PCIHandler.AddPin ( DOOR_IS_OPEN_INPUT_PIN, DoorOpenedISR, CHANGE, INPUT_PULLUP );
+	PCIHandler.AddPin ( DOOR_IS_CLOSED_INPUT_PIN, DoorClosedISR, CHANGE, INPUT_PULLUP );
+	PCIHandler.AddPin ( LIGHT_IS_ON_INPUT_PIN, LightChangeISR, CHANGE, INPUT_PULLUP );
+	
+	// Set initial light state
+	bLightIsOn =  GetLightInitialState();
 
 	// now we have state table set up and temp sensor configured, allow users to query state
-	if ( pMyUDPService->Begin ( ProcessUDPMsg, ssid, pass, MyHostName, new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN ) ) )
-	{
-		pMyUDPService->Start();	
-	}
-	else
+	if ( !pMyUDPService->Begin ( ProcessUDPMsg, ssid, pass, MyHostName, &TheMKR_RGB_LED ) )	
 	{
 		Error ( "Cannot connect WiFI ");
-	}
-
-	ClearScreen();
-}
-
-void loop()
-{
-	static uint8_t Count = 0;
-
-	pMyUDPService->CheckUDP ();
-
-	DisplayStats();
-	delay (500);
-
-	if ( ++Count % ( 2 * 60 ) == 0  )
-	{
-		Count = 0;
-		// 120 half seconds have passed so get the sensor readings
-		sHTResults = pmyHumidityTempSensor->GetLastReading();
 	}	
 }
 
-void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
+// set the colour of the inbuilt MKR Wifi 1010 RGB LED based on the current door state
+void SetLED()
 {
-	String          sResponse;
+	static DoorState::State OldState = DoorState::State::Opening;
+	DoorState::State currentState = pGarageDoor->GetDoorState();
+
+	if ( currentState != OldState )
+	{
+		OldState = currentState;
+	
+		switch ( currentState )
+		{
+			case DoorState::State::Closed:
+				pMyLED->SetLEDColour ( DOOR_CLOSED_COLOUR, DOOR_STATIONARY_FLASHTIME) ;
+				break;
+
+			case DoorState::State::Closing:
+				pMyLED->SetLEDColour ( DOOR_CLOSED_COLOUR, DOOR_MOVING_FLASHTIME );
+				break;
+
+			case DoorState::State::Open:
+				pMyLED->SetLEDColour ( DOOR_OPEN_COLOUR, DOOR_STATIONARY_FLASHTIME );
+				break;
+
+			case DoorState::State::Opening:
+				pMyLED->SetLEDColour ( DOOR_OPEN_COLOUR, DOOR_MOVING_FLASHTIME );
+				break;
+
+			case DoorState::State::Stopped:
+				pMyLED->SetLEDColour( DOOR_STOPPED_COLOUR, DOOR_STATIONARY_FLASHTIME );
+				break;
+
+			case DoorState::State::Bad:
+				pMyLED->SetLEDColour( DOOR_BAD_COLOUR, DOOR_MOVING_FLASHTIME );
+				break;
+
+			case DoorState::State::Unknown:
+				pMyLED->SetLEDColour( DOOR_UNKNOWN_COLOUR, DOOR_MOVING_FLASHTIME );
+				break;
+
+		}
+	}
+}
+// main loop function
+void loop()
+{
+	static unsigned long ulLastTempTime = 0UL;
+	static unsigned long ulLastDisplayTime = 0UL;
+	static DoorState::State	LastState;
+
+	// See if we have any udp requests to action
+	pMyUDPService->CheckUDP ();
+	// set LED to match Door State
+	SetLED();
+
+	if ( millis() - ulLastTempTime > 30 * 1000 )
+	{
+		//  30 secs have passed to get latest temp reading
+		sHTResults = pmyHumidityTempSensor->GetLastReading();
+		sHTResults.ulTimeOfReadingms = pMyUDPService->GetTime();
+		MulticastMsg ( UDPWiFiService::ReqMsgType::TEMPDATA );
+		// reset time counter
+		ulLastTempTime = millis();
+	}
+	// update debug stats every 1/2 second
+	if ( millis() - ulLastDisplayTime > 500 )
+	{
+		ulLastDisplayTime = millis();
+		DisplayStats();
+	}
+	// if door state has changed, multicast news		
+	if ( pGarageDoor->GetDoorState() != LastState  )
+	{
+		LastState = pGarageDoor->GetDoorState();
+		MulticastMsg ( UDPWiFiService::ReqMsgType::DOORDATA );
+	}
+}
+
+// called to generate a response to a command
+// returns an empty string if no reposnse required ie only do action
+String BuildMessage ( UDPWiFiService::ReqMsgType eReqType )
+{
+	String	sResponse;
 	switch ( eReqType )
 	{
 		case UDPWiFiService::ReqMsgType::TEMPDATA:
@@ -237,104 +323,153 @@ void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
 				sResponse += F ( ",D=" );
 				sResponse += sHTResults.fDewPoint;
 				sResponse += F ( ",A=" );
-				sResponse += millis () - sHTResults.ulTimeOfReadingms;
+				sResponse += sHTResults.ulTimeOfReadingms;
 				sResponse += F ( "\r" );
-				pMyUDPService->SendReply ( sResponse );
 			}
 			else
 			{
-				Error ( F ( "Not responding to UDP request for data as no valid results" ) );
+				Error ( "Not responding to UDP request for data as no valid results" );
 			}
 			break;
 
 		case UDPWiFiService::ReqMsgType::DOORDATA:
 			sResponse = F ( "S=" );
-			sResponse += pGarageDoor->GetDoorState();							// Door State
+			sResponse += pGarageDoor->GetDoorDisplayState();					// Door State
 			sResponse += F ( ",L=" );
-			sResponse += pGarageDoor->GetLightState();						// Light on or not
+			sResponse += bLightIsOn ? "On":"Off";								// Light on or not
 			sResponse += F ( ",C=" );
 			sResponse += pGarageDoor->IsClosed() ? F ( "Y" ) : F ( "N" );		// Closed or not
 			sResponse += F ( ",O=" );
-			sResponse += pGarageDoor->IsOpen() ? F ( "Y" ) : F ( "N" );		// Open or not
+			sResponse += pGarageDoor->IsOpen() ? F ( "Y" ) : F ( "N" );		    // Open or not
 			sResponse += F ( ",M=" );
 			sResponse += pGarageDoor->IsMoving() ? F ( "Y" ) : F ( "N" );		// Moving or not
+			sResponse += F ( ",A=" );
+			sResponse += pMyUDPService->GetTime();								// current epoch time			
 			sResponse += F ( "\r" );
-			pMyUDPService->SendReply ( sResponse );
+			break;
+
+		case UDPWiFiService::ReqMsgType::DOOROPEN:
+			pGarageDoor->DoRequest( DoorState::Request::OpenDoor );		
+			break;
+
+		case UDPWiFiService::ReqMsgType::DOORCLOSE:
+			pGarageDoor->DoRequest( DoorState::Request::CloseDoor );		
+			break;
+
+		case UDPWiFiService::ReqMsgType::DOORSTOP:
+			pGarageDoor->DoRequest( DoorState::Request::StopDoor );			
+			break;
+			
+		case UDPWiFiService::ReqMsgType::LIGHTON:
+			pGarageDoor->DoRequest( DoorState::Request::LightOn );
+			break;
+
+		case UDPWiFiService::ReqMsgType::LIGHTOFF:
+			pGarageDoor->DoRequest( DoorState::Request::LightOff );
 			break;
 	}
+	return sResponse;
+}
+void MulticastMsg ( UDPWiFiService::ReqMsgType eReqType )
+{
+	String sResponse = BuildMessage ( eReqType );
+	if ( sResponse.length() > 0 )
+	{
+		pMyUDPService->SendAll ( sResponse );
+	}
+}
+void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
+{
+	String sResponse = BuildMessage ( eReqType );
+	if ( sResponse.length() > 0 )
+	{
+		pMyUDPService->SendReply ( sResponse );
+	}
 }
 
-void DoorOpened()
+// ISR to handle DoorOpen Pin state change
+void DoorOpenedISR ()
 {
-	static unsigned long ulLastIntTime = 0UL;
-	if ( millis() > ulLastIntTime + DEBOUNCE_MS )
+	static unsigned long ulLastDOIntTime = 0UL;
+    static int DoorOpenPinRead = -1;
+
+	int newReading = digitalRead ( DOOR_IS_OPEN_INPUT_PIN );
+	if (  newReading != DoorOpenPinRead && millis() > ulLastDOIntTime )
 	{
-		ulLastIntTime = millis();
-		if ( digitalRead ( DOOR_IS_OPEN_INPUT_PIN ) == UAP_TRUE )
+		ulLastDOIntTime = millis();
+        DoorOpenPinRead = newReading;
+		if ( newReading == UAP_TRUE )
 		{	
-			pGarageDoor->DoEvent ( DoorState::Event::DoorOpened , DoorState::State::Opened );
-			TheMKR_RGB_LED.SetLEDColour ( DOOR_OPEN_COLOUR, DOOR_STATIONARY_FLASHTIME );
+			gDoorOpened++;
+			pGarageDoor->DoEvent ( DoorState::Event::DoorOpenTrue );
 		}
 		else
 		{
-			pGarageDoor->DoEvent ( DoorState::Event::DoorOpened , DoorState::State::Opening );
-			TheMKR_RGB_LED.SetLEDColour ( DOOR_OPEN_COLOUR, DOOR_MOVING_FLASHTIME );
+			gDoorClosing++;
+			pGarageDoor->DoEvent ( DoorState::Event::DoorOpenFalse );
+		}
+    
+	}
+}
+
+// ISR to handle DoorClosed Pin state change
+void DoorClosedISR ()
+{
+	static unsigned long ulLastDCIntTime = 0UL;
+    static int DoorClosedPinRead = -1;
+
+	int newReading = digitalRead ( DOOR_IS_CLOSED_INPUT_PIN );
+	if (  newReading != DoorClosedPinRead && millis() > ulLastDCIntTime )
+	{    
+		ulLastDCIntTime = millis();
+        DoorClosedPinRead = newReading;        
+		if ( newReading == UAP_TRUE )
+		{
+			gDoorClosed++;
+			pGarageDoor->DoEvent ( DoorState::Event::DoorClosedTrue );
+		}
+		else
+		{
+			gDoorOpening++;
+			pGarageDoor->DoEvent ( DoorState::Event::DoorClosedFalse );
 		}
 	}
 }
 
-void DoorClosed()
+// ISR to handle DoorLight Pin state change
+void LightChangeISR ()
 {
-	static unsigned long ulLastIntTime = 0UL;
-	if ( millis() > ulLastIntTime + DEBOUNCE_MS )
+	static unsigned long ulLastLCIntTime = 0UL;
+    static int LightPinRead = -1;
+
+    int newReading = digitalRead ( LIGHT_IS_ON_INPUT_PIN );
+    if ( newReading != LightPinRead && millis() - ulLastLCIntTime > DEBOUNCE_MS )
 	{
-		ulLastIntTime = millis();
-		if ( digitalRead ( DOOR_IS_CLOSED_INPUT_PIN ) == UAP_TRUE )
-		{		
-			pGarageDoor->DoEvent ( DoorState::Event::DoorClosed, DoorState::State::Closed );
-			TheMKR_RGB_LED.SetLEDColour ( DOOR_CLOSED_COLOUR, DOOR_STATIONARY_FLASHTIME) ;
+		ulLastLCIntTime = millis();
+        LightPinRead = newReading;
+		if ( newReading == UAP_TRUE )
+		{
+			gLightOn++;
+			bLightIsOn = true;
 		}
 		else
 		{
-			pGarageDoor->DoEvent ( DoorState::Event::DoorClosed , DoorState::State::Closing );
-			TheMKR_RGB_LED.SetLEDColour ( DOOR_CLOSED_COLOUR, DOOR_MOVING_FLASHTIME );
-		}		
-	}
-}
-
-void LightChange ()
-{
-	static unsigned long ulLastIntTime = 0UL;
-	if ( millis() > ulLastIntTime + DEBOUNCE_MS )
-	{
-		ulLastIntTime = millis();
-
-		if ( digitalRead ( LIGHT_IS_ON_INPUT_PIN ) ==  UAP_TRUE )
-		{
-			pGarageDoor->DoEvent ( DoorState::Event::LightOn, 0 );
-			//bLightIsOn = true;
-		}
-		else
-		{
-			pGarageDoor->DoEvent ( DoorState::Event::LightOff, 0 );
-			//bLightIsOn = false;		
+			gLightOff++;
+			bLightIsOn = false;
 		}
 	}
 }
 
-void SwitchPressed ()
+// ISR to handle rocker switch Pin state change
+void SwitchPressedISR ()
 {
-	static unsigned long ulLastIntTime = 0UL;
+	static unsigned long ulLastSPIntTime = 0UL;
 
-	if ( millis() > ulLastIntTime + DEBOUNCE_MS )
+	unsigned long ulNow = millis();
+	if ( ulNow - ulLastSPIntTime > SWITCH_DEBOUNCE_MS )
 	{	
-		ulLastIntTime = millis();
-		bSwitchPressed = true;
-		ulCount++;
-		pGarageDoor->DoEvent ( DoorState::SwitchPressed, 0 );
+		ulLastSPIntTime = ulNow;
+		ulSwitchCount++;
+		pGarageDoor->DoEvent ( DoorState::Event::SwitchPress );
 	}
 }
-
-
-
-

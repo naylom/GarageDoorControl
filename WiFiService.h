@@ -1,3 +1,4 @@
+#include "api/IPAddress.h"
 #pragma once
 /*
 
@@ -10,7 +11,6 @@ Author: (c) M. Naylor 2022
 History:
 	Ver 1.0			Initial version
 */
-//#include <limits.h>
 #include "Logging.h"
 #include <MNRGBLEDBaseLib.h>
 
@@ -24,10 +24,10 @@ History:
 #endif
 
 // Colours used on MKR RGB LED to indicate status
-const RGBType OLD_WIFI_FIRMWARE_COLOUR	= MNRGBLEDBaseLib::eColour::DARK_YELLOW ;
-const RGBType UNCONNECTED_COLOUR		= MNRGBLEDBaseLib::eColour::DARK_RED;
-const RGBType CONNECTED_COLOUR			= MNRGBLEDBaseLib::eColour::DARK_GREEN;
-const RGBType PROCESSING_MSG_COLOUR		= MNRGBLEDBaseLib::eColour::DARK_MAGENTA;
+constexpr RGBType OLD_WIFI_FIRMWARE_COLOUR	= MNRGBLEDBaseLib::eColour::DARK_YELLOW ;
+constexpr RGBType UNCONNECTED_COLOUR		= MNRGBLEDBaseLib::eColour::DARK_RED;
+constexpr RGBType CONNECTED_COLOUR			= MNRGBLEDBaseLib::eColour::DARK_GREEN;
+constexpr RGBType PROCESSING_MSG_COLOUR		= MNRGBLEDBaseLib::eColour::DARK_MAGENTA;
 
 void TerminateProgram ( const __FlashStringHelper* pErrMsg );
 
@@ -38,29 +38,39 @@ public:
 							WiFiService ( );
 			void 			Begin ( const char * HostName, const char * WiFissid, const char * WiFipwd, MNRGBLEDBaseLib * pLED = nullptr  );
 			const char *	GetHostName();
-			Status			GetStatus();
+            IPAddress       GetMulticastAddress();
+			Status			GetState();
 	static 	String			ToIPString ( const IPAddress& address );
+			unsigned long	GetTime();
+			
 protected:
 			bool			Check();
 			void 			Stop();
 			bool 			WiFiConnect();
 			void			SetLED ( RGBType theColour, uint8_t flashTime = 0 );
 			void 			SetState ( WiFiService::Status state );
+            void            CalcMulticastAddress ();
+			const char *	WiFiStatusToString ( uint8_t iState );
+			
+			uint32_t			m_beginTimeouts		= 0UL;						// count of times WiFi.begin fails to connect within 10 secs
+			uint32_t			m_beginConnects		= 0UL;						// count of times WiFi.begin has connected successfully			
 private:
+
 			const char * 		m_SSID				= nullptr;
 			const char *		m_Pwd				= nullptr;
 			const char *		m_HostName			= nullptr;
 			Status				m_State				= Status::UNCONNECTED;
+            IPAddress           m_multicastAddr     = 0UL;
 			MNRGBLEDBaseLib *	m_pLED 				= nullptr;
 };
 
-const auto	MAX_UDP_RECV_LEN	= 255;
-const auto	MAX_CONNECT_RETRIES	= 20;
+constexpr auto	MAX_UDP_RECV_LEN	= 255;
+constexpr auto	MAX_CONNECT_RETRIES	= 20;
 class UDPWiFiService : public WiFiService
 {
 public:
 
-	enum 	ReqMsgType : uint16_t { TEMPDATA, DOORDATA };
+	enum 	ReqMsgType : uint16_t { TEMPDATA, DOORDATA, DOOROPEN, DOORCLOSE, DOORSTOP, LIGHTON, LIGHTOFF };
 	typedef void ( * UDPWiFiServiceCallback) ( UDPWiFiService::ReqMsgType uiParam );
 
 					UDPWiFiService();
@@ -68,20 +78,41 @@ public:
 			bool 	Begin ( UDPWiFiServiceCallback pHandleReqData, const char * WiFissid, const char * WiFipwd, const char * HostName, MNRGBLEDBaseLib * pLED = nullptr, const uint16_t portUDP = 0xFEED );
 			void	CheckUDP();
 			void 	DisplayStatus();
-			void 	SendReply ( String sMsg );
+            bool    SendAll ( String sMsg );
+			bool 	SendReply ( String sMsg );
 			bool 	Start();
 			void 	Stop ();
 
 private:
+	enum WiFiState { DISCONNECTED, ISCONNECTED };
+	enum WiFiEvent { MADE_CONNECTION, LOST_CONNECTION, SENDREPLY, GETREQUEST, SENDMCAST };
+	typedef bool ( UDPWiFiService::*WiFiStateFunction )( void * paramPtr );              	// prototype of function to handle event
 
-	uint16_t				m_Port				= 0;
-	WiFiUDP 				m_myUDP;
-	String 					m_sUDPReceivedMsg;
-	UDPWiFiServiceCallback	m_MsghHandlerCallback;
-	uint32_t				m_ulBadRequests		= 0UL;
-	uint32_t				m_ulBadMgsVersion	= 0UL;
-	uint32_t				m_ulLastClientReq 	= 0UL;
+			bool			Connect ( void * paramPtr );
+			bool			DoNowt ( void * paramPtr );
+			bool			GetReq ( void * paramPtr );
+			bool			NowConnected ( void * paramPtr );			
+			bool			SendMCast ( void * paramPtr );
+			bool			SendReply ( void * paramPtr );
 
-	bool GetUDPMessage ( String& sRecvMessage );
-	void ProcessUDPMessage ( const String &sRecvMessage );
+
+	WiFiStateFunction StateTableFn [ 5 ][ 5 ] =
+	{
+		{ &UDPWiFiService::NowConnected,  	&UDPWiFiService::DoNowt,		&UDPWiFiService::Connect,		&UDPWiFiService::Connect,		&UDPWiFiService::Connect },		// Actions when current state is UNCONNECTED
+		{ &UDPWiFiService::DoNowt,    		&UDPWiFiService::Connect,     	&UDPWiFiService::SendReply, 	&UDPWiFiService::GetReq,  		&UDPWiFiService::SendMCast }	// Actions when current state is CONNECTED
+	};
+			uint16_t				m_Port				= 0;
+			WiFiUDP 				m_myUDP;
+			String 					m_sUDPReceivedMsg;
+			UDPWiFiServiceCallback	m_MsghHandlerCallback;
+			uint32_t				m_ulBadRequests		= 0UL;
+			uint32_t				m_ulBadMgsVersion	= 0UL;
+			uint32_t				m_ulReqCount		= 0UL;
+			uint32_t				m_ulMCastSentCount  = 0UL;
+			uint32_t 				m_ulReplyCount		= 0UL;
+			WiFiState				m_WiFiState 		= WiFiState::DISCONNECTED;			
+
+			bool GetUDPMessage ( String* pRecvMessage );
+			void ProcessUDPMessage ( const String &sRecvMessage );
+			bool ReadUDPMessage ( String& sRecvMessage );
 };
