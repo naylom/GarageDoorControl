@@ -112,7 +112,7 @@ void DisplayStats ( void )
 		LastTime = tNow;
 		tm* localtm = localtime ( &tNow );
 		char sTime[20];
-		sprintf ( sTime, "%02d/%02d/%02d %02d:%02d:%02d", localtm->tm_mday, localtm->tm_mon, ( localtm->tm_year - 100 ), localtm->tm_hour, localtm->tm_min, localtm->tm_sec );
+		sprintf ( sTime, "%02d/%02d/%02d %02d:%02d:%02d", localtm->tm_mday, localtm->tm_mon + 1, ( localtm->tm_year - 100 ), localtm->tm_hour, localtm->tm_min, localtm->tm_sec );
 		COLOUR_AT ( FG_WHITE, BG_BLACK, 0, 60, sTime ) ;
 	}
 
