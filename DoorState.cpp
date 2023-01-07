@@ -117,7 +117,7 @@ void DoorState::SwitchPressed ( Event  )
 			ResetTimer();
 			// rely on UAP outpins to signal this is happening
 			Error( "Door open - close pin on                  ");
-			SetRelayPin (m_ClosePin );
+			SetRelayPin ( m_ClosePin );
 			break;
 
 		case State::Opening:

@@ -24,7 +24,7 @@ Author: (c) M. Naylor 2022
 History:
 	Ver 1.0			Initial version
 */
-#define 	VERSION					"1.0.0 Beta"
+#define 	VERSION					"1.0.1 Beta"
 #include <time.h>
 #include <ClosedCube_SHT31D.h>
 #include <MNPCIHandler.h>
@@ -390,13 +390,14 @@ void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
 // ISR to handle DoorOpen Pin state change
 void DoorOpenedISR ()
 {
-	static unsigned long ulLastDOIntTime = 0UL;
-    static int DoorOpenPinRead = -1;
+	static unsigned long 	ulLastDOIntTime = 0UL;
+    static PinStatus 		DoorOpenPinRead = CHANGE;				// HIGH or LOW only valid return values
 
-	int newReading = digitalRead ( DOOR_IS_OPEN_INPUT_PIN );
-	if (  newReading != DoorOpenPinRead && millis() > ulLastDOIntTime )
+	PinStatus newReading = digitalRead ( DOOR_IS_OPEN_INPUT_PIN );
+	unsigned long ulNow = millis();
+	if ( newReading != DoorOpenPinRead && ( ulNow - ulLastDOIntTime ) > DEBOUNCE_MS )
 	{
-		ulLastDOIntTime = millis();
+		ulLastDOIntTime = ulNow;
         DoorOpenPinRead = newReading;
 		if ( newReading == UAP_TRUE )
 		{	
@@ -415,14 +416,15 @@ void DoorOpenedISR ()
 // ISR to handle DoorClosed Pin state change
 void DoorClosedISR ()
 {
-	static unsigned long ulLastDCIntTime = 0UL;
-    static int DoorClosedPinRead = -1;
+	static unsigned long 	ulLastDCIntTime 	= 0UL;
+    static PinStatus 		DoorClosedPinRead 	= CHANGE;				// HIGH or LOW only valid return values
 
-	int newReading = digitalRead ( DOOR_IS_CLOSED_INPUT_PIN );
-	if (  newReading != DoorClosedPinRead && millis() > ulLastDCIntTime )
+	PinStatus newReading = digitalRead ( DOOR_IS_CLOSED_INPUT_PIN );
+	unsigned long ulNow = millis();
+	if ( newReading != DoorClosedPinRead && ( ulNow - ulLastDCIntTime ) > DEBOUNCE_MS )
 	{    
-		ulLastDCIntTime = millis();
-        DoorClosedPinRead = newReading;        
+		ulLastDCIntTime		= ulNow;
+        DoorClosedPinRead	= newReading;        
 		if ( newReading == UAP_TRUE )
 		{
 			gDoorClosed++;
@@ -439,13 +441,14 @@ void DoorClosedISR ()
 // ISR to handle DoorLight Pin state change
 void LightChangeISR ()
 {
-	static unsigned long ulLastLCIntTime = 0UL;
-    static int LightPinRead = -1;
+	static unsigned long 	ulLastLCIntTime = 0UL;
+    static PinStatus 		LightPinRead 	= CHANGE;
 
-    int newReading = digitalRead ( LIGHT_IS_ON_INPUT_PIN );
-    if ( newReading != LightPinRead && millis() - ulLastLCIntTime > DEBOUNCE_MS )
+    PinStatus newReading	= digitalRead ( LIGHT_IS_ON_INPUT_PIN );		// HIGH or LOW only valid return values
+	unsigned long ulNow		= millis();
+    if ( newReading != LightPinRead && ( ulNow - ulLastLCIntTime ) > DEBOUNCE_MS )
 	{
-		ulLastLCIntTime = millis();
+		ulLastLCIntTime = ulNow;
         LightPinRead = newReading;
 		if ( newReading == UAP_TRUE )
 		{
@@ -464,9 +467,9 @@ void LightChangeISR ()
 void SwitchPressedISR ()
 {
 	static unsigned long ulLastSPIntTime = 0UL;
-
 	unsigned long ulNow = millis();
-	if ( ulNow - ulLastSPIntTime > SWITCH_DEBOUNCE_MS )
+
+	if ( ( ulNow - ulLastSPIntTime ) > SWITCH_DEBOUNCE_MS )
 	{	
 		ulLastSPIntTime = ulNow;
 		ulSwitchCount++;

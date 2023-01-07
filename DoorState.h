@@ -58,7 +58,7 @@ private:
         { &DoorState::NowOpen,    	&DoorState::DoNowt,     &DoorState::NowClosed, 	&DoorState::DoNowt,  	&DoorState::SwitchPressed },	// Actions when current state is Opening
         { &DoorState::NowOpen,		&DoorState::DoNowt,		&DoorState::DoNowt,		&DoorState::NowOpening,	&DoorState::SwitchPressed },	// Actions when current state is Closed
         { &DoorState::NowOpen,		&DoorState::DoNowt,		&DoorState::NowClosed, 	&DoorState::DoNowt, 	&DoorState::SwitchPressed },	// Actions when current state is Closing
-        { &DoorState::NowOpen,		&DoorState::DoNowt,		&DoorState::NowClosed,	&DoorState::DoNowt, 	&DoorState::SwitchPressed }	// Actions when current state is Stopped 
+        { &DoorState::NowOpen,		&DoorState::DoNowt,		&DoorState::NowClosed,	&DoorState::DoNowt, 	&DoorState::SwitchPressed }		// Actions when current state is Stopped 
     };
 
     volatile 	State 		m_theDoorState		= State::Unknown;
