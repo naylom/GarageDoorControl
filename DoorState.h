@@ -15,10 +15,9 @@ Author: (c) M. Naylor 2022
 History:
 	Ver 1.0			Initial version
 */
-#define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
 typedef uint8_t Pin;
 #ifndef NOT_A_PIN
-const int NOT_A_PIN = -1;
+const uint8_t NOT_A_PIN = 255;
 #endif
 
 #include "MNRGBLEDBaseLib.h"

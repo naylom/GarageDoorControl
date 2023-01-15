@@ -162,9 +162,9 @@ void DisplayStats ( void )
 DoorState::State GetDoorInitialState ()
 {
 	//  ensure we can read from pins connected to UAP1 outputs
-	pinMode ( DOOR_IS_OPEN_INPUT_PIN, INPUT_PULLUP );
+	pinMode ( DOOR_IS_OPEN_INPUT_PIN, INPUT_PULLDOWN );
 	int OpenState;
-	pinMode ( DOOR_IS_CLOSED_INPUT_PIN, INPUT_PULLUP );
+	pinMode ( DOOR_IS_CLOSED_INPUT_PIN, INPUT_PULLDOWN );
 	int CloseState;
 
 	uint8_t iCount = 0;
@@ -212,9 +212,9 @@ void setup()
 
 	// Setup so we are called if the state of door changes
 	PCIHandler.AddPin ( DOOR_SWITCH_INPUT_PIN, SwitchPressedISR, HIGH, INPUT_PULLDOWN );
-	PCIHandler.AddPin ( DOOR_IS_OPEN_INPUT_PIN, DoorOpenedISR, CHANGE, INPUT_PULLUP );
-	PCIHandler.AddPin ( DOOR_IS_CLOSED_INPUT_PIN, DoorClosedISR, CHANGE, INPUT_PULLUP );
-	PCIHandler.AddPin ( LIGHT_IS_ON_INPUT_PIN, LightChangeISR, CHANGE, INPUT_PULLUP );
+	PCIHandler.AddPin ( DOOR_IS_OPEN_INPUT_PIN, DoorOpenedISR, CHANGE, INPUT_PULLDOWN );
+	PCIHandler.AddPin ( DOOR_IS_CLOSED_INPUT_PIN, DoorClosedISR, CHANGE, INPUT_PULLDOWN );
+	PCIHandler.AddPin ( LIGHT_IS_ON_INPUT_PIN, LightChangeISR, CHANGE, INPUT_PULLDOWN );
 	
 	// Set initial light state
 	bLightIsOn =  GetLightInitialState();
@@ -272,9 +272,10 @@ void SetLED()
 // main loop function
 void loop()
 {
-	static unsigned long ulLastTempTime = 0UL;
-	static unsigned long ulLastDisplayTime = 0UL;
-	static DoorState::State	LastState;
+	static unsigned long ulLastTempTime 	= 0UL;
+	static unsigned long ulLastDisplayTime 	= 0UL;
+	static DoorState::State	LastDoorState 	= DoorState::Unknown;
+	static bool LastLightState 				= !bLightIsOn;
 
 	// See if we have any udp requests to action
 	pMyUDPService->CheckUDP ();
@@ -297,9 +298,10 @@ void loop()
 		DisplayStats();
 	}
 	// if door state has changed, multicast news		
-	if ( pGarageDoor->GetDoorState() != LastState  )
+	if ( pGarageDoor->GetDoorState() != LastDoorState || LastLightState != bLightIsOn )
 	{
-		LastState = pGarageDoor->GetDoorState();
+		LastDoorState	= pGarageDoor->GetDoorState();
+		LastLightState	= bLightIsOn;
 		MulticastMsg ( UDPWiFiService::ReqMsgType::DOORDATA );
 	}
 }
@@ -391,25 +393,27 @@ void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
 void DoorOpenedISR ()
 {
 	static unsigned long 	ulLastDOIntTime = 0UL;
-    static PinStatus 		DoorOpenPinRead = CHANGE;				// HIGH or LOW only valid return values
+    static PinStatus 		DoorOpenPinRead = FALLING;				// HIGH or LOW only valid return values
 
-	PinStatus newReading = digitalRead ( DOOR_IS_OPEN_INPUT_PIN );
 	unsigned long ulNow = millis();
-	if ( newReading != DoorOpenPinRead && ( ulNow - ulLastDOIntTime ) > DEBOUNCE_MS )
+	if ( ( ulNow - ulLastDOIntTime ) > DEBOUNCE_MS )
 	{
-		ulLastDOIntTime = ulNow;
-        DoorOpenPinRead = newReading;
-		if ( newReading == UAP_TRUE )
-		{	
-			gDoorOpened++;
-			pGarageDoor->DoEvent ( DoorState::Event::DoorOpenTrue );
-		}
-		else
-		{
-			gDoorClosing++;
-			pGarageDoor->DoEvent ( DoorState::Event::DoorOpenFalse );
-		}
-    
+    	PinStatus newReading = digitalRead ( DOOR_IS_OPEN_INPUT_PIN );
+        if ( newReading != DoorOpenPinRead )
+        {        
+            ulLastDOIntTime = ulNow;
+            DoorOpenPinRead = newReading;
+            if ( newReading == UAP_TRUE )
+            {	
+                gDoorOpened++;
+                pGarageDoor->DoEvent ( DoorState::Event::DoorOpenTrue );
+            }
+            else
+            {
+                gDoorClosing++;
+                pGarageDoor->DoEvent ( DoorState::Event::DoorOpenFalse );
+            }
+        }
 	}
 }
 
@@ -417,24 +421,27 @@ void DoorOpenedISR ()
 void DoorClosedISR ()
 {
 	static unsigned long 	ulLastDCIntTime 	= 0UL;
-    static PinStatus 		DoorClosedPinRead 	= CHANGE;				// HIGH or LOW only valid return values
+    static PinStatus 		DoorClosedPinRead 	= FALLING;				// HIGH or LOW only valid return values
 
-	PinStatus newReading = digitalRead ( DOOR_IS_CLOSED_INPUT_PIN );
 	unsigned long ulNow = millis();
-	if ( newReading != DoorClosedPinRead && ( ulNow - ulLastDCIntTime ) > DEBOUNCE_MS )
-	{    
-		ulLastDCIntTime		= ulNow;
-        DoorClosedPinRead	= newReading;        
-		if ( newReading == UAP_TRUE )
-		{
-			gDoorClosed++;
-			pGarageDoor->DoEvent ( DoorState::Event::DoorClosedTrue );
-		}
-		else
-		{
-			gDoorOpening++;
-			pGarageDoor->DoEvent ( DoorState::Event::DoorClosedFalse );
-		}
+	if ( ( ulNow - ulLastDCIntTime ) > DEBOUNCE_MS )
+	{
+    	PinStatus newReading = digitalRead ( DOOR_IS_CLOSED_INPUT_PIN );
+		if ( newReading != DoorClosedPinRead )
+		{ 
+			ulLastDCIntTime		= ulNow;
+			DoorClosedPinRead	= newReading;        
+			if ( newReading == UAP_TRUE )
+			{
+				gDoorClosed++;
+				pGarageDoor->DoEvent ( DoorState::Event::DoorClosedTrue );
+			}
+			else
+			{
+				gDoorOpening++;
+				pGarageDoor->DoEvent ( DoorState::Event::DoorClosedFalse );
+			}
+        }
 	}
 }
 
@@ -442,23 +449,27 @@ void DoorClosedISR ()
 void LightChangeISR ()
 {
 	static unsigned long 	ulLastLCIntTime = 0UL;
-    static PinStatus 		LightPinRead 	= CHANGE;
+    static PinStatus 		LightPinRead 	= FALLING;
 
-    PinStatus newReading	= digitalRead ( LIGHT_IS_ON_INPUT_PIN );		// HIGH or LOW only valid return values
+
 	unsigned long ulNow		= millis();
-    if ( newReading != LightPinRead && ( ulNow - ulLastLCIntTime ) > DEBOUNCE_MS )
+    if (  ( ulNow - ulLastLCIntTime ) > DEBOUNCE_MS )
 	{
-		ulLastLCIntTime = ulNow;
-        LightPinRead = newReading;
-		if ( newReading == UAP_TRUE )
-		{
-			gLightOn++;
-			bLightIsOn = true;
-		}
-		else
-		{
-			gLightOff++;
-			bLightIsOn = false;
+		PinStatus newReading = digitalRead ( LIGHT_IS_ON_INPUT_PIN );		
+		if  ( newReading != LightPinRead  )
+		{		
+			ulLastLCIntTime = ulNow;
+			LightPinRead 	= newReading;
+			if ( newReading == UAP_TRUE )
+			{
+				gLightOn++;
+				bLightIsOn = true;
+			}
+			else
+			{
+				gLightOff++;
+				bLightIsOn = false;
+			}
 		}
 	}
 }
@@ -473,6 +484,6 @@ void SwitchPressedISR ()
 	{	
 		ulLastSPIntTime = ulNow;
 		ulSwitchCount++;
-		pGarageDoor->DoEvent ( DoorState::Event::SwitchPress );
+		//pGarageDoor->DoEvent ( DoorState::Event::SwitchPress );
 	}
 }

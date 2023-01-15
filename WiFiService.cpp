@@ -385,7 +385,7 @@ bool	    UDPWiFiService::Start()
 	return bResult;	
 }
 
-bool				UDPWiFiService::NowConnected ( void * paramPtr )
+bool				UDPWiFiService::NowConnected ( void * )
 {
 	bool bResult = false;
 	if ( Start () )	
@@ -395,7 +395,7 @@ bool				UDPWiFiService::NowConnected ( void * paramPtr )
 	return bResult;
 }
 
-bool				UDPWiFiService::DoNowt ( void * paramPtr )
+bool				UDPWiFiService::DoNowt ( void * )
 {
 	return true;
 }
