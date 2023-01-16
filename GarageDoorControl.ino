@@ -24,7 +24,7 @@ Author: (c) M. Naylor 2022
 History:
 	Ver 1.0			Initial version
 */
-#define 	VERSION					"1.0.2 Beta"
+#define 	VERSION					"1.0.3 Beta"
 #include <time.h>
 #include <ClosedCube_SHT31D.h>
 #include <ClosedCube_LPS25HB.h>

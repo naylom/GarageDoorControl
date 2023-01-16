@@ -42,6 +42,7 @@ constexpr   char    DoorCloseReqMsg[]       = "M005";               // Req Door 
 constexpr   char    DoorStopReqMsg[]        = "M006";               // Req Door Stop
 constexpr   char    DoorLightOnReqMsg[]     = "M007";               // Req Light On
 constexpr   char    DoorLightOffReqMsg[]    = "M008";               // Req Light off
+constexpr   char    PartSeparator[]         = ":";
 
 constexpr 	auto 	MAX_INCOMING_UDP_MSG 	= 255;
 constexpr   uint8_t	PrintStartLine 			= 15;
@@ -416,7 +417,7 @@ bool				UDPWiFiService::SendReply ( void * paramPtr )
 	bool bResult = false;
 	String* pMsg =  (String*)(paramPtr);
 
-	if ( m_myUDP.beginPacket ( m_myUDP.remoteIP (), 0xFEED ) == 1 )
+	if ( m_myUDP.beginPacket ( m_myUDP.remoteIP (), m_myUDP.remotePort() ) == 1 )
 	{
 		m_myUDP.write ( pMsg->c_str () );
 		if ( m_myUDP.endPacket () == 0 )
@@ -427,7 +428,7 @@ bool				UDPWiFiService::SendReply ( void * paramPtr )
 		else
 		{
 			m_ulReplyCount++;
-			Error ( "Sent " + String ( pMsg->substring(0, pMsg->length()-1) ) + " to " + ToIPString ( m_myUDP.remoteIP () ) );
+			Error ( "Sent " + String ( pMsg->substring(0, pMsg->length()-1) ) + " to " + ToIPString ( m_myUDP.remoteIP () ) + ":" + m_myUDP.remotePort() );
 			SetState ( WiFiService::Status::CONNECTED );	
 		}		
 	}
@@ -492,48 +493,53 @@ void	    		UDPWiFiService::ProcessUDPMessage ( const String& sRecvMessage )
 	{
 	
 		// Version 1 message received
-		if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) - 1 ).startsWith ( TempHumidityReqMsg ) )
+		if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( TempHumidityReqMsg ) )
 		{
 			// Got a data request
 			Error ( "Temp Data request" );
 			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::TEMPDATA );
 		}
-		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) - 1 ).startsWith ( RestartReqMsg ) )
+		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( RestartReqMsg ) )
 		{
 			// Got a reset request
 			ResetBoard ( F ( "Reset request" ) );
 		}
-		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) - 1 ).startsWith ( DoorStatusReqMsg ) )
+		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( DoorStatusReqMsg ) )
 		{
 			// Got a door status request
 			Error ( "Door Data request" );
 			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::DOORDATA );
 		}
-		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) - 1 ).startsWith ( DoorOpenReqMsg ) )
+		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( DoorOpenReqMsg ) )
 		{
 			Error ( "Door Open request" );
 			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::DOOROPEN );
 		}
-		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) - 1 ).startsWith ( DoorCloseReqMsg ) )
+		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( DoorCloseReqMsg ) )
 		{
 			Error ( "Door Close request" );
 			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::DOORCLOSE );
 		}
-		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) - 1 ).startsWith ( DoorStopReqMsg ) )
+		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( DoorStopReqMsg ) )
 		{
 			Error ( "Door Stop request" );
 			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::DOORSTOP );
 		}
-		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 )- 1 ).startsWith ( DoorLightOnReqMsg ) )
+		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( DoorLightOnReqMsg ) )
 		{
 			Error ( "Light On request" );
 			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::LIGHTON );
 		}
-		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) - 1 ).startsWith ( DoorLightOffReqMsg ) )
+		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( DoorLightOffReqMsg ) )
 		{
 			Error ( "Light Off request" );
 			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::LIGHTOFF );
 		}
+        else
+        {
+            m_ulBadRequests++;
+            Error ( "Unknown request : "  + sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 1 ) );
+        }
 	}
 	else
 	{
