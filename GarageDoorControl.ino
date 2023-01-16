@@ -3,7 +3,7 @@
 GarageDoorControl.ino
 
 Arduino sketch to control a Hormann Garage door via a Horman UAP1
-Also collects the temperature and humidity
+Also collects the temperature, humidity and barometric pressure
 Door state and humidity can be queried by remote client sending and receiving UDP messages - see WiFiService files
 
 This is designed to use two RGB LEDS to display status
@@ -24,9 +24,10 @@ Author: (c) M. Naylor 2022
 History:
 	Ver 1.0			Initial version
 */
-#define 	VERSION					"1.0.1 Beta"
+#define 	VERSION					"1.0.2 Beta"
 #include <time.h>
 #include <ClosedCube_SHT31D.h>
+#include <ClosedCube_LPS25HB.h>
 #include <MNPCIHandler.h>
 #include <MNTimerLib.h>
 #include <MNRGBLEDBaseLib.h>
@@ -48,7 +49,7 @@ volatile uint32_t gDoorClosing 	= 0UL;
 /*
     HumiditySensor config
 */
-#define SHT35D                      						// Configure to use SHT35D sensor for humidity and temperature
+#define SHT35D                      										// Configure to use SHT35D sensor for humidity and temperature
 
 constexpr auto HUMIDITYSENSOR_READ_INTERVAL = 2000;
 
@@ -62,7 +63,17 @@ constexpr 	auto 		SensorDeviceID 				= 6;						// Data Pin Num for DHT sensor
 DHTTempHumSensorsClass * pmyHumidityTempSensor = nullptr;
 #endif
 
+
 THSENSOR_RESULT sHTResults;														// Holds last temperature and humidity results
+
+/*
+	Baramoter sensor, closedcube LPS25HB based on MEMS sensor
+*/
+ClosedCube_LPS25HB 		lps25hb;
+// TN210TD height adjustment factor for pressure, see //https://www.engineeringtoolbox.com/barometers-elevation-compensation-d_1812.html
+constexpr	float		ALTITUDE_COMPENSATION		= 15.0;						// TN210TD is 127m above sea level according to Google Maps, which the above link converts to 15 mbars (hPa) compensation
+constexpr	auto		lps25hbDevID				= 0x5C;						// I2C device id
+float					fLatestPressure				= NAN;
 /*
 	WiFi config
 */
@@ -132,6 +143,11 @@ void DisplayStats ( void )
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 13, 0,  F ("Humidity is ") );
 	ClearPartofLine ( 13, 16, 6 );
 	COLOUR_AT ( FG_CYAN, BG_BLACK, 13, 16, String ( sHTResults.fHumidity ) );
+	
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 14, 0,  F ("Pressure is ") );
+	ClearPartofLine ( 14, 16, 7 );
+	COLOUR_AT ( FG_CYAN, BG_BLACK, 14, 16, String ( fLatestPressure ) );	
+	
 	// debug stats
 	noInterrupts();
 	uint32_t Loff = gLightOff;
@@ -201,6 +217,10 @@ void setup()
 {
 	LogStart();
 	ClearScreen();
+
+	// 	Start barometric sensor
+	lps25hb.begin ( lps25hbDevID );
+
 	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, GetDoorInitialState() );
 	SetLED();
 	pMyUDPService = new UDPWiFiService();
@@ -272,7 +292,7 @@ void SetLED()
 // main loop function
 void loop()
 {
-	static unsigned long ulLastTempTime 	= 0UL;
+	static unsigned long ulLastSensorTime 	= 0UL;
 	static unsigned long ulLastDisplayTime 	= 0UL;
 	static DoorState::State	LastDoorState 	= DoorState::Unknown;
 	static bool LastLightState 				= !bLightIsOn;
@@ -282,14 +302,15 @@ void loop()
 	// set LED to match Door State
 	SetLED();
 
-	if ( millis() - ulLastTempTime > 30 * 1000 )
+	if ( millis() - ulLastSensorTime > 30 * 1000 )
 	{
 		//  30 secs have passed to get latest temp reading
+		fLatestPressure = ( lps25hb.readPressure()  + ALTITUDE_COMPENSATION );
 		sHTResults = pmyHumidityTempSensor->GetLastReading();
 		sHTResults.ulTimeOfReadingms = pMyUDPService->GetTime();
 		MulticastMsg ( UDPWiFiService::ReqMsgType::TEMPDATA );
 		// reset time counter
-		ulLastTempTime = millis();
+		ulLastSensorTime = millis();
 	}
 	// update debug stats every 1/2 second
 	if ( millis() - ulLastDisplayTime > 500 )
@@ -324,6 +345,8 @@ String BuildMessage ( UDPWiFiService::ReqMsgType eReqType )
 				sResponse += sHTResults.fHumidity;
 				sResponse += F ( ",D=" );
 				sResponse += sHTResults.fDewPoint;
+				sResponse += F ( ",P=" );
+				sResponse += fLatestPressure;				
 				sResponse += F ( ",A=" );
 				sResponse += sHTResults.ulTimeOfReadingms;
 				sResponse += F ( "\r" );
