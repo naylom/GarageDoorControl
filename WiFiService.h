@@ -12,6 +12,7 @@ History:
 	Ver 1.0			Initial version
 */
 #include "Logging.h"
+#include "FixedIPList.h"
 #include <MNRGBLEDBaseLib.h>
 
 #ifdef ARDUINO_AVR_UNO              // On UNO, I use the Cytron shield-esp-wifi
@@ -49,7 +50,8 @@ protected:
 			bool 			WiFiConnect();
 			void			SetLED ( RGBType theColour, uint8_t flashTime = 0 );
 			void 			SetState ( WiFiService::Status state );
-            void            CalcMulticastAddress ();
+            IPAddress       CalcMyMulticastAddress ();
+			IPAddress       CalcMulticastAddress ( IPAddress ip );
 			const char *	WiFiStatusToString ( uint8_t iState );
 			
 			uint32_t			m_beginTimeouts		= 0UL;						// count of times WiFi.begin fails to connect within 10 secs
@@ -105,6 +107,7 @@ private:
 			WiFiUDP 				m_myUDP;
 			String 					m_sUDPReceivedMsg;
 			UDPWiFiServiceCallback	m_MsghHandlerCallback;
+			FixedIPList	*			m_pMulticastDestList = nullptr;			
 			uint32_t				m_ulBadRequests		= 0UL;
 			uint32_t				m_ulBadMgsVersion	= 0UL;
 			uint32_t				m_ulReqCount		= 0UL;

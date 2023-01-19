@@ -15,6 +15,7 @@ History:
 #include "WiFiService.h"
 #include "DoorState.h"
 
+
 const char * WiFIStatus[] = {
         "WL_IDLE_STATUS", // = 0,
         "WL_NO_SSID_AVAIL",
@@ -61,6 +62,7 @@ void TerminateProgram ( const __FlashStringHelper* pErrMsg )
 						WiFiService::WiFiService ( )
 {
 }
+
 const char * WiFiService::WiFiStatusToString ( uint8_t iState )
 {
 	if ( iState == 255 )
@@ -135,14 +137,16 @@ void					WiFiService::Begin ( const char * HostName, const char * WiFissid, cons
 	}
 }
 
-void					WiFiService::CalcMulticastAddress()
+IPAddress					WiFiService::CalcMyMulticastAddress()
 {
-	IPAddress myAddr = WiFi.localIP();
-	IPAddress subnetMask =  WiFi.subnetMask();
-	m_multicastAddr = ( myAddr & subnetMask ) | (~subnetMask);
+	return CalcMulticastAddress ( WiFi.localIP() );
 }
-
-inline IPAddress               WiFiService::GetMulticastAddress()
+IPAddress					WiFiService::CalcMulticastAddress ( IPAddress ip )
+{
+	IPAddress subnetMask =  WiFi.subnetMask();
+	return ( ip & subnetMask ) | (~subnetMask);
+}
+inline IPAddress        WiFiService::GetMulticastAddress()
 {
 	return m_multicastAddr;
 }
@@ -180,7 +184,7 @@ bool					WiFiService::WiFiConnect()
 		}
 		else 
 		{
-			CalcMulticastAddress();
+			m_multicastAddr = CalcMyMulticastAddress();
 			Error ( "Connected to Network named: " + String ( m_SSID ) );
 			iStartCount = 0UL;
 			m_beginConnects++;
@@ -216,7 +220,15 @@ String	        WiFiService::ToIPString ( const IPAddress& address )
 *
 */
 /***************************************************************************************************************************************/
-				UDPWiFiService::UDPWiFiService(){}
+				UDPWiFiService::UDPWiFiService()
+{
+			m_pMulticastDestList = new FixedIPList ( 4 );
+			IPAddress localSubnet = GetMulticastAddress();
+			if ( (long unsigned int)localSubnet != 0UL )
+			{
+				m_pMulticastDestList->Add ( localSubnet );
+			}
+}
 
 bool	        UDPWiFiService::Begin ( UDPWiFiServiceCallback  pHandleReqData, const char *WiFissid, const char *WiFipwd, const char * HostName, const uint16_t portUDP, MNRGBLEDBaseLib * pLED )
 {
@@ -344,6 +356,8 @@ bool			UDPWiFiService::ReadUDPMessage ( String& sRecvMessage )
 			sRecvMessage = sBuffer;
 			bResult = true;
 			m_ulReqCount++;
+			// create multicast address from send ip and add to list of subnets to send multicasts to and add ot list
+			m_pMulticastDestList->Add ( CalcMulticastAddress ( m_myUDP.remoteIP () ) );
 		}
 		else
 		{
@@ -441,22 +455,27 @@ bool				UDPWiFiService::SendMCast ( void * paramPtr )
 	String*  pMsg =  (String*)paramPtr;
 	if ( pMsg->length() > 0 )
 	{
-		if ( m_myUDP.beginPacket ( GetMulticastAddress(), 0xCE5C ) == 1 )
+		uint8_t iterator = m_pMulticastDestList->GetIterator();
+		IPAddress nextIP;
+		while ( ( long unsigned int )( nextIP = m_pMulticastDestList->GetNext ( iterator ) ) !=  0UL )
 		{
-			m_myUDP.write ( pMsg->c_str () );
-			if ( m_myUDP.endPacket () == 0 )
+			if ( m_myUDP.beginPacket ( nextIP, 0xCE5C ) == 1 )
 			{
-				Error (  "Multicast Message failed" );
-				Stop();
+				m_myUDP.write ( pMsg->c_str () );
+				if ( m_myUDP.endPacket () == 0 )
+				{
+					Error (  "Multicast Message failed" );
+					Stop();
+				}
+				else
+				{
+					SetLED ( PROCESSING_MSG_COLOUR );
+					delay ( 500 );		
+					SetState( WiFiService::Status::CONNECTED );
+					bResult = true;
+					m_ulMCastSentCount++;
+				}		
 			}
-			else
-			{
-				SetLED ( PROCESSING_MSG_COLOUR );
-				delay ( 500 );		
-				SetState( WiFiService::Status::CONNECTED );
-				bResult = true;
-				m_ulMCastSentCount++;
-			}		
 		}
 	}
 	else
