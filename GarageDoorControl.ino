@@ -23,49 +23,48 @@ Author: (c) M. Naylor 2022
 
 History:
 	Ver 1.0			Initial version
+	Ver 1.0.4		Supports config to add/remove UAP, Distance Centre, Barometruc sensor
 */
-#define 	VERSION					"1.0.3 Beta"
+#define 	VERSION					"1.0.4 Beta"
+
+#define 	UAP_SUPPORT				
+#define 	BAROMETRIC_SUPPORT		
+#define		TEMP_HUMIDITY_SUPPORT	
+#define 	DISTANCE_SENSOR_SUPPORT	
+
 #include <time.h>
-#include <ClosedCube_SHT31D.h>
-#include <ClosedCube_LPS25HB.h>
 #include <MNPCIHandler.h>
 #include <MNTimerLib.h>
 #include <MNRGBLEDBaseLib.h>
-#include "DoorState.h"
 #include "logging.h"
-#include "WiFiService.h"
-
 #include <WiFiNINA.h>
 #include <WiFiUdp.h>
+#include "WiFiService.h"
 
-// debug - remove 
-volatile uint32_t gLightOff 	= 0UL;
-volatile uint32_t gLightOn 		= 0UL;
-volatile uint32_t gDoorOpened 	= 0UL;
-volatile uint32_t gDoorOpening 	= 0UL;
-volatile uint32_t gDoorClosed 	= 0UL;
-volatile uint32_t gDoorClosing 	= 0UL;
-
+#ifdef TEMP_HUMIDITY_SUPPORT
+#include <ClosedCube_SHT31D.h>
 /*
     HumiditySensor config
 */
 #define SHT35D                      										// Configure to use SHT35D sensor for humidity and temperature
-
-constexpr auto HUMIDITYSENSOR_READ_INTERVAL = 2000;
+constexpr auto HUMIDITYSENSOR_READ_INTERVAL 		= 2000;
 
 #ifdef SHT35D
 #include "SHTTempHumSensors.h"
 constexpr auto 			SensorDeviceID 				= 0x44;						// I2C device id for SHT35-D sensor
-SHTTempHumSensorsClass * pmyHumidityTempSensor = nullptr;
+SHTTempHumSensorsClass * pmyHumidityTempSensor 		= nullptr;
 #else
 #include "DHTTempHumSensors.h"
 constexpr 	auto 		SensorDeviceID 				= 6;						// Data Pin Num for DHT sensor
-DHTTempHumSensorsClass * pmyHumidityTempSensor = nullptr;
+DHTTempHumSensorsClass * pmyHumidityTempSensor 		= nullptr;
 #endif
-
 
 THSENSOR_RESULT sHTResults;														// Holds last temperature and humidity results
 
+#endif
+
+#ifdef BAROMETRIC_SUPPORT 
+#include <ClosedCube_LPS25HB.h>
 /*
 	Baramoter sensor, closedcube LPS25HB based on MEMS sensor
 */
@@ -74,12 +73,10 @@ ClosedCube_LPS25HB 		lps25hb;
 constexpr	float		ALTITUDE_COMPENSATION		= 15.0;						// TN210TD is 127m above sea level according to Google Maps, which the above link converts to 15 mbars (hPa) compensation
 constexpr	auto		lps25hbDevID				= 0x5C;						// I2C device id
 float					fLatestPressure				= NAN;
-/*
-	WiFi config
-*/
-constexpr	char 		ssid[] 						= "Naylorfamily";			// your network SSID (name)
-constexpr 	char 		pass[] 						= "welcome1";				// your network password
-constexpr 	char 		MyHostName[] 				= "GarageControl";
+#endif
+
+#ifdef UAP_SUPPORT
+#include "DoorState.h"
 // PIN allocations, input & output from arduino perspective
 
 constexpr 	uint8_t		DOOR_IS_OPEN_INPUT_PIN 		= 0;
@@ -96,16 +93,36 @@ constexpr	uint8_t 	STOP_DOOR_OUTPUT_PIN		= 9;
 
 volatile 	bool 		bLightIsOn 					= false;
 
+// debug - remove 
+volatile uint32_t 		gLightOff 					= 0UL;
+volatile uint32_t 		gLightOn 					= 0UL;
+volatile uint32_t 		gDoorOpened 				= 0UL;
+volatile uint32_t 		gDoorOpening 				= 0UL;
+volatile uint32_t 		gDoorClosed 				= 0UL;
+volatile uint32_t 		gDoorClosing 				= 0UL;
+
+volatile uint32_t		ulSwitchCount				= 0UL;
+
+DoorState * 			pGarageDoor					= nullptr;
+#endif
+/*
+	WiFi config
+*/
+constexpr	char 		ssid[] 						= "Naylorfamily";			// your network SSID (name)
+constexpr 	char 		pass[] 						= "welcome1";				// your network password
+constexpr 	char 		MyHostName[] 				= "GarageControl";
+
+
 // external RGB LED pins
 constexpr 	uint8_t 	RED_PIN						= A4;
 constexpr 	uint8_t 	GREEN_PIN					= A5;
 constexpr 	uint8_t 	BLUE_PIN					= A6;
 
 UDPWiFiService* 		pMyUDPService 				= nullptr;
-DoorState * 			pGarageDoor					= nullptr;
+
 MNRGBLEDBaseLib * 		pMyLED						= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
 unsigned long			ulLastClientReq				= 0UL;						// millis of last wifi incoming message
-volatile uint32_t		ulSwitchCount				= 0UL;
+
 
 
 // Debug information for ANSI screen with cursor control
@@ -113,7 +130,11 @@ void DisplayStats ( void )
 {
 #ifdef MNDEBUG	
 	static time_t LastTime = 0;
+#ifdef UAP_SUPPORT	
 	String Heading = F ( "Garage Door Control -  ver " );
+#else
+	String Heading = F ( "Temp Sensor - ver ")	;
+#endif
 	Heading += String ( VERSION );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 0, 20, Heading ) ;
 
@@ -126,7 +147,7 @@ void DisplayStats ( void )
 		sprintf ( sTime, "%02d/%02d/%02d %02d:%02d:%02d", localtm->tm_mday, localtm->tm_mon + 1, ( localtm->tm_year - 100 ), localtm->tm_hour, localtm->tm_min, localtm->tm_sec );
 		COLOUR_AT ( FG_WHITE, BG_BLACK, 0, 60, sTime ) ;
 	}
-
+#ifdef UAP_SUPPORT
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 0,  F ("Light is ") );
 	ClearPartofLine ( 4, 10, 8 );
 	COLOUR_AT ( FG_CYAN, BG_BLACK, 4, 10, bLightIsOn ? "On" : "Off" );
@@ -136,18 +157,6 @@ void DisplayStats ( void )
 
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 0,  F ( "Switch Presssed " ) );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 17, String ( ulSwitchCount ) );
-
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 12, 0,  F ("Temperature is ") );
-	ClearPartofLine ( 12, 16, 6 );
-	COLOUR_AT ( FG_RED, BG_BLACK, 12, 16, String ( sHTResults.fTemperature ) );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 13, 0,  F ("Humidity is ") );
-	ClearPartofLine ( 13, 16, 6 );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, 13, 16, String ( sHTResults.fHumidity ) );
-	
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 14, 0,  F ("Pressure is ") );
-	ClearPartofLine ( 14, 16, 7 );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, 14, 16, String ( fLatestPressure ) );	
-	
 	// debug stats
 	noInterrupts();
 	uint32_t Loff = gLightOff;
@@ -168,12 +177,25 @@ void DisplayStats ( void )
  	COLOUR_AT ( FG_WHITE, BG_BLACK, 8, 40,  F ("Door Closed count   ") );
  	COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 61, String ( DClose ) );
  	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 40,  F ("Door Closing count  ") );
- 	COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 61, String ( DClosing ) );
- 	
+ 	COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 61, String ( DClosing ) );	
+#endif
+#ifdef TEMP_HUMIDITY_SUPPORT
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 12, 0,  F ("Temperature is ") );
+	ClearPartofLine ( 12, 16, 6 );
+	COLOUR_AT ( FG_RED, BG_BLACK, 12, 16, String ( sHTResults.fTemperature ) );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 13, 0,  F ("Humidity is ") );
+	ClearPartofLine ( 13, 16, 6 );
+	COLOUR_AT ( FG_CYAN, BG_BLACK, 13, 16, String ( sHTResults.fHumidity ) );
+#endif
+#ifdef BAROMETRIC_SUPPORT
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 14, 0,  F ("Pressure is ") );
+	ClearPartofLine ( 14, 16, 7 );
+	COLOUR_AT ( FG_CYAN, BG_BLACK, 14, 16, String ( fLatestPressure ) );	
+#endif
 	pMyUDPService->DisplayStatus();
 #endif	
 }
-
+#ifdef UAP_SUPPORT
 // Find initial state of door
 DoorState::State GetDoorInitialState ()
 {
@@ -212,24 +234,19 @@ inline bool GetLightInitialState ()
 {
 	return digitalRead ( LIGHT_IS_ON_INPUT_PIN ) == UAP_TRUE ? true : false;
 }
+#endif
 // main setup routine
 void setup()
 {
 	LogStart();
 	ClearScreen();
-
+#ifdef BAROMETRIC_SUPPORT
 	// 	Start barometric sensor
 	lps25hb.begin ( lps25hbDevID );
-
+#endif
+#ifdef UAP_SUPPORT
 	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, GetDoorInitialState() );
 	SetLED();
-	pMyUDPService = new UDPWiFiService();
-	
-	// cannot instantiate object as global - causes board to freeze, need to allocate when running
-	pmyHumidityTempSensor = new SHTTempHumSensorsClass ( SensorDeviceID );
-	// get initial reading
-	sHTResults = pmyHumidityTempSensor->GetLastReading();
-
 	// Setup so we are called if the state of door changes
 	PCIHandler.AddPin ( DOOR_SWITCH_INPUT_PIN, SwitchPressedISR, HIGH, INPUT_PULLDOWN );
 	PCIHandler.AddPin ( DOOR_IS_OPEN_INPUT_PIN, DoorOpenedISR, CHANGE, INPUT_PULLDOWN );
@@ -237,15 +254,24 @@ void setup()
 	PCIHandler.AddPin ( LIGHT_IS_ON_INPUT_PIN, LightChangeISR, CHANGE, INPUT_PULLDOWN );
 	
 	// Set initial light state
-	bLightIsOn =  GetLightInitialState();
+	bLightIsOn =  GetLightInitialState();	
+#endif
 
+#ifdef TEMP_HUMIDITY_SUPPORT	
+	// cannot instantiate object as global - causes board to freeze, need to allocate when running
+	pmyHumidityTempSensor = new SHTTempHumSensorsClass ( SensorDeviceID );
+	// get initial reading
+	sHTResults = pmyHumidityTempSensor->GetLastReading();
+#endif
+
+	pMyUDPService = new UDPWiFiService();
 	// now we have state table set up and temp sensor configured, allow users to query state
 	if ( !pMyUDPService->Begin ( ProcessUDPMsg, ssid, pass, MyHostName, &TheMKR_RGB_LED ) )	
 	{
 		Error ( "Cannot connect WiFI ");
 	}	
 }
-
+#ifdef UAP_SUPPORT
 // set the colour of the inbuilt MKR Wifi 1010 RGB LED based on the current door state
 void SetLED()
 {
@@ -289,35 +315,48 @@ void SetLED()
 		}
 	}
 }
+#endif
 // main loop function
 void loop()
 {
+#if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT 
 	static unsigned long ulLastSensorTime 	= 0UL;
+#endif	
 	static unsigned long ulLastDisplayTime 	= 0UL;
+#ifdef UAP_SUPPORT	
 	static DoorState::State	LastDoorState 	= DoorState::Unknown;
 	static bool LastLightState 				= !bLightIsOn;
+	
+	// set LED to match Door State
+	SetLED();	
+#endif
 
 	// See if we have any udp requests to action
 	pMyUDPService->CheckUDP ();
-	// set LED to match Door State
-	SetLED();
 
+#if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT 
 	if ( millis() - ulLastSensorTime > 30 * 1000 )
 	{
-		//  30 secs have passed to get latest temp reading
+		//  30 secs have passed to get latest sesnor readings
+#ifdef BAROMETRIC_SUPPORT		
 		fLatestPressure = ( lps25hb.readPressure()  + ALTITUDE_COMPENSATION );
+#endif		
+#ifdef TEMP_HUMIDITY_SUPPORT
 		sHTResults = pmyHumidityTempSensor->GetLastReading();
 		sHTResults.ulTimeOfReadingms = pMyUDPService->GetTime();
+#endif		
 		MulticastMsg ( UDPWiFiService::ReqMsgType::TEMPDATA );
 		// reset time counter
 		ulLastSensorTime = millis();
 	}
+#endif	
 	// update debug stats every 1/2 second
 	if ( millis() - ulLastDisplayTime > 500 )
 	{
 		ulLastDisplayTime = millis();
 		DisplayStats();
 	}
+#ifdef UAP_SUPPORT	
 	// if door state has changed, multicast news		
 	if ( pGarageDoor->GetDoorState() != LastDoorState || LastLightState != bLightIsOn )
 	{
@@ -325,6 +364,7 @@ void loop()
 		LastLightState	= bLightIsOn;
 		MulticastMsg ( UDPWiFiService::ReqMsgType::DOORDATA );
 	}
+#endif	
 }
 
 // called to generate a response to a command
@@ -334,10 +374,12 @@ String BuildMessage ( UDPWiFiService::ReqMsgType eReqType )
 	String	sResponse;
 	switch ( eReqType )
 	{
+#if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT
 		case UDPWiFiService::ReqMsgType::TEMPDATA:
 			// check we have good data to share
 			if ( sHTResults.fTemperature != NAN && sHTResults.fHumidity != NAN )
 			{
+#ifdef TEMP_HUMIDITY_SUPPORT				
 				// send a reply, to the IP address and port that sent us the packet we received
 				sResponse = F ( "T=" );
 				sResponse += sHTResults.fTemperature;
@@ -345,9 +387,13 @@ String BuildMessage ( UDPWiFiService::ReqMsgType eReqType )
 				sResponse += sHTResults.fHumidity;
 				sResponse += F ( ",D=" );
 				sResponse += sHTResults.fDewPoint;
-				sResponse += F ( ",P=" );
+				sResponse += F ( "," );
+#endif				
+#ifdef BAROMETRIC_SUPPORT				
+				sResponse += F ( "P=" );
 				sResponse += fLatestPressure;				
-				sResponse += F ( ",A=" );
+#endif				
+				sResponse += F ( "A=" );
 				sResponse += sHTResults.ulTimeOfReadingms;
 				sResponse += F ( "\r" );
 			}
@@ -356,7 +402,8 @@ String BuildMessage ( UDPWiFiService::ReqMsgType eReqType )
 				Error ( "Not responding to UDP request for data as no valid results" );
 			}
 			break;
-
+#endif
+#ifdef UAP_SUPPORT
 		case UDPWiFiService::ReqMsgType::DOORDATA:
 			sResponse = F ( "S=" );
 			sResponse += pGarageDoor->GetDoorDisplayState();					// Door State
@@ -392,6 +439,7 @@ String BuildMessage ( UDPWiFiService::ReqMsgType eReqType )
 		case UDPWiFiService::ReqMsgType::LIGHTOFF:
 			pGarageDoor->DoRequest( DoorState::Request::LightOff );
 			break;
+#endif			
 	}
 	return sResponse;
 }
@@ -411,7 +459,7 @@ void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
 		pMyUDPService->SendReply ( sResponse );
 	}
 }
-
+#ifdef UAP_SUPPORT
 // ISR to handle DoorOpen Pin state change
 void DoorOpenedISR ()
 {
@@ -510,3 +558,4 @@ void SwitchPressedISR ()
 		//pGarageDoor->DoEvent ( DoorState::Event::SwitchPress );
 	}
 }
+#endif
