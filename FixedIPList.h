@@ -9,6 +9,7 @@ class FixedIPList
 		bool 		Add ( IPAddress addition );
 		uint8_t		GetIterator ();
 		IPAddress	GetNext ( uint8_t &iterator );
+        uint8_t     Count();
 	private:
 		bool 		IsPresent ( IPAddress addr );
 

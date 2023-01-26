@@ -1,4 +1,5 @@
 #include "FixedIPList.h"
+#include "Logging.h"
 IPAddress EmptyAddress = IPAddress ( 0UL );
 FixedIPList::FixedIPList ( uint8_t MaxEntries )
 {
@@ -24,11 +25,15 @@ bool FixedIPList::Add ( IPAddress addition )
 			m_pIPList [ m_maxEntries -1 ] = EmptyAddress;
 			m_nextEntry = m_maxEntries - 1;
 		}
+        Error ( "Adding macast entry" );
 		m_pIPList [ m_nextEntry++ ] = addition;
 	}
 	return bResult;
 }
-
+uint8_t FixedIPList::Count()
+{
+    return m_nextEntry;
+}
 uint8_t FixedIPList::GetIterator ()
 {
 	return 0;
