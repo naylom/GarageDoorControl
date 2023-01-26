@@ -30,7 +30,7 @@ History:
 #define 	UAP_SUPPORT				
 #define 	BAROMETRIC_SUPPORT		
 #define		TEMP_HUMIDITY_SUPPORT	
-#define 	DISTANCE_SENSOR_SUPPORT	
+#undef  	DISTANCE_SENSOR_SUPPORT	
 
 #include <time.h>
 #include <MNPCIHandler.h>
@@ -391,7 +391,8 @@ String BuildMessage ( UDPWiFiService::ReqMsgType eReqType )
 #endif				
 #ifdef BAROMETRIC_SUPPORT				
 				sResponse += F ( "P=" );
-				sResponse += fLatestPressure;				
+				sResponse += fLatestPressure;
+                sResponse += F ( "," );		
 #endif				
 				sResponse += F ( "A=" );
 				sResponse += sHTResults.ulTimeOfReadingms;
