@@ -407,7 +407,6 @@ bool			UDPWiFiService::ReadUDPMessage ( String& sRecvMessage )
             Error ( "Adding mcast " + ToIPString ( CalcMulticastAddress ( m_myUDP.remoteIP () )));
             delay ( 500 );
 			m_pMulticastDestList->Add ( CalcMulticastAddress ( m_myUDP.remoteIP () ) );
-            
 		}
 		else
 		{
@@ -443,10 +442,7 @@ bool	    UDPWiFiService::Start()
         IPAddress localSubnet = GetMulticastAddress();
         if ( (long unsigned int)localSubnet != 0UL )
         {
-            if ( !m_pMulticastDestList->Add ( localSubnet ) )
-            {
-                Error ( "Add of mcast sunbet to list failed");
-            }
+            m_pMulticastDestList->Add ( localSubnet );
         }        
 	}
 	else

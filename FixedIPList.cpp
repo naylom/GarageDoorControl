@@ -3,7 +3,7 @@
 IPAddress EmptyAddress = IPAddress ( 0UL );
 FixedIPList::FixedIPList ( uint8_t MaxEntries )
 {
-	m_maxEntries = m_maxEntries;
+	m_maxEntries = MaxEntries;
 	m_pIPList = new IPAddress [ m_maxEntries ];
 	for ( uint8_t i = 0 ; i < m_maxEntries ; i++ )
 	{
@@ -15,7 +15,7 @@ bool FixedIPList::Add ( IPAddress addition )
 	bool bResult = false;
 	if ( !IsPresent ( addition ) )
 	{
-		if ( m_nextEntry >=  m_maxEntries )
+		if ( m_nextEntry >= m_maxEntries )
 		{
 			// list full, so discard oldest
 			for ( uint8_t i = 0 ; i < m_maxEntries - 1 ; i ++)
@@ -58,6 +58,10 @@ bool FixedIPList::IsPresent ( IPAddress addr )
 			bResult = true;
 			break;
 		}
+	}
+	if ( !bResult )
+	{
+		Error ( "Max entries is " + String ( m_maxEntries ) );
 	}
 	return bResult;
 }

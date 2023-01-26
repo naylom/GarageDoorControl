@@ -27,10 +27,10 @@ History:
 */
 #define 	VERSION					"1.0.4 Beta"
 
-#define 	UAP_SUPPORT				
-#define 	BAROMETRIC_SUPPORT		
-#define		TEMP_HUMIDITY_SUPPORT	
-#define 	DISTANCE_SENSOR_SUPPORT	
+#define	UAP_SUPPORT				
+#define	BAROMETRIC_SUPPORT		
+#define	TEMP_HUMIDITY_SUPPORT	
+#undef 	DISTANCE_SENSOR_SUPPORT	
 
 #include <time.h>
 #include <MNPCIHandler.h>
@@ -104,6 +104,7 @@ volatile uint32_t 		gDoorClosing 				= 0UL;
 volatile uint32_t		ulSwitchCount				= 0UL;
 
 DoorState * 			pGarageDoor					= nullptr;
+MNRGBLEDBaseLib * 		pMyLED						= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
 #endif
 /*
 	WiFi config
@@ -120,7 +121,7 @@ constexpr 	uint8_t 	BLUE_PIN					= A6;
 
 UDPWiFiService* 		pMyUDPService 				= nullptr;
 
-MNRGBLEDBaseLib * 		pMyLED						= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
+
 unsigned long			ulLastClientReq				= 0UL;						// millis of last wifi incoming message
 
 
