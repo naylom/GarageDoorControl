@@ -103,6 +103,10 @@ volatile uint32_t 		gDoorClosing 				= 0UL;
 
 volatile uint32_t		ulSwitchCount				= 0UL;
 
+constexpr 	uint8_t 	RED_PIN						= A4;
+constexpr 	uint8_t 	GREEN_PIN					= A5;
+constexpr 	uint8_t 	BLUE_PIN					= A6;
+
 DoorState * 			pGarageDoor					= nullptr;
 MNRGBLEDBaseLib * 		pMyLED						= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
 #endif
@@ -114,10 +118,7 @@ constexpr 	char 		pass[] 						= "welcome1";				// your network password
 constexpr 	char 		MyHostName[] 				= "GarageControl";
 
 
-// external RGB LED pins
-constexpr 	uint8_t 	RED_PIN						= A4;
-constexpr 	uint8_t 	GREEN_PIN					= A5;
-constexpr 	uint8_t 	BLUE_PIN					= A6;
+
 
 UDPWiFiService* 		pMyUDPService 				= nullptr;
 
