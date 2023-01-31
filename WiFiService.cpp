@@ -127,7 +127,7 @@ void					WiFiService::Begin ( const char * HostName, const char * WiFissid, cons
 	m_Pwd				= WiFipwd;
 	m_HostName			= HostName;
 	m_pLED				= pLED;
-
+    
 	WiFi.setHostname ( m_HostName );
 
 	String fv = WiFi.firmwareVersion ();
@@ -136,6 +136,10 @@ void					WiFiService::Begin ( const char * HostName, const char * WiFissid, cons
 		SetLED ( OLD_WIFI_FIRMWARE_COLOUR );
 		Error ( "Please upgrade the firmware. Latest is " + String (WIFI_FIRMWARE_LATEST_VERSION) + ", board has " + String (fv)  );
 	}
+    else 
+    {
+        SetState ( Status::UNCONNECTED );
+    }
 }
 
 IPAddress					WiFiService::CalcMyMulticastAddress()
