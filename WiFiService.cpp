@@ -16,7 +16,7 @@ History:
 #include "DoorState.h"
 
 
-const char * WiFIStatus[] = {
+const char * WiFiStatus[] = {
         "WL_IDLE_STATUS", // = 0,
         "WL_NO_SSID_AVAIL",
         "WL_SCAN_COMPLETED",
@@ -68,17 +68,17 @@ const char * WiFiService::WiFiStatusToString ( uint8_t iState )
 {
 	if ( iState == 255 )
 	{
-		return WiFIStatus [ 9 ];
+		return WiFiStatus [ 9 ];
 	}
 	else 
 	{
-		if  ( iState > sizeof ( WiFIStatus ) / sizeof ( WiFIStatus [0] ) - 1 )
+		if  ( iState > sizeof ( WiFiStatus ) / sizeof ( WiFiStatus [0] ) - 1 )
 		{  
 			return "Unknown";
 		}
 		else 
 		{
-			return WiFIStatus [ iState ];
+			return WiFiStatus [ iState ];
 		}
 	}
 }

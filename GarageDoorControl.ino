@@ -25,7 +25,7 @@ History:
 	Ver 1.0			Initial version
 	Ver 1.0.4		Supports config to add/remove UAP, Distance Centre, Barometruc sensor
 */
-#define 	VERSION					"1.0.4 Beta"
+#define 	VERSION					"1.0.5 Beta"
 
 #define 	UAP_SUPPORT				
 #define 	BAROMETRIC_SUPPORT		

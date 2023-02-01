@@ -23,14 +23,23 @@ History:
 */
 constexpr auto BAUD_RATE = 115200;
 #include <Arduino.h>
-
+#include "CTelnet.h"
 #define MNDEBUG
+#define TELNET
 #ifdef MNDEBUG
+#ifdef TELNET
+#define Log(x)			Telnet.print ( x )
+#define Log2(x, y)		Telnet.print ( x, y )
+#define Logln(x)		Telnet.println ( x )
+#define LogFlush		
+#define LogStart()		Telnet.begin ( 0xFEEE )
+#else
 #define Log(x)			Serial.print ( x )
 #define Log2(x, y)		Serial.print ( x, y )
 #define Logln(x)		Serial.println ( x )
 #define LogFlush		Serial.flush()
 #define LogStart()		Serial.begin ( BAUD_RATE ); /*while ( !Serial )*/
+#endif
 #else
 #define Log(x) 
 #define Log2(x, y)
