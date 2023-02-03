@@ -9,9 +9,7 @@ Author: (c) M. Naylor 2022
 History:
 	Ver 1.0			Initial version
 */
-#include "WiFi.h"
-#include "api/IPAddress.h"
-#include "utility/wl_definitions.h"
+#include <WiFiNINA.h>
 #include "WiFiService.h"
 #include "DoorState.h"
 
@@ -301,16 +299,6 @@ void	        UDPWiFiService::CheckUDP()
 void	        UDPWiFiService::DisplayStatus()
 {
 #ifdef MNDEBUG
-#ifdef ARDUINO_AVR_UNO
-	Log (F ("Connected to: "));
-	Log (wifi.SSID ());
-	Log (F (", "));
-	Logln (wifi.RSSI ());
-	Log (F ("IP address: "));
-	Logln (wifi.localIP ());
-	Log (F ("Status: "));
-	Logln (wifi.status ());          
-#else
 	// print the SSID of the network you're attached to:
 	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine, 0,  F ("SSID: ") );
 	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine, 23, WiFi.SSID () );
@@ -324,9 +312,7 @@ void	        UDPWiFiService::DisplayStatus()
             ClearPartofLine ( PrintStartLine +  iterator - 1, 61, 15 );
             COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine +  iterator - 1, 61, ToIPString ( mcastDest ) );	
         }
-        //COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine, 41, "Mcast #" + String(m_pMulticastDestList->Count())  );        
     }
-    
 
 	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 1, 0,  F ("My Hostname: ") );
 	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 1, 23, GetHostName() );
@@ -375,7 +361,6 @@ void	        UDPWiFiService::DisplayStatus()
 
 	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 8, 41,  F ( "WiFi Service State: " ) );
 	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 8, 61, String ( GetState() ) );
-#endif
 #endif
 }
 
