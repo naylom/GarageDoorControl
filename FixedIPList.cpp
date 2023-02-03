@@ -25,7 +25,7 @@ bool FixedIPList::Add ( IPAddress addition )
 			m_pIPList [ m_maxEntries -1 ] = EmptyAddress;
 			m_nextEntry = m_maxEntries - 1;
 		}
-        Error ( "Adding macast entry" );
+        //Error ( "Adding macast entry" );
 		m_pIPList [ m_nextEntry++ ] = addition;
 	}
 	return bResult;
@@ -58,10 +58,6 @@ bool FixedIPList::IsPresent ( IPAddress addr )
 			bResult = true;
 			break;
 		}
-	}
-	if ( !bResult )
-	{
-		Error ( "Max entries is " + String ( m_maxEntries ) );
 	}
 	return bResult;
 }

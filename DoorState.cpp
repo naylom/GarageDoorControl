@@ -38,10 +38,15 @@ const char* StateNames []= 								// In order of State enums!
 					DoorState::DoorState ( Pin OpenPin, Pin ClosePin, Pin StopPin, Pin LightPin, State initialState )
 {
 	m_OpenPin = OpenPin;
+    pinMode ( m_OpenPin, OUTPUT );
 	m_ClosePin = ClosePin;
+    pinMode ( m_ClosePin, OUTPUT );
 	m_StopPin = StopPin;
+    pinMode ( m_StopPin, OUTPUT );
 	m_LightPin = LightPin;
+    pinMode ( m_LightPin, OUTPUT );
     m_theDoorState = initialState;
+
 	TurnOffControlPins();
 }
 // called to turn relay off
@@ -49,9 +54,7 @@ void				DoorState::ClearRelayPin ( Pin thePin )
 {
 	if (  thePin != NOT_A_PIN && digitalRead ( thePin ) == RELAY_ON )
 	{
-		pinMode ( thePin, OUTPUT );
 		digitalWrite ( thePin, RELAY_OFF );
-		Error ( "setting pin " + String ( thePin ) + " to HIGH" );
 	}
 }
 // called to turn relay on
@@ -59,9 +62,7 @@ void				DoorState::SetRelayPin ( Pin thePin )
 {
 	if (  thePin != NOT_A_PIN && digitalRead ( thePin ) == RELAY_OFF )
 	{
-		pinMode ( thePin, OUTPUT );
 		digitalWrite ( thePin, RELAY_ON );
-		Error ( "setting pin " + String ( thePin ) + " to LOW" );
 	}
 }
 // routines called when event occurs, these are called from within an interrupt and need to be short
@@ -103,6 +104,7 @@ void DoorState::NowOpening ( Event  )
 void DoorState::SwitchPressed ( Event  )
 {
 	Error( "Switch Pressed                  ");	
+#ifndef MNDEBUG
     switch ( m_theDoorState )
 	{
 		case State::Closed:
@@ -156,6 +158,7 @@ void DoorState::SwitchPressed ( Event  )
 		case State::Unknown:
 			break;
 	}
+#endif    
 }
 
 /// <summary>

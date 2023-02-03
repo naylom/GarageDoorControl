@@ -205,7 +205,7 @@ bool					WiFiService::WiFiConnect()
 		Error ( "Starting WiFi, attempt " + String ( iStartCount ) );
 		uint8_t status; 
 		uint32_t ulStart = millis();
-		//WiFi.end ();
+
 		WiFi.begin ( m_SSID, m_Pwd );
 		String msg = "connecting ";
 		do
@@ -220,7 +220,7 @@ bool					WiFiService::WiFiConnect()
 		if ( status != WL_CONNECTED )
 		{
 			bResult =  false;
-			//WiFi.end ();
+
 			SetState ( WiFiService::Status::UNCONNECTED );
 			Error  ( "Connect failed, status is " + String ( WiFiStatusToString ( status ) ) );
 			iStartCount++;
@@ -229,7 +229,7 @@ bool					WiFiService::WiFiConnect()
 		else 
 		{
 			m_multicastAddr = CalcMyMulticastAddress();
-			Error ( "Connected to Network named: " + String ( m_SSID ) );
+			Error ( "Connected to " + String ( m_SSID ) );
 			iStartCount = 0UL;
 			m_beginConnects++;
 		}
@@ -275,7 +275,7 @@ bool	        UDPWiFiService::Begin ( UDPWiFiServiceCallback  pHandleReqData, con
 
 	WiFiService::Begin ( HostName, WiFissid, WiFipwd, pLED );
 	m_Port					= portUDP;
-	m_MsghHandlerCallback	= pHandleReqData;
+	m_MsgHandlerCallback	= pHandleReqData;
 
 	if ( m_sUDPReceivedMsg.reserve ( MAX_INCOMING_UDP_MSG ) )
 	{
@@ -398,7 +398,7 @@ bool			UDPWiFiService::ReadUDPMessage ( String& sRecvMessage )
 		SetLED ( PROCESSING_MSG_COLOUR );
 		delay ( 500 );
 		String s = "Received packet of size " + String ( packetSize ) + " From " + ToIPString ( m_myUDP.remoteIP () ) +  ", port " + String ( m_myUDP.remotePort () );
-
+        //Error ( s ) ;
 		if ( packetSize < sizeof ( sBuffer ) - 1 )
 		{
 			// read the packet into packetBufffer
@@ -408,8 +408,6 @@ bool			UDPWiFiService::ReadUDPMessage ( String& sRecvMessage )
 			bResult = true;
 			m_ulReqCount++;
 			// create multicast address from send ip and add to list of subnets to send multicasts to and add ot list
-            Error ( "Adding mcast " + ToIPString ( CalcMulticastAddress ( m_myUDP.remoteIP () )));
-            delay ( 500 );
 			m_pMulticastDestList->Add ( CalcMulticastAddress ( m_myUDP.remoteIP () ) );
 		}
 		else
@@ -442,7 +440,7 @@ bool	    UDPWiFiService::Start()
 	if (  m_myUDP.begin ( m_Port ) == 1 )
 	{
 		bResult = true;
-		Error ( "Started UDP" );
+		//Error ( "Started UDP" );
         IPAddress localSubnet = GetMulticastAddress();
         if ( (long unsigned int)localSubnet != 0UL )
         {
@@ -499,7 +497,7 @@ bool				UDPWiFiService::SendReply ( void * paramPtr )
 		else
 		{
 			m_ulReplyCount++;
-			Error ( "Sent " + String ( pMsg->substring(0, pMsg->length()-1) ) + " to " + ToIPString ( m_myUDP.remoteIP () ) + ":" + m_myUDP.remotePort() );
+			//Error ( "Sent " + String ( pMsg->substring(0, pMsg->length()-1) ) + " to " + ToIPString ( m_myUDP.remoteIP () ) + ":" + m_myUDP.remotePort() );
 			SetState ( WiFiService::Status::CONNECTED );	
 		}		
 	}
@@ -517,7 +515,6 @@ bool				UDPWiFiService::SendMCast ( void * paramPtr )
 		IPAddress nextIP;
 		while ( ( long unsigned int )( nextIP = m_pMulticastDestList->GetNext ( iterator ) ) !=  0UL )
 		{
-            Error ( "Sending mcast to " + ToIPString ( nextIP ) );
             delay ( 200 );
 			if ( m_myUDP.beginPacket ( nextIP, 0xCE5C ) == 1 )
 			{
@@ -534,7 +531,6 @@ bool				UDPWiFiService::SendMCast ( void * paramPtr )
 					SetState( WiFiService::Status::CONNECTED );
 					bResult = true;
 					m_ulMCastSentCount++;
-                    Error ( "Sent multicast to " + ToIPString( nextIP ));
 				}		
 			}
 		}
@@ -575,8 +571,8 @@ void	    		UDPWiFiService::ProcessUDPMessage ( const String& sRecvMessage )
 		if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( TempHumidityReqMsg ) )
 		{
 			// Got a data request
-			Error ( "Temp Data request" );
-			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::TEMPDATA );
+			//Error ( "Temp Data request" );
+			m_MsgHandlerCallback ( UDPWiFiService::ReqMsgType::TEMPDATA );
 		}
 		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( RestartReqMsg ) )
 		{
@@ -586,33 +582,33 @@ void	    		UDPWiFiService::ProcessUDPMessage ( const String& sRecvMessage )
 		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( DoorStatusReqMsg ) )
 		{
 			// Got a door status request
-			Error ( "Door Data request" );
-			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::DOORDATA );
+			//Error ( "Door Data request" );
+			m_MsgHandlerCallback ( UDPWiFiService::ReqMsgType::DOORDATA );
 		}
 		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( DoorOpenReqMsg ) )
 		{
-			Error ( "Door Open request" );
-			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::DOOROPEN );
+			//Error ( "Door Open request" );
+			m_MsgHandlerCallback ( UDPWiFiService::ReqMsgType::DOOROPEN );
 		}
 		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( DoorCloseReqMsg ) )
 		{
-			Error ( "Door Close request" );
-			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::DOORCLOSE );
+			//Error ( "Door Close request" );
+			m_MsgHandlerCallback ( UDPWiFiService::ReqMsgType::DOORCLOSE );
 		}
 		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( DoorStopReqMsg ) )
 		{
-			Error ( "Door Stop request" );
-			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::DOORSTOP );
+			//Error ( "Door Stop request" );
+			m_MsgHandlerCallback ( UDPWiFiService::ReqMsgType::DOORSTOP );
 		}
 		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( DoorLightOnReqMsg ) )
 		{
-			Error ( "Light On request" );
-			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::LIGHTON );
+			//Error ( "Light On request" );
+			m_MsgHandlerCallback ( UDPWiFiService::ReqMsgType::LIGHTON );
 		}
 		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof (  PartSeparator ) - 2 ).startsWith ( DoorLightOffReqMsg ) )
 		{
-			Error ( "Light Off request" );
-			m_MsghHandlerCallback ( UDPWiFiService::ReqMsgType::LIGHTOFF );
+			//Error ( "Light Off request" );
+			m_MsgHandlerCallback ( UDPWiFiService::ReqMsgType::LIGHTOFF );
 		}
         else
         {

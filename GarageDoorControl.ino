@@ -86,10 +86,10 @@ constexpr	uint8_t 	DOOR_SWITCH_INPUT_PIN		= 5;
 constexpr	uint32_t 	DEBOUNCE_MS					= 75;						// min ms between consecutive pin interrupts before signal accepted
 constexpr	uint32_t	SWITCH_DEBOUNCE_MS			= 200;						// min ms between consecutive pin interrupts before signal accepted from manual switch
 constexpr	int	  		UAP_TRUE					= LOW;						// UAP signals LOW when sensor is TRUE
-constexpr	uint8_t 	TURN_LIGHT_ON_OUTPUT_PIN	= 6;
-constexpr	uint8_t 	CLOSE_DOOR_OUTPUT_PIN		= 7;
-constexpr	uint8_t 	OPEN_DOOR_OUTPUT_PIN		= 8;
-constexpr	uint8_t 	STOP_DOOR_OUTPUT_PIN		= 9;
+constexpr	uint8_t 	TURN_LIGHT_ON_OUTPUT_PIN	= 9;
+constexpr	uint8_t 	CLOSE_DOOR_OUTPUT_PIN		= 8;
+constexpr	uint8_t 	OPEN_DOOR_OUTPUT_PIN		= 7;
+constexpr	uint8_t 	STOP_DOOR_OUTPUT_PIN		= 6;
 
 volatile 	bool 		bLightIsOn 					= false;
 
@@ -240,6 +240,7 @@ inline bool GetLightInitialState ()
 // main setup routine
 void setup()
 {
+    delay ( 10 * 1000 );
 	LogStart();
 	ClearScreen();
 #ifdef BAROMETRIC_SUPPORT
@@ -267,6 +268,7 @@ void setup()
 #endif
 
 	pMyUDPService = new UDPWiFiService();
+ 
 	// now we have state table set up and temp sensor configured, allow users to query state
 	if ( !pMyUDPService->Begin ( ProcessUDPMsg, ssid, pass, MyHostName, &TheMKR_RGB_LED ) )	
 	{
