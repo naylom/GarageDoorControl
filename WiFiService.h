@@ -1,4 +1,3 @@
-#include "api/IPAddress.h"
 #pragma once
 /*
 
@@ -11,18 +10,10 @@ Author: (c) M. Naylor 2022
 History:
 	Ver 1.0			Initial version
 */
+#include <MNRGBLEDBaseLib.h>
+#include <WiFiNINA.h>
 #include "Logging.h"
 #include "FixedIPList.h"
-#include <MNRGBLEDBaseLib.h>
-
-#ifdef ARDUINO_AVR_UNO              // On UNO, I use the Cytron shield-esp-wifi
-//#include <CytronWiFiShield.h>
-//#include <CytronWiFiServer.h>
-//#include <CytronWiFiClient.h>
-#else                               // On MKR1010 WIFI with in built wifi use nina libs
-#include <WiFiNINA.h>
-#include <WiFiUdp.h>
-#endif
 
 // Colours used on MKR RGB LED to indicate status
 constexpr RGBType OLD_WIFI_FIRMWARE_COLOUR	= MNRGBLEDBaseLib::eColour::DARK_YELLOW ;
