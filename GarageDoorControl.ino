@@ -24,6 +24,7 @@ Author: (c) M. Naylor 2022
 History:
 	Ver 1.0			Initial version
 	Ver 1.0.4		Supports config to add/remove UAP, Distance Centre, Barometruc sensor
+	Ver 1.0.5		Add ability to get loggging data over a telnet connection on 0xFEEE
 */
 #define 	VERSION					"1.0.5 Beta"
 
@@ -46,9 +47,7 @@ History:
 /*
     HumiditySensor config
 */
-#define SHT35D                      										// Configure to use SHT35D sensor for humidity and temperature
-constexpr auto HUMIDITYSENSOR_READ_INTERVAL 		= 2000;
-
+#define SHT35D                      											// Configure to use SHT35D sensor for humidity and temperature
 #ifdef SHT35D
 #include "SHTTempHumSensors.h"
 constexpr auto 			SensorDeviceID 				= 0x44;						// I2C device id for SHT35-D sensor
@@ -250,7 +249,7 @@ void setup()
 	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, GetDoorInitialState() );
 	SetLED();
 	// Setup so we are called if the state of door changes
-	PCIHandler.AddPin ( DOOR_SWITCH_INPUT_PIN, SwitchPressedISR, HIGH, INPUT_PULLDOWN );
+	PCIHandler.AddPin ( DOOR_SWITCH_INPUT_PIN, SwitchPressedISR, FALLING, INPUT_PULLDOWN );
 	PCIHandler.AddPin ( DOOR_IS_OPEN_INPUT_PIN, DoorOpenedISR, CHANGE, INPUT_PULLDOWN );
 	PCIHandler.AddPin ( DOOR_IS_CLOSED_INPUT_PIN, DoorClosedISR, CHANGE, INPUT_PULLDOWN );
 	PCIHandler.AddPin ( LIGHT_IS_ON_INPUT_PIN, LightChangeISR, CHANGE, INPUT_PULLDOWN );

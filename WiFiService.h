@@ -89,7 +89,7 @@ private:
 			bool			SendReply ( void * paramPtr );
 
 
-	WiFiStateFunction StateTableFn [ 5 ][ 5 ] =
+	WiFiStateFunction StateTableFn [ 2 ][ 5 ] =
 	{
 		{ &UDPWiFiService::NowConnected,  	&UDPWiFiService::DoNowt,		&UDPWiFiService::Connect,		&UDPWiFiService::Connect,		&UDPWiFiService::Connect },		// Actions when current state is UNCONNECTED
 		{ &UDPWiFiService::DoNowt,    		&UDPWiFiService::Connect,     	&UDPWiFiService::SendReply, 	&UDPWiFiService::GetReq,  		&UDPWiFiService::SendMCast }	// Actions when current state is CONNECTED

@@ -166,28 +166,6 @@ IPAddress					WiFiService::CalcMulticastAddress ( IPAddress ip )
 	return ( ip & subnetMask ) | (~subnetMask);
 }
 
-// static IPAddress CalcMulticastAddress1 ( UInt32 ip )
-// {
-//     UInt32 subnetMask =  0;    //WiFi.subnetMask();
-//     byte firstOctet = (byte) (ip & 0xff);
-//     if ( firstOctet > 0 && firstOctet <= 127 )
-//     {
-//         // class A
-//         subnetMask = 0x000000ff ;
-//     }
-//     else if ( firstOctet > 127 && firstOctet <= 191 )
-//     {
-//         // Class B
-//         subnetMask = 0x0000ffff;
-//     }
-//     else if ( firstOctet > 191 && firstOctet <= 223 )
-//     {
-//         // Class C
-//         subnetMask = 0x00ffffff;
-//     }
-//     return new IPAddress (( ip & subnetMask | ( ~subnetMask ) ) );
-// }
-
 inline IPAddress        WiFiService::GetMulticastAddress()
 {
 	return m_multicastAddr;
@@ -203,7 +181,6 @@ bool					WiFiService::WiFiConnect()
 		Error ( "Starting WiFi, attempt " + String ( iStartCount ) );
 		uint8_t status; 
 		uint32_t ulStart = millis();
-		//WiFi.end ();
 		WiFi.begin ( m_SSID, m_Pwd );
 		String msg = "connecting ";
 		do
@@ -274,7 +251,6 @@ bool	        UDPWiFiService::Begin ( UDPWiFiServiceCallback  pHandleReqData, con
 	WiFiService::Begin ( HostName, WiFissid, WiFipwd, pLED );
 	m_Port					= portUDP;
 	m_MsghHandlerCallback	= pHandleReqData;
-
 	if ( m_sUDPReceivedMsg.reserve ( MAX_INCOMING_UDP_MSG ) )
 	{
 		bResult = true;			
@@ -284,7 +260,7 @@ bool	        UDPWiFiService::Begin ( UDPWiFiServiceCallback  pHandleReqData, con
 
 bool	        UDPWiFiService::Begin ( UDPWiFiServiceCallback  pHandleReqData, const char *WiFissid, const char *WiFipwd, const char * HostName,  MNRGBLEDBaseLib * pLED, const uint16_t portUDP )
 {
-	return Begin ( pHandleReqData, WiFissid, WiFipwd, HostName, portUDP, pLED) ;	
+	return Begin ( pHandleReqData, WiFissid, WiFipwd, HostName, portUDP, pLED) ;
 }
 
 void	        UDPWiFiService::CheckUDP()
