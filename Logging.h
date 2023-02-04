@@ -25,7 +25,7 @@ constexpr auto BAUD_RATE = 115200;
 #include <Arduino.h>
 #include "CTelnet.h"
 #define MNDEBUG
-#define TELNET
+#undef TELNET
 #ifdef MNDEBUG
 #ifdef TELNET
 #define Log(x)			Telnet.print ( x )

@@ -97,7 +97,7 @@ private:
 			uint16_t				m_Port				= 0;
 			WiFiUDP 				m_myUDP;
 			String 					m_sUDPReceivedMsg;
-			UDPWiFiServiceCallback	m_MsghHandlerCallback;
+			UDPWiFiServiceCallback	m_MsgHandlerCallback;
 			FixedIPList	*			m_pMulticastDestList = nullptr;			
 			uint32_t				m_ulBadRequests		= 0UL;
 			uint32_t				m_ulBadMgsVersion	= 0UL;
