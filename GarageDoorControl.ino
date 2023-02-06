@@ -239,7 +239,6 @@ inline bool GetLightInitialState ()
 // main setup routine
 void setup()
 {
-    delay ( 10 * 1000 );
 	LogStart();
 	ClearScreen();
 #ifdef BAROMETRIC_SUPPORT
@@ -323,7 +322,7 @@ void SetLED()
 void loop()
 {
 #if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT 
-	static unsigned long ulLastSensorTime 	= 0UL;
+	static unsigned long ulLastSensorTime 	= (unsigned long)(-30*1000);
 #endif	
 	static unsigned long ulLastDisplayTime 	= 0UL;
 #ifdef UAP_SUPPORT	
