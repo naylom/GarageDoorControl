@@ -83,7 +83,7 @@ constexpr 	uint8_t 	DOOR_IS_CLOSED_INPUT_PIN	= 1;
 constexpr	uint8_t 	LIGHT_IS_ON_INPUT_PIN		= 4;
 constexpr	uint8_t 	DOOR_SWITCH_INPUT_PIN		= 5;
 constexpr	uint32_t 	DEBOUNCE_MS					= 75;						// min ms between consecutive pin interrupts before signal accepted
-constexpr	uint32_t	SWITCH_DEBOUNCE_MS			= 200;						// min ms between consecutive pin interrupts before signal accepted from manual switch
+constexpr	uint32_t	SWITCH_DEBOUNCE_MS			= 400;						// min ms between consecutive pin interrupts before signal accepted from manual switch
 constexpr	int	  		UAP_TRUE					= LOW;						// UAP signals LOW when sensor is TRUE
 constexpr	uint8_t 	TURN_LIGHT_ON_OUTPUT_PIN	= 9;
 constexpr	uint8_t 	CLOSE_DOOR_OUTPUT_PIN		= 8;
@@ -239,6 +239,7 @@ inline bool GetLightInitialState ()
 // main setup routine
 void setup()
 {
+    //Serial.begin ( BAUD_RATE );
 	LogStart();
 	ClearScreen();
 #ifdef BAROMETRIC_SUPPORT
@@ -249,7 +250,7 @@ void setup()
 	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, GetDoorInitialState() );
 	SetLED();
 	// Setup so we are called if the state of door changes
-	PCIHandler.AddPin ( DOOR_SWITCH_INPUT_PIN, SwitchPressedISR, FALLING, INPUT_PULLDOWN );
+	PCIHandler.AddPin ( DOOR_SWITCH_INPUT_PIN, SwitchPressedISR, CHANGE, INPUT_PULLDOWN );
 	PCIHandler.AddPin ( DOOR_IS_OPEN_INPUT_PIN, DoorOpenedISR, CHANGE, INPUT_PULLDOWN );
 	PCIHandler.AddPin ( DOOR_IS_CLOSED_INPUT_PIN, DoorClosedISR, CHANGE, INPUT_PULLDOWN );
 	PCIHandler.AddPin ( LIGHT_IS_ON_INPUT_PIN, LightChangeISR, CHANGE, INPUT_PULLDOWN );
@@ -367,6 +368,22 @@ void loop()
 		MulticastMsg ( UDPWiFiService::ReqMsgType::DOORDATA );
 	}
 #endif	
+    // static int LastSwitchRead = 0;
+    // static bool bSwitchread = true;
+    // static int countdown=40;
+    // if ( countdown > 0 )
+    // {
+    //     int thisread = digitalRead ( DOOR_SWITCH_INPUT_PIN );
+    //     Serial.println ( thisread );
+    //     if ( thisread != LastSwitchRead )
+    //     {
+    //         bSwitchread = false;
+    //     }
+    //     if ( !bSwitchread )
+    //     {
+    //         countdown--;
+    //     }
+    // }
 }
 
 // called to generate a response to a command
@@ -552,13 +569,16 @@ void LightChangeISR ()
 void SwitchPressedISR ()
 {
 	static unsigned long ulLastSPIntTime = 0UL;
-	unsigned long ulNow = millis();
 
-	if ( ( ulNow - ulLastSPIntTime ) > SWITCH_DEBOUNCE_MS )
-	{	
-		ulLastSPIntTime = ulNow;
-		ulSwitchCount++;
-		//pGarageDoor->DoEvent ( DoorState::Event::SwitchPress );
-	}
+    if ( digitalRead ( DOOR_SWITCH_INPUT_PIN ) == HIGH )
+    {
+        unsigned long ulNow = millis();
+        if ( ( ulNow - ulLastSPIntTime ) > SWITCH_DEBOUNCE_MS )
+        {	
+            ulLastSPIntTime = ulNow;
+            ulSwitchCount++;
+            //pGarageDoor->DoEvent ( DoorState::Event::SwitchPress );
+        }
+    }
 }
 #endif
