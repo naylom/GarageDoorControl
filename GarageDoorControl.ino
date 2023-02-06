@@ -26,13 +26,13 @@ History:
 	Ver 1.0.4		Supports config to add/remove UAP, Distance Centre, Barometruc sensor
 	Ver 1.0.5		Add ability to get loggging data over a telnet connection on 0xFEEE
 */
-#define 	VERSION					"1.0.5 Beta"
+#define 	VERSION					"1.0.6 Beta"
 
 #define 	UAP_SUPPORT				
 #define 	BAROMETRIC_SUPPORT		
 #define		TEMP_HUMIDITY_SUPPORT	
 #undef	 	DISTANCE_SENSOR_SUPPORT	
-
+//#define 	MKR_RGB_INVERT														// only required if Red and Green colours are inverted as found on some boards
 #include <time.h>
 #include <MNPCIHandler.h>
 #include <MNTimerLib.h>
@@ -116,15 +116,9 @@ constexpr	char 		ssid[] 						= "Naylorfamily";			// your network SSID (name)
 constexpr 	char 		pass[] 						= "welcome1";				// your network password
 constexpr 	char 		MyHostName[] 				= "GarageControl";
 
-
-
-
 UDPWiFiService* 		pMyUDPService 				= nullptr;
 
-
 unsigned long			ulLastClientReq				= 0UL;						// millis of last wifi incoming message
-
-
 
 // Debug information for ANSI screen with cursor control
 void DisplayStats ( void )
