@@ -10,6 +10,7 @@ Author: (c) M. Naylor 2022
 History:
 	Ver 1.0			Initial version
 */
+#define MKR_RGB_INVERT
 #include <MNRGBLEDBaseLib.h>
 #include <WiFiNINA.h>
 #include "Logging.h"

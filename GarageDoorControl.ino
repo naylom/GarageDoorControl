@@ -25,8 +25,9 @@ History:
 	Ver 1.0			Initial version
 	Ver 1.0.4		Supports config to add/remove UAP, Distance Centre, Barometruc sensor
 	Ver 1.0.5		Add ability to get loggging data over a telnet connection on 0xFEEE
+    Ver 1.0.6       Changed input pins to be simply INPUT and use external pulldown resistors
 */
-#define 	VERSION					"1.0.5 Beta"
+#define 	VERSION					"1.0.6 Beta"
 
 #define 	UAP_SUPPORT				
 #define 	BAROMETRIC_SUPPORT		
@@ -99,8 +100,7 @@ volatile uint32_t 		gDoorOpened 				= 0UL;
 volatile uint32_t 		gDoorOpening 				= 0UL;
 volatile uint32_t 		gDoorClosed 				= 0UL;
 volatile uint32_t 		gDoorClosing 				= 0UL;
-
-volatile uint32_t		ulSwitchCount				= 0UL;
+volatile uint32_t 		gSwitchCount 				= 0UL;
 
 constexpr 	uint8_t 	RED_PIN						= A4;
 constexpr 	uint8_t 	GREEN_PIN					= A5;
@@ -156,8 +156,6 @@ void DisplayStats ( void )
 	ClearPartofLine ( 5, 10, 8 );
 	COLOUR_AT ( FG_CYAN, BG_BLACK, 5, 10, pGarageDoor->GetDoorDisplayState() );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 0,  F ( "Switch Presssed " ) );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 17, String ( ulSwitchCount ) );
 	// debug stats
 	noInterrupts();
 	uint32_t Loff = gLightOff;
@@ -166,7 +164,9 @@ void DisplayStats ( void )
 	uint32_t DOpening = gDoorOpening;
 	uint32_t DClose = gDoorClosed;
 	uint32_t DClosing = gDoorClosing;
+    uint32_t SwitchPressed = gSwitchCount;
 	interrupts();
+   
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 40,  F ("Light Off count     ") );
  	COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 61, String ( Loff ) );
  	COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 40,  F ("Light On count      ") );
@@ -178,7 +178,9 @@ void DisplayStats ( void )
  	COLOUR_AT ( FG_WHITE, BG_BLACK, 8, 40,  F ("Door Closed count   ") );
  	COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 61, String ( DClose ) );
  	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 40,  F ("Door Closing count  ") );
- 	COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 61, String ( DClosing ) );	
+ 	COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 61, String ( DClosing ) );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 0,  F ( "Switch Presssed " ) );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 17, String ( SwitchPressed ) ); 
 #endif
 #ifdef TEMP_HUMIDITY_SUPPORT
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 12, 0,  F ("Temperature is ") );
@@ -201,9 +203,9 @@ void DisplayStats ( void )
 DoorState::State GetDoorInitialState ()
 {
 	//  ensure we can read from pins connected to UAP1 outputs
-	pinMode ( DOOR_IS_OPEN_INPUT_PIN, INPUT_PULLDOWN );
+	pinMode ( DOOR_IS_OPEN_INPUT_PIN, INPUT /*INPUT_PULLDOWN*/ );
 	int OpenState;
-	pinMode ( DOOR_IS_CLOSED_INPUT_PIN, INPUT_PULLDOWN );
+	pinMode ( DOOR_IS_CLOSED_INPUT_PIN, INPUT /*INPUT_PULLDOWN*/ );
 	int CloseState;
 
 	uint8_t iCount = 0;
@@ -250,10 +252,18 @@ void setup()
 	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, GetDoorInitialState() );
 	SetLED();
 	// Setup so we are called if the state of door changes
-	PCIHandler.AddPin ( DOOR_SWITCH_INPUT_PIN, SwitchPressedISR, CHANGE, INPUT_PULLDOWN );
-	PCIHandler.AddPin ( DOOR_IS_OPEN_INPUT_PIN, DoorOpenedISR, CHANGE, INPUT_PULLDOWN );
-	PCIHandler.AddPin ( DOOR_IS_CLOSED_INPUT_PIN, DoorClosedISR, CHANGE, INPUT_PULLDOWN );
-	PCIHandler.AddPin ( LIGHT_IS_ON_INPUT_PIN, LightChangeISR, CHANGE, INPUT_PULLDOWN );
+	//PCIHandler.AddPin ( DOOR_SWITCH_INPUT_PIN, SwitchPressedISR, CHANGE, INPUT /*INPUT_PULLDOWN*/ );
+    pinMode ( DOOR_SWITCH_INPUT_PIN, INPUT );
+    attachInterrupt( digitalPinToInterrupt ( DOOR_SWITCH_INPUT_PIN ), SwitchPressedISR, CHANGE );
+	//PCIHandler.AddPin ( DOOR_IS_OPEN_INPUT_PIN, DoorOpenedISR, CHANGE, INPUT /*INPUT_PULLDOWN*/ );
+    pinMode ( DOOR_IS_OPEN_INPUT_PIN, INPUT );
+    attachInterrupt( digitalPinToInterrupt ( DOOR_IS_OPEN_INPUT_PIN ), DoorOpenedISR, CHANGE );
+	//PCIHandler.AddPin ( DOOR_IS_CLOSED_INPUT_PIN, DoorClosedISR, CHANGE, INPUT /*INPUT_PULLDOWN*/ );
+    pinMode ( DOOR_IS_CLOSED_INPUT_PIN, INPUT );
+    attachInterrupt( digitalPinToInterrupt ( DOOR_IS_CLOSED_INPUT_PIN ), DoorClosedISR, CHANGE );
+	//PCIHandler.AddPin ( LIGHT_IS_ON_INPUT_PIN, LightChangeISR, CHANGE, INPUT /*INPUT_PULLDOWN*/ );
+    pinMode ( LIGHT_IS_ON_INPUT_PIN, INPUT );
+    attachInterrupt( digitalPinToInterrupt ( LIGHT_IS_ON_INPUT_PIN ), LightChangeISR, CHANGE );
 	
 	// Set initial light state
 	bLightIsOn =  GetLightInitialState();	
@@ -323,7 +333,7 @@ void SetLED()
 void loop()
 {
 #if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT 
-	static unsigned long ulLastSensorTime 	= (unsigned long)(-30*1000);
+	static unsigned long ulLastSensorTime 	= 0UL;
 #endif	
 	static unsigned long ulLastDisplayTime 	= 0UL;
 #ifdef UAP_SUPPORT	
@@ -569,14 +579,14 @@ void LightChangeISR ()
 void SwitchPressedISR ()
 {
 	static unsigned long ulLastSPIntTime = 0UL;
-
-    if ( digitalRead ( DOOR_SWITCH_INPUT_PIN ) == HIGH )
+    
+    unsigned long ulNow = millis();
+    if ( ( ulNow - ulLastSPIntTime ) > SWITCH_DEBOUNCE_MS )
     {
-        unsigned long ulNow = millis();
-        if ( ( ulNow - ulLastSPIntTime ) > SWITCH_DEBOUNCE_MS )
-        {	
+        if ( digitalRead ( DOOR_SWITCH_INPUT_PIN ) == HIGH )
+        {
             ulLastSPIntTime = ulNow;
-            ulSwitchCount++;
+            gSwitchCount++;
             //pGarageDoor->DoEvent ( DoorState::Event::SwitchPress );
         }
     }
