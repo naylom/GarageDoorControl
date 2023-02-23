@@ -9,9 +9,10 @@ Author: (c) M. Naylor 2022
 History:
 	Ver 1.0			Initial version
 */
+#include <WiFiNINA.h>
 #include "WiFiService.h"
 #include "DoorState.h"
-#include <WiFiNINA.h>
+
 
 const char		 *WiFiStatus []			= { "WL_IDLE_STATUS",																																											   // = 0,
 											"WL_NO_SSID_AVAIL", "WL_SCAN_COMPLETED", "WL_CONNECTED", "WL_CONNECT_FAILED", "WL_CONNECTION_LOST", "WL_DISCONNECTED", "WL_AP_LISTENING", "WL_AP_CONNECTED", "WL_AP_FAILED", "WL_NO_MODULE" }; // = 255

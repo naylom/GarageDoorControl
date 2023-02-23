@@ -1,3 +1,11 @@
+#include <MNPCIHandler.h>
+#include <MNRGBLEDBaseLib.h>
+#include <MNTimerLib.h>
+#include <WiFiNINA.h>
+#include <WiFiUdp.h>
+#include <time.h>
+#include "WiFiService.h"
+#include "logging.h"
 /*
 
 GarageDoorControl.ino
@@ -35,14 +43,6 @@ History:
 #undef DISTANCE_SENSOR_SUPPORT
 // #define 	MKR_RGB_INVERT														// only required if Red and Green colours
 // are inverted as found on some boards
-#include "WiFiService.h"
-#include "logging.h"
-#include <MNPCIHandler.h>
-#include <MNRGBLEDBaseLib.h>
-#include <MNTimerLib.h>
-#include <WiFiNINA.h>
-#include <WiFiUdp.h>
-#include <time.h>
 
 #ifdef TEMP_HUMIDITY_SUPPORT
 	#include <ClosedCube_SHT31D.h>

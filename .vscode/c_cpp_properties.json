@@ -15,6 +15,24 @@
             "cStandard": "c17",
             "cppStandard": "c++17",
             "intelliSenseMode": "windows-msvc-x64"
+        },
+        {
+            "name": "ArduinoWIn",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "F:/mark_/OneDrive/Documents/Arduino/libraries/**",
+                "C:/Users/mark_/AppData/Local/Arduino15/**"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "windowsSdkVersion": "10.0.22000.0",
+            "compilerPath": "C:/Users/mark_/AppData/Local/Arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/bin/arm-none-eabi-g++",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-gcc-arm"
         }
     ],
     "version": 4

@@ -1,6 +1,6 @@
+#include <MNTimerLib.h>
 #include "DoorState.h"
 #include "Logging.h"
-#include <MNTimerLib.h>
 /*
 
 DoorState.cpp

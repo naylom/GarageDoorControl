@@ -15,12 +15,14 @@ Author: (c) M. Naylor 2022
 History:
 	Ver 1.0			Initial version
 */
+#include <stdint.h>
+#include <MNRGBLEDBaseLib.h>
 typedef uint8_t Pin;
 #ifndef NOT_A_PIN
 const uint8_t NOT_A_PIN = 255;
 #endif
 
-#include "MNRGBLEDBaseLib.h"
+
 
 // Colours used on MKR RGB LED to indicate status
 constexpr RGBType STATE_UNKNOWN_COLOUR		= MNRGBLEDBaseLib::WHITE;
