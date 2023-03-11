@@ -63,7 +63,7 @@ void CTelnet::print ( int16_t s )
 	Send ( String ( s ) );
 }
 
-void CTelnet::print ( const arduino::__FlashStringHelper *s )
+void CTelnet::print ( const __FlashStringHelper *s )
 {
 	Send ( String ( s ) );
 }

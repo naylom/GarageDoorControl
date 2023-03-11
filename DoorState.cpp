@@ -48,7 +48,7 @@ void DoorState::ClearRelayPin ( Pin thePin )
 {
 	if ( thePin != NOT_A_PIN && digitalRead ( thePin ) == RELAY_ON )
 	{
-		digitalWrite ( thePin, RELAY_OFF );
+		digitalWrite ( thePin, (PinStatus)RELAY_OFF ); 
 	}
 }
 
@@ -57,7 +57,7 @@ void DoorState::SetRelayPin ( Pin thePin )
 {
 	if ( thePin != NOT_A_PIN && digitalRead ( thePin ) == RELAY_OFF )
 	{
-		digitalWrite ( thePin, RELAY_ON );
+		digitalWrite ( thePin, (PinStatus)RELAY_ON );
 	}
 }
 

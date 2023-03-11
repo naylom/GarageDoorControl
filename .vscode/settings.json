@@ -1,4 +1,11 @@
 {
 	"C_Cpp.errorSquiggles": "enabled",
-	"editor.insertSpaces": false
+	"editor.insertSpaces": false,
+	"files.associations": {
+		"*.cps": "javascript",
+		".ino": "c",
+		".clang-format": "plaintext",
+		"*.h": "cpp",
+		"*.tcc": "cpp"
+	}
 }

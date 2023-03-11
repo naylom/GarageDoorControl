@@ -1,3 +1,4 @@
 {
-    "board": "arduino:samd:mkrwifi1010"
+    "board": "arduino:samd:mkrwifi1010",
+    "sketch": "GarageDoorControl.ino"
 }

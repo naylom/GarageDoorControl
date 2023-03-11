@@ -19,7 +19,7 @@ class CTelnet
 		void print ( String &s );
 		void print ( int32_t s );
 		void print ( int16_t s );
-		void print ( const arduino::__FlashStringHelper *s );
+		void print ( const __FlashStringHelper *s );
 		void println ( char *s );
 
 	private:
