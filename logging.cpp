@@ -21,20 +21,21 @@ History:
 #ifdef ARDUINO_AVR_UNO
 extern "C"
 {
-	void ( *SWResetBoard ) ( void ) = 0;					        //declare reset function at address 0
+	void ( *SWResetBoard ) ( void ) = 0; // declare reset function at address 0
 }
-void ResetBoard ( const __FlashStringHelper* pErrMsg )
+
+void ResetBoard ( const __FlashStringHelper *pErrMsg )
 {
 	Error ( pErrMsg );
 	LogFlush;
 	SWResetBoard ();
 }
 #else
-void ResetBoard ( const __FlashStringHelper* pErrMsg )
+void ResetBoard ( const __FlashStringHelper *pErrMsg )
 {
 	Error ( pErrMsg );
 	LogFlush;
-	NVIC_SystemReset ();										// processor software reset for ARM SAMD processor
+	NVIC_SystemReset (); // processor software reset for ARM SAMD processor
 }
 #endif
 /* ---------------------------------------- */
@@ -47,8 +48,8 @@ void ClearScreen ()
 
 void AT ( uint8_t row, uint8_t col, String s )
 {
-	row = row == 0 ? 1 : row;
-	col = col == 0 ? 1 : col;
+	row		 = row == 0 ? 1 : row;
+	col		 = col == 0 ? 1 : col;
 	String m = String ( CSI ) + row + String ( ";" ) + col + String ( "H" ) + s;
 	Log ( m );
 }
@@ -61,6 +62,7 @@ void COLOUR_AT ( uint8_t FGColour, uint8_t BGColour, uint8_t row, uint8_t col, S
 	// reset colours
 	Log ( RESET_COLOURS );
 }
+
 void RestoreCursor ( void )
 {
 	Log ( RESTORE_CURSOR );
@@ -70,12 +72,14 @@ void SaveCursor ( void )
 {
 	Log ( SAVE_CURSOR );
 }
+
 void ClearLine ( uint8_t row )
 {
 	SaveCursor ();
 	AT ( row, 1, String ( CLEAR_LINE ) );
 	RestoreCursor ();
 }
+
 void ClearPartofLine ( uint8_t row, uint8_t start_col, uint8_t toclear )
 {
 	static char buf [ MAX_COLS + 1 ];
@@ -83,12 +87,12 @@ void ClearPartofLine ( uint8_t row, uint8_t start_col, uint8_t toclear )
 	buf [ MAX_COLS ] = 0;
 
 	// build string of toclear spaces
-	toclear %= MAX_COLS + 1;						// ensure toclear is <= MAX_COLS
+	toclear			 %= MAX_COLS + 1; // ensure toclear is <= MAX_COLS
 	if ( start_col + toclear > MAX_COLS + 1 )
 	{
 		toclear = MAX_COLS - start_col + 1;
 	}
-	toclear = ( MAX_COLS - start_col + 1 ) % ( MAX_COLS + 1 );	// ensure toclear doesn't go past end of line
+	toclear = ( MAX_COLS - start_col + 1 ) % ( MAX_COLS + 1 ); // ensure toclear doesn't go past end of line
 	SaveCursor ();
 	buf [ toclear ] = 0;
 	AT ( row, start_col, buf );
@@ -100,5 +104,5 @@ void Error ( String s )
 	// Clear error line
 	ClearLine ( ERROR_ROW );
 	// Output new error
-	COLOUR_AT ( FG_WHITE, BG_RED, ERROR_ROW, ERROR_COL, s.substring( 0, min ( s.length() ,(unsigned int)MAX_COLS ) ) );
+	COLOUR_AT ( FG_WHITE, BG_RED, ERROR_ROW, ERROR_COL, s.substring ( 0, min ( s.length (), (unsigned int)MAX_COLS ) ) );
 }
