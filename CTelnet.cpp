@@ -1,21 +1,22 @@
 #include "CTelnet.h"
 
-bool CTelnet::isConnected()
+bool CTelnet::isConnected ()
 {
-	return WiFi.status() == WL_CONNECTED ? true : false;
+	return WiFi.status () == WL_CONNECTED ? true : false;
 }
 
-CTelnet::operator bool()
+CTelnet::operator bool ()
 {
-	return isConnected();
+	return isConnected ();
 }
 
 void CTelnet::begin ( uint32_t port )
 {
 	m_telnetPort = port & 0xffff;
-	m_pmyServer = new WiFiServer ( port  & 0xffff );
+	m_pmyServer	 = new WiFiServer ( port & 0xffff );
 	m_pmyServer->begin ();
 }
+
 bool CTelnet::Send ( String Msg )
 {
 	bool bResult = false;
@@ -23,49 +24,58 @@ bool CTelnet::Send ( String Msg )
 	{
 		if ( m_myClient.print ( Msg ) <= 0 )
 		{
-			m_myClient.stop();
+			m_myClient.stop ();
 			m_bClientConnected = false;
 		}
 	}
 	else
 	{
-		m_myClient = m_pmyServer->available();
+		m_myClient = m_pmyServer->available ();
 	}
-	return bResult;		
+	return bResult;
 }
-void CTelnet::print  ( char c )
+
+void CTelnet::print ( char c )
 {
 	char buf [ 2 ];
 	buf [ 0 ] = c;
-	buf [ 1 ] = 0;	
+	buf [ 1 ] = 0;
 	Send ( buf );
 }
-void CTelnet::print  ( char * s )
+
+void CTelnet::print ( char *s )
 {
 	Send ( s );
 }
-void CTelnet::print  ( const char * s )
+
+void CTelnet::print ( const char *s )
 {
 	Send ( s );
 }
-void CTelnet::print  ( int32_t s )
+
+void CTelnet::print ( int32_t s )
 {
 	Send ( String ( s ) );
 }
-void CTelnet::print  ( int16_t s )
+
+void CTelnet::print ( int16_t s )
 {
 	Send ( String ( s ) );
 }
-void CTelnet::print ( const arduino::__FlashStringHelper* s )
+
+void CTelnet::print ( const __FlashStringHelper *s )
 {
 	Send ( String ( s ) );
 }
-void CTelnet::print ( String& s)
+
+void CTelnet::print ( String &s )
 {
 	Send ( s );
 }
-void CTelnet::println ( char * s )
+
+void CTelnet::println ( char *s )
 {
 	Send ( String ( s ) + "\n" );
 }
-CTelnet	Telnet;
+
+CTelnet Telnet;

@@ -1,3 +1,11 @@
+#include <MNPCIHandler.h>
+#include <MNRGBLEDBaseLib.h>
+#include <MNTimerLib.h>
+#include <WiFiNINA.h>
+#include <WiFiUdp.h>
+#include <time.h>
+#include "WiFiService.h"
+#include "logging.h"
 /*
 
 GarageDoorControl.ino
@@ -33,15 +41,8 @@ History:
 #define BAROMETRIC_SUPPORT
 #define TEMP_HUMIDITY_SUPPORT
 #undef DISTANCE_SENSOR_SUPPORT
-// #define 	MKR_RGB_INVERT														// only required if Red and Green colours are inverted as found on some boards
-#include <time.h>
-#include <MNPCIHandler.h>
-#include <MNTimerLib.h>
-#include <MNRGBLEDBaseLib.h>
-#include "logging.h"
-#include <WiFiNINA.h>
-#include <WiFiUdp.h>
-#include "WiFiService.h"
+// #define 	MKR_RGB_INVERT														// only required if Red and Green colours
+// are inverted as found on some boards
 
 #ifdef TEMP_HUMIDITY_SUPPORT
 	#include <ClosedCube_SHT31D.h>
@@ -69,8 +70,10 @@ THSENSOR_RESULT sHTResults; // Holds last temperature and humidity results
 	Baramoter sensor, closedcube LPS25HB based on MEMS sensor
 */
 ClosedCube_LPS25HB lps25hb;
-// TN210TD height adjustment factor for pressure, see //https://www.engineeringtoolbox.com/barometers-elevation-compensation-d_1812.html
-constexpr float	   ALTITUDE_COMPENSATION = 15.0; // TN210TD is 127m above sea level according to Google Maps, which the above link converts to 15 mbars (hPa) compensation
+// TN210TD height adjustment factor for pressure, see
+// //https://www.engineeringtoolbox.com/barometers-elevation-compensation-d_1812.html
+constexpr float	   ALTITUDE_COMPENSATION = 15.0; // TN210TD is 127m above sea level according to Google Maps, which the
+												 // above link converts to 15 mbars (hPa) compensation
 constexpr auto	   lps25hbDevID			 = 0x5C; // I2C device id
 float			   fLatestPressure		 = NAN;
 #endif
@@ -79,48 +82,35 @@ float			   fLatestPressure		 = NAN;
 	#include "DoorState.h"
 // PIN allocations, input & output from arduino perspective
 
-constexpr uint8_t  DOOR_IS_OPEN_INPUT_PIN	  = 0;
-constexpr uint8_t  DOOR_IS_CLOSED_INPUT_PIN	  = 1;
-constexpr uint8_t  LIGHT_IS_ON_INPUT_PIN	  = 4;
-constexpr uint8_t  DOOR_SWITCH_INPUT_PIN	  = 5;
-constexpr uint32_t DEBOUNCE_MS				  = 75;	 // min ms between consecutive pin interrupts before signal accepted
-constexpr uint32_t SWITCH_DEBOUNCE_MS		  = 400; // min ms between consecutive pin interrupts before signal accepted from manual switch
-constexpr int	   UAP_TRUE					  = LOW; // UAP signals LOW when sensor is TRUE
-constexpr uint8_t  TURN_LIGHT_ON_OUTPUT_PIN	  = 9;
-constexpr uint8_t  CLOSE_DOOR_OUTPUT_PIN	  = 8;
-constexpr uint8_t  OPEN_DOOR_OUTPUT_PIN		  = 7;
-constexpr uint8_t  STOP_DOOR_OUTPUT_PIN		  = 6;
+constexpr uint8_t  DOOR_IS_OPEN_INPUT_PIN	= 0;
+constexpr uint8_t  DOOR_IS_CLOSED_INPUT_PIN = 1;
+constexpr uint8_t  LIGHT_IS_ON_INPUT_PIN	= 4;
+constexpr uint8_t  DOOR_SWITCH_INPUT_PIN	= 5;
+constexpr uint32_t DEBOUNCE_MS				= 75;  // min ms between consecutive pin interrupts before signal accepted
+constexpr uint32_t SWITCH_DEBOUNCE_MS		= 400; // min ms between consecutive pin interrupts before signal accepted from manual switch
+constexpr int	   UAP_TRUE					= LOW; // UAP signals LOW when sensor is TRUE
+constexpr uint8_t  TURN_LIGHT_ON_OUTPUT_PIN = 9;
+constexpr uint8_t  CLOSE_DOOR_OUTPUT_PIN	= 8;
+constexpr uint8_t  OPEN_DOOR_OUTPUT_PIN		= 7;
+constexpr uint8_t  STOP_DOOR_OUTPUT_PIN		= 6;
 
-volatile bool	   bLightIsOn				  = false;
+volatile bool	   bLightIsOn				= false;
 
 // debug - remove
-volatile uint32_t  gLightOff				  = 0UL;
-volatile uint32_t  gLightOn					  = 0UL;
-volatile uint32_t  gDoorOpened				  = 0UL;
-volatile uint32_t  gDoorOpening				  = 0UL;
-volatile uint32_t  gDoorClosed				  = 0UL;
-volatile uint32_t  gDoorClosing				  = 0UL;
-volatile uint32_t  gSwitchCount				  = 0UL;
+volatile uint32_t  gLightOff				= 0UL;
+volatile uint32_t  gLightOn					= 0UL;
+volatile uint32_t  gDoorOpened				= 0UL;
+volatile uint32_t  gDoorOpening				= 0UL;
+volatile uint32_t  gDoorClosed				= 0UL;
+volatile uint32_t  gDoorClosing				= 0UL;
+volatile uint32_t  gSwitchCount				= 0UL;
 
-volatile uint32_t  gSwitchDebounceSuppressed  = 0UL;
-volatile uint32_t  gLightDebounceSuppressed	  = 0UL;
-volatile uint32_t  gOpenPinDebounceSupressed  = 0UL;
-volatile uint32_t  gClosePinDebounceSupressed = 0UL;
-volatile bool	   gbSwitchChanged			  = false;
-volatile bool	   gbLightChanged			  = false;
-volatile bool	   gbOpenPinChanged			  = false;
-volatile bool	   gbClosePinChanged		  = false;
-volatile uint32_t  gSwitchChangedms			  = 0UL;
-volatile uint32_t  gLightChangedms			  = 0UL;
-volatile uint32_t  gOpenPinChangedms		  = 0UL;
-volatile uint32_t  gClosePinChangedms		  = 0UL;
+constexpr uint8_t  RED_PIN					= A4;
+constexpr uint8_t  GREEN_PIN				= A5;
+constexpr uint8_t  BLUE_PIN					= A6;
 
-constexpr uint8_t  RED_PIN					  = A4;
-constexpr uint8_t  GREEN_PIN				  = A5;
-constexpr uint8_t  BLUE_PIN					  = A6;
-
-DoorState		  *pGarageDoor				  = nullptr;
-MNRGBLEDBaseLib	  *pMyLED					  = new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
+DoorState		  *pGarageDoor				= nullptr;
+MNRGBLEDBaseLib	  *pMyLED					= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
 #endif
 /*
 	WiFi config
@@ -218,7 +208,8 @@ DoorState::State GetDoorInitialState ()
 	uint8_t iCount = 0;
 	while ( ( CloseState = digitalRead ( DOOR_IS_CLOSED_INPUT_PIN ) ) == ( OpenState = digitalRead ( DOOR_IS_OPEN_INPUT_PIN ) ) && iCount < ( 15 * ( 1000 / 500 ) ) )
 	{
-		// door is either in bad state, stopped or opening / closing, wait for state to change for max 15 seconds which is enough for door to complete normal closing
+		// door is either in bad state, stopped or opening / closing, wait for state to change for max 15 seconds which
+		// is enough for door to complete normal closing
 		delay ( 500 );
 		iCount++;
 	}
@@ -240,7 +231,7 @@ DoorState::State GetDoorInitialState ()
 	}
 }
 
-/// find initial state oi light
+/// find initial state of light
 inline bool GetLightInitialState ()
 {
 	return digitalRead ( LIGHT_IS_ON_INPUT_PIN ) == UAP_TRUE ? true : false;
@@ -262,7 +253,7 @@ void setup ()
 	// Setup so we are called if the state of door changes
 	// PCIHandler.AddPin ( DOOR_SWITCH_INPUT_PIN, SwitchPressedISR, CHANGE, INPUT /*INPUT_PULLDOWN*/ );
 	pinMode ( DOOR_SWITCH_INPUT_PIN, INPUT );
-	attachInterrupt ( digitalPinToInterrupt ( DOOR_SWITCH_INPUT_PIN ), SwitchPressedISR, FALLING );
+	attachInterrupt ( digitalPinToInterrupt ( DOOR_SWITCH_INPUT_PIN ), SwitchPressedISR, CHANGE );
 	// PCIHandler.AddPin ( DOOR_IS_OPEN_INPUT_PIN, DoorOpenedISR, CHANGE, INPUT /*INPUT_PULLDOWN*/ );
 	pinMode ( DOOR_IS_OPEN_INPUT_PIN, INPUT );
 	attachInterrupt ( digitalPinToInterrupt ( DOOR_IS_OPEN_INPUT_PIN ), DoorOpenedISR, CHANGE );
@@ -346,7 +337,6 @@ void loop ()
 #ifdef UAP_SUPPORT
 	static DoorState::State LastDoorState  = DoorState::Unknown;
 	static bool				LastLightState = !bLightIsOn;
-	String					sMsg;
 
 	// set LED to match Door State
 	SetLED ();
@@ -386,28 +376,6 @@ void loop ()
 		MulticastMsg ( UDPWiFiService::ReqMsgType::DOORDATA );
 	}
 #endif
-	if ( gbLightChanged || gbOpenPinChanged || gbClosePinChanged || gbSwitchChanged )
-	{
-		noInterrupts ();
-		uint32_t LOff					   = gLightOff;
-		uint32_t LOn					   = gLightOn;
-		uint32_t DOpen					   = gDoorOpened;
-		uint32_t DOpening				   = gDoorOpening;
-		uint32_t DClose					   = gDoorClosed;
-		uint32_t DClosing				   = gDoorClosing;
-		uint32_t SwitchPressed			   = gSwitchCount;
-		uint32_t ClosePinDebounceSupressed = gClosePinDebounceSupressed;
-		uint32_t OpenPinDebounceSupressed  = gOpenPinDebounceSupressed;
-		uint32_t LightDebounceSuppressed   = gLightDebounceSuppressed;
-		uint32_t SwitchDebounceSuppressed  = gSwitchDebounceSuppressed;
-		gbLightChanged = gbOpenPinChanged = gbClosePinChanged = gbSwitchChanged = false;
-		gClosePinDebounceSupressed = gOpenPinDebounceSupressed = gLightDebounceSuppressed = gSwitchDebounceSuppressed = 0UL;
-		interrupts ();
-		sMsg = "LD=" + String ( LightDebounceSuppressed ) + ",LT=" + gLightChangedms + ",LX=" + LOn + ",LY=" + LOff + ",OD=" + OpenPinDebounceSupressed + ",OT=" + gOpenPinChangedms + ",OX=" + DOpen + ",OY=" + DClosing + ",CD=" + ClosePinDebounceSupressed + ",CT=" + gClosePinChangedms +
-			   ",CX=" + DClose + ",CY=" + DOpening + ",SD=" + SwitchDebounceSuppressed + ",ST=" + gSwitchChangedms + ",SX=" + SwitchPressed + "\r";
-		pMyUDPService->SendAll ( sMsg );
-	}
-
 	// static int LastSwitchRead = 0;
 	// static bool bSwitchread = true;
 	// static int countdown=40;
@@ -532,8 +500,6 @@ void DoorOpenedISR ()
 	unsigned long		 ulNow			 = millis ();
 	if ( ( ulNow - ulLastDOIntTime ) > DEBOUNCE_MS )
 	{
-		gbOpenPinChanged	 = true;
-		gOpenPinChangedms	 = ulNow;
 		PinStatus newReading = digitalRead ( DOOR_IS_OPEN_INPUT_PIN );
 		if ( newReading != DoorOpenPinRead )
 		{
@@ -551,10 +517,6 @@ void DoorOpenedISR ()
 			}
 		}
 	}
-	else
-	{
-		gOpenPinDebounceSupressed++;
-	}
 }
 
 // ISR to handle DoorClosed Pin state change
@@ -566,8 +528,6 @@ void DoorClosedISR ()
 	unsigned long		 ulNow			   = millis ();
 	if ( ( ulNow - ulLastDCIntTime ) > DEBOUNCE_MS )
 	{
-		gbClosePinChanged	 = true;
-		gClosePinChangedms	 = ulNow;
 		PinStatus newReading = digitalRead ( DOOR_IS_CLOSED_INPUT_PIN );
 		if ( newReading != DoorClosedPinRead )
 		{
@@ -585,10 +545,6 @@ void DoorClosedISR ()
 			}
 		}
 	}
-	else
-	{
-		gClosePinDebounceSupressed++;
-	}
 }
 
 // ISR to handle DoorLight Pin state change
@@ -600,8 +556,6 @@ void LightChangeISR ()
 	unsigned long		 ulNow			 = millis ();
 	if ( ( ulNow - ulLastLCIntTime ) > DEBOUNCE_MS )
 	{
-		gbLightChanged		 = true;
-		gLightChangedms		 = ulNow;
 		PinStatus newReading = digitalRead ( LIGHT_IS_ON_INPUT_PIN );
 		if ( newReading != LightPinRead )
 		{
@@ -619,35 +573,22 @@ void LightChangeISR ()
 			}
 		}
 	}
-	else
-	{
-		gLightDebounceSuppressed++;
-	}
 }
 
 // ISR to handle rocker switch Pin state change
 void SwitchPressedISR ()
 {
 	static unsigned long ulLastSPIntTime = 0UL;
-	static PinStatus	 SwitchPinRead	 = LOW;
 
 	unsigned long		 ulNow			 = millis ();
 	if ( ( ulNow - ulLastSPIntTime ) > SWITCH_DEBOUNCE_MS )
 	{
-		gSwitchChangedms	 = ulNow;
-		gbSwitchChanged		 = true;
-		PinStatus newReading = digitalRead ( DOOR_SWITCH_INPUT_PIN );
-		if ( newReading != SwitchPinRead )
+		if ( digitalRead ( DOOR_SWITCH_INPUT_PIN ) == HIGH )
 		{
-			SwitchPinRead	= newReading;
 			ulLastSPIntTime = ulNow;
 			gSwitchCount++;
 			// pGarageDoor->DoEvent ( DoorState::Event::SwitchPress );
 		}
-	}
-	else
-	{
-		gSwitchDebounceSuppressed++;
 	}
 }
 #endif

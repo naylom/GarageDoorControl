@@ -3,9 +3,10 @@
 //
 //  Base class for temperature and humidity sensors
 //
-#include "Logging.h"
-#include "TempHumSensor.h"
 #include <Arduino.h>
+#include "TempHumSensor.h"
+#include "Logging.h"
+
 
 float TempHumSensorClass::CalcDewPoint ( float fTemperature, float fHumidity )
 {
