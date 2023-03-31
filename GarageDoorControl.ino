@@ -490,6 +490,7 @@ void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
 	}
 }
 #ifdef UAP_SUPPORT
+
 // ISR to handle DoorOpen Pin state change
 void DoorOpenedISR ()
 {
