@@ -7,7 +7,6 @@
 #include "TempHumSensor.h"
 #include "Logging.h"
 
-
 float TempHumSensorClass::CalcDewPoint ( float fTemperature, float fHumidity )
 {
 	const float a	  = 17.271;
@@ -52,10 +51,8 @@ unsigned long TempHumSensorClass::GetSensorTimeoutms ()
 	return m_ulSensorTimeoutms;
 }
 
-THSENSOR_RESULT TempHumSensorClass::GetLastReading ()
+void TempHumSensorClass::GetLastReading ( THSENSOR_RESULT &sResult )
 {
-	THSENSOR_RESULT sResult;
-
 	if ( millis () - m_ulTimeOfLastReading > GetShelfLifems () )
 	{
 		// current readings stale so try and get more recent
@@ -69,5 +66,4 @@ THSENSOR_RESULT TempHumSensorClass::GetLastReading ()
 	sResult.fHumidity		  = m_fLastHumidityReading;
 	sResult.fDewPoint		  = m_fLastDewPointReading;
 	sResult.ulTimeOfReadingms = m_ulTimeOfLastReading;
-	return sResult;
 }

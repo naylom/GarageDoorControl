@@ -28,9 +28,9 @@ class TempHumSensorClass
 
 	public:
 		TempHumSensorClass ();
-		THSENSOR_RESULT GetLastReading ();
-		void			SetShelfLifems ( unsigned long ulShelfLife );
-		unsigned long	GetShelfLifems ();
-		void			SetSensorTimeoutms ( unsigned long ulTimeOutms );
-		unsigned long	GetSensorTimeoutms ();
+		void		  GetLastReading ( THSENSOR_RESULT &result );
+		void		  SetShelfLifems ( unsigned long ulShelfLife );
+		unsigned long GetShelfLifems ();
+		void		  SetSensorTimeoutms ( unsigned long ulTimeOutms );
+		unsigned long GetSensorTimeoutms ();
 };

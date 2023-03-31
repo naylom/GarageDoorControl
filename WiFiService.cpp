@@ -129,14 +129,14 @@ void WiFiService::Begin ( const char *HostName, const char *WiFissid, const char
 	}
 }
 
-IPAddress WiFiService::CalcMyMulticastAddress ()
+void WiFiService::CalcMyMulticastAddress ( IPAddress& result )
 {
-	return CalcMulticastAddress ( WiFi.localIP () );
+	CalcMulticastAddress ( WiFi.localIP (), result );
 }
 
-IPAddress WiFiService::CalcMulticastAddress ( IPAddress ip )
+void WiFiService::CalcMulticastAddress ( IPAddress ip, IPAddress& subnetMask )
 {
-	IPAddress subnetMask = IPAddress ( 0UL ); // WiFi.subnetMask();
+	subnetMask = IPAddress ( 0UL ); // WiFi.subnetMask();
 	uint8_t	  firstOctet = ( ip & 0xff );
 	if ( firstOctet > 0 && firstOctet <= 127 )
 	{
@@ -153,7 +153,7 @@ IPAddress WiFiService::CalcMulticastAddress ( IPAddress ip )
 		// Class C
 		subnetMask = IPAddress ( 255, 255, 255, 0 );
 	}
-	return ( ip & subnetMask ) | ( ~subnetMask );
+	subnetMask = ( ip & subnetMask ) | ( ~subnetMask );
 }
 
 inline IPAddress WiFiService::GetMulticastAddress ()
@@ -194,7 +194,7 @@ bool WiFiService::WiFiConnect ()
 		}
 		else
 		{
-			m_multicastAddr = CalcMyMulticastAddress ();
+			CalcMyMulticastAddress ( m_multicastAddr );
 			Error ( "Connected to " + String ( m_SSID ) );
 			iStartCount = 0UL;
 			m_beginConnects++;
@@ -360,8 +360,10 @@ bool UDPWiFiService::ReadUDPMessage ( String &sRecvMessage )
 			sRecvMessage	= sBuffer;
 			bResult			= true;
 			m_ulReqCount++;
-			// create multicast address from send ip and add to list of subnets to send multicasts to and add ot list
-			m_pMulticastDestList->Add ( CalcMulticastAddress ( m_myUDP.remoteIP () ) );
+			// create multicast address from send ip and add to list of subnets to send multicasts to and add to list
+			IPAddress result;
+			CalcMulticastAddress ( m_myUDP.remoteIP (), result );
+			m_pMulticastDestList->Add ( result );
 		}
 		else
 		{

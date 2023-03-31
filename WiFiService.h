@@ -43,8 +43,8 @@ class WiFiService
 		bool		WiFiConnect ();
 		void		SetLED ( RGBType theColour, uint8_t flashTime = 0 );
 		void		SetState ( WiFiService::Status state );
-		IPAddress	CalcMyMulticastAddress ();
-		IPAddress	CalcMulticastAddress ( IPAddress ip );
+		void		CalcMyMulticastAddress ( IPAddress &result );
+		void		CalcMulticastAddress ( IPAddress ip, IPAddress &result );
 		const char *WiFiStatusToString ( uint8_t iState );
 
 		uint32_t	m_beginTimeouts = 0UL; // count of times WiFi.begin fails to connect within 10 secs

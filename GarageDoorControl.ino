@@ -272,7 +272,7 @@ void setup ()
 	// cannot instantiate object as global - causes board to freeze, need to allocate when running
 	pmyHumidityTempSensor = new SHTTempHumSensorsClass ( SensorDeviceID );
 	// get initial reading
-	sHTResults			  = pmyHumidityTempSensor->GetLastReading ();
+	pmyHumidityTempSensor->GetLastReading ( sHTResults );
 #endif
 
 	pMyUDPService = new UDPWiFiService ();
@@ -353,7 +353,7 @@ void loop ()
 		fLatestPressure = ( lps25hb.readPressure () + ALTITUDE_COMPENSATION );
 	#endif
 	#ifdef TEMP_HUMIDITY_SUPPORT
-		sHTResults					 = pmyHumidityTempSensor->GetLastReading ();
+		pmyHumidityTempSensor->GetLastReading ( sHTResults );
 		sHTResults.ulTimeOfReadingms = pMyUDPService->GetTime ();
 	#endif
 		MulticastMsg ( UDPWiFiService::ReqMsgType::TEMPDATA );
@@ -396,9 +396,8 @@ void loop ()
 
 // called to generate a response to a command
 // returns an empty string if no reposnse required ie only do action
-String BuildMessage ( UDPWiFiService::ReqMsgType eReqType )
+void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 {
-	String sResponse;
 	switch ( eReqType )
 	{
 #if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT
@@ -469,12 +468,12 @@ String BuildMessage ( UDPWiFiService::ReqMsgType eReqType )
 			break;
 #endif
 	}
-	return sResponse;
 }
 
 void MulticastMsg ( UDPWiFiService::ReqMsgType eReqType )
 {
-	String sResponse = BuildMessage ( eReqType );
+	String sResponse;
+	BuildMessage ( eReqType, sResponse );
 	if ( sResponse.length () > 0 )
 	{
 		pMyUDPService->SendAll ( sResponse );
@@ -483,7 +482,8 @@ void MulticastMsg ( UDPWiFiService::ReqMsgType eReqType )
 
 void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
 {
-	String sResponse = BuildMessage ( eReqType );
+	String sResponse;
+	BuildMessage ( eReqType, sResponse );
 	if ( sResponse.length () > 0 )
 	{
 		pMyUDPService->SendReply ( sResponse );

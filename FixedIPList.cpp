@@ -45,12 +45,11 @@ uint8_t FixedIPList::GetIterator ()
 
 IPAddress FixedIPList::GetNext ( uint8_t &iterator )
 {
-	IPAddress Result = EmptyAddress;
 	if ( iterator < m_nextEntry )
 	{
-		Result = m_pIPList [ iterator++ ];
+		return m_pIPList [ iterator++ ];
 	}
-	return Result;
+	return EmptyAddress;
 }
 
 bool FixedIPList::IsPresent ( IPAddress addr )
