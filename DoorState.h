@@ -53,8 +53,8 @@ class DoorState
 		void NowOpening ( Event event );
 		void SwitchPressed ( Event event );
 
-		typedef void ( DoorState::*StateFunction ) ( Event ); // prototype of function to handle event
-		StateFunction StateTableFn [ 5 ][ 5 ] = {
+		typedef void ( DoorState::*StateFunction ) ( Event );																	  // prototype of function to handle event
+		const StateFunction StateTableFn [ 5 ][ 5 ] = {
 			{&DoorState::DoNowt,	  &DoorState::NowClosing, &DoorState::NowClosed, &DoorState::DoNowt,	 &DoorState::SwitchPressed}, // Actions when current state is Open
 			{ &DoorState::NowOpen, &DoorState::DoNowt,	   &DoorState::NowClosed, &DoorState::DoNowt,	  &DoorState::SwitchPressed}, // Actions when current state is Opening
 			{ &DoorState::NowOpen, &DoorState::DoNowt,	   &DoorState::DoNowt,	   &DoorState::NowOpening, &DoorState::SwitchPressed}, // Actions when current state is Closed
@@ -64,10 +64,10 @@ class DoorState
 
 		volatile State m_theDoorState	   = State::Unknown;
 		volatile bool  m_bDoorStateChanged = true;
-		Pin			   m_OpenPin;
-		Pin			   m_ClosePin;
-		Pin			   m_StopPin;
-		Pin			   m_LightPin;
+		const Pin	   m_OpenPin;
+		const Pin	   m_ClosePin;
+		const Pin	   m_StopPin;
+		const Pin	   m_LightPin;
 
 		enum Direction { Up, Down, None };
 
@@ -76,7 +76,6 @@ class DoorState
 		void			   ResetTimer ();
 		void			   SetRelayPin ( Pin thePin );
 		void			   TurnOffControlPins (); // bring low all pins controlling garage functions
-		static void		   TurnOff ();
 
 	public:
 		DoorState ( Pin OpenPin, Pin ClosePin, Pin StopPin, Pin LightPin, State initialState );

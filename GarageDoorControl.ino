@@ -407,7 +407,7 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 			{
 	#ifdef TEMP_HUMIDITY_SUPPORT
 				// send a reply, to the IP address and port that sent us the packet we received
-				sResponse = F ( "T=" );
+				sResponse  = F ( "T=" );
 				sResponse += sHTResults.fTemperature;
 				sResponse += F ( ",H=" );
 				sResponse += sHTResults.fHumidity;
@@ -432,18 +432,18 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 #endif
 #ifdef UAP_SUPPORT
 		case UDPWiFiService::ReqMsgType::DOORDATA:
-			sResponse = F ( "S=" );
-			sResponse += pGarageDoor->GetDoorDisplayState (); // Door State
+			sResponse  = F ( "S=" );
+			sResponse += pGarageDoor->GetDoorDisplayState ();			   // Door State
 			sResponse += F ( ",L=" );
-			sResponse += bLightIsOn ? "On" : "Off"; // Light on or not
+			sResponse += bLightIsOn ? "On" : "Off";						   // Light on or not
 			sResponse += F ( ",C=" );
 			sResponse += pGarageDoor->IsClosed () ? F ( "Y" ) : F ( "N" ); // Closed or not
 			sResponse += F ( ",O=" );
-			sResponse += pGarageDoor->IsOpen () ? F ( "Y" ) : F ( "N" ); // Open or not
+			sResponse += pGarageDoor->IsOpen () ? F ( "Y" ) : F ( "N" );   // Open or not
 			sResponse += F ( ",M=" );
 			sResponse += pGarageDoor->IsMoving () ? F ( "Y" ) : F ( "N" ); // Moving or not
 			sResponse += F ( ",A=" );
-			sResponse += pMyUDPService->GetTime (); // current epoch time
+			sResponse += pMyUDPService->GetTime ();						   // current epoch time
 			sResponse += F ( "\r" );
 			break;
 

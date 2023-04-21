@@ -2,9 +2,8 @@
 #include "Logging.h"
 IPAddress EmptyAddress = IPAddress ( 0UL );
 
-FixedIPList::FixedIPList ( uint8_t MaxEntries )
+FixedIPList::FixedIPList ( uint8_t MaxEntries ) : m_maxEntries ( MaxEntries )
 {
-	m_maxEntries = MaxEntries;
 	m_pIPList	 = new IPAddress [ m_maxEntries ];
 	for ( uint8_t i = 0; i < m_maxEntries; i++ )
 	{

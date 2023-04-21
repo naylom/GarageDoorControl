@@ -28,15 +28,11 @@ const int16_t  SIGNAL_PULSE	  = 2000 * 5; // 2000 per sec, so every 1/5 sec, 200
 const char	  *StateNames []  =			  // In order of State enums!
 	{ "Opened", "Opening", "Closed", "Closing", "Stopped", "Bad", "Unknown" };
 
-DoorState::DoorState ( Pin OpenPin, Pin ClosePin, Pin StopPin, Pin LightPin, State initialState )
+DoorState::DoorState ( Pin OpenPin, Pin ClosePin, Pin StopPin, Pin LightPin, State initialState ) : m_OpenPin ( OpenPin ), m_ClosePin ( ClosePin), m_StopPin ( StopPin ), m_LightPin ( LightPin )
 {
-	m_OpenPin = OpenPin;
 	pinMode ( m_OpenPin, OUTPUT );
-	m_ClosePin = ClosePin;
 	pinMode ( m_ClosePin, OUTPUT );
-	m_StopPin = StopPin;
 	pinMode ( m_StopPin, OUTPUT );
-	m_LightPin = LightPin;
 	pinMode ( m_LightPin, OUTPUT );
 	m_theDoorState = initialState;
 
@@ -48,7 +44,7 @@ void DoorState::ClearRelayPin ( Pin thePin )
 {
 	if ( thePin != NOT_A_PIN && digitalRead ( thePin ) == RELAY_ON )
 	{
-		digitalWrite ( thePin, (PinStatus)RELAY_OFF ); 
+		digitalWrite ( thePin, (PinStatus)RELAY_OFF );
 	}
 }
 

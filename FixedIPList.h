@@ -15,7 +15,7 @@ class FixedIPList
 		bool IsPresent ( IPAddress addr );
 
 	private:
-		uint8_t	   m_maxEntries;
-		uint8_t	   m_nextEntry = 0;
-		IPAddress *m_pIPList;
+		const uint8_t m_maxEntries;
+		uint8_t		  m_nextEntry = 0;
+		IPAddress	 *m_pIPList;
 };
