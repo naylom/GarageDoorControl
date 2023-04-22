@@ -60,12 +60,14 @@ class DoorState
 		DoorState::State GetDoorInitialState ();
 
 		typedef void ( DoorState::*StateFunction ) ( Event );																						  // prototype of function to handle event
-		const StateFunction StateTableFn [ 5 ][ 6 ] = {
+		const StateFunction StateTableFn [ 7 ][ 6 ] = { // [State][Event]
 			{&DoorState::DoNowt,	  &DoorState::NowClosing, &DoorState::NowClosed, &DoorState::DoNowt,	 &DoorState::SwitchPressed, &DoorState::DoNowt}, // Actions when current state is Open
 			{ &DoorState::NowOpen, &DoorState::DoNowt,	   &DoorState::NowClosed, &DoorState::DoNowt,	  &DoorState::SwitchPressed, &DoorState::DoNowt}, // Actions when current state is Opening
 			{ &DoorState::NowOpen, &DoorState::DoNowt,	   &DoorState::DoNowt,	   &DoorState::NowOpening, &DoorState::SwitchPressed, &DoorState::DoNowt}, // Actions when current state is Closed
 			{ &DoorState::NowOpen, &DoorState::DoNowt,	   &DoorState::NowClosed, &DoorState::DoNowt,	  &DoorState::SwitchPressed, &DoorState::DoNowt}, // Actions when current state is Closing
-			{ &DoorState::NowOpen, &DoorState::DoNowt,	   &DoorState::NowClosed, &DoorState::DoNowt,	  &DoorState::SwitchPressed, &DoorState::DoNowt}  // Actions when current state is Stopped
+			{ &DoorState::NowOpen, &DoorState::DoNowt,	   &DoorState::NowClosed, &DoorState::DoNowt,	  &DoorState::SwitchPressed, &DoorState::DoNowt,},  // Actions when current state is Stopped
+			{ &DoorState::NowOpen, &DoorState::NowClosing, &DoorState::NowClosed, &DoorState::NowOpening,  &DoorState::SwitchPressed, &DoorState::DoNowt},  // Actions when current state is Unknown
+			{ &DoorState::NowOpen, &DoorState::NowClosing, &DoorState::NowClosed, &DoorState::NowOpening,  &DoorState::SwitchPressed, &DoorState::DoNowt}  // Actions when current state is Bad
 		};
 
 		volatile State	 m_theDoorState		 = State::Unknown;
