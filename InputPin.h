@@ -16,6 +16,7 @@ class InputPin
 		uint32_t GetInvokedCount ();
 		uint32_t GetPostDebounceCount ();
 		uint32_t GetDiscardUnchangedCount ();
+		void	 DebugStats ( String &result );
 
 	private:
 		virtual void	   MatchAction ()	= 0;

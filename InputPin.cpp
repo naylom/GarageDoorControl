@@ -84,3 +84,12 @@ uint32_t InputPin::GetDiscardUnchangedCount ()
 {
 	return m_DiscardedUnchangedCount;
 }
+
+void InputPin::DebugStats ( String &result )
+{
+	result = String ( m_ISRCalledCount) + " : ";
+	result += String ( m_AfterDebounceCount ) + " : ";
+	result += String ( m_DiscardedUnchangedCount ) + " : ";
+	result += String ( m_MatchedCount ) + " : ";
+	result += String ( m_UnmatchedCount );
+}
