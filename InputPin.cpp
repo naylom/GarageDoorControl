@@ -73,7 +73,6 @@ uint32_t InputPin::GetUnmatchedCount ()
 uint32_t InputPin::GetInvokedCount ()
 {
 	return m_ISRCalledCount;
-	;
 }
 
 uint32_t InputPin::GetPostDebounceCount ()

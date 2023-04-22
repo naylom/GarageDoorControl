@@ -153,17 +153,23 @@ void			DisplayStats ( void )
 	interrupts ();
 
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 40, F ( "Light Off count     " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 61, String ( pGarageDoor->GetLightOffCount () ) );
+	//COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 61, String ( pGarageDoor->GetLightOffCount () ) );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 61, String ( pGarageDoor->m_pDoorLightStatusPin->GetInvokedCount () ) );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 40, F ( "Light On count      " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 5, 61, String ( pGarageDoor->GetLightOnCount () ) );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 5, 61, String ( pGarageDoor->m_pDoorLightStatusPin->GetPostDebounceCount () ) );
+	//COLOUR_AT ( FG_GREEN, BG_BLACK, 5, 61, String ( pGarageDoor->GetLightOnCount () ) );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 6, 40, F ( "Door Opened count   " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 61, String ( pGarageDoor->GetDoorOpenedCount () ) );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 61, String ( pGarageDoor->m_pDoorOpenStatusPin->GetInvokedCount () ) );
+	//COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 61, String ( pGarageDoor->GetDoorOpenedCount () ) );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 7, 40, F ( "Door Opening count  " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 7, 61, String ( pGarageDoor->GetDoorOpeningCount () ) );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 7, 61, String ( pGarageDoor->m_pDoorOpenStatusPin->GetPostDebounceCount () ) );
+	//COLOUR_AT ( FG_GREEN, BG_BLACK, 7, 61, String ( pGarageDoor->GetDoorOpeningCount () ) );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 8, 40, F ( "Door Closed count   " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 61, String ( pGarageDoor->GetDoorClosedCount () ) );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 61, String ( pGarageDoor->m_pDoorClosedStatusPin->GetInvokedCount () ) );
+	//COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 61, String ( pGarageDoor->GetDoorClosedCount () ) );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 40, F ( "Door Closing count  " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 61, String ( pGarageDoor->GetDoorClosingCount () ) );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 61, String ( pGarageDoor->m_pDoorClosedStatusPin->GetPostDebounceCount () ) );
+	//COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 61, String ( pGarageDoor->GetDoorClosingCount () ) );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 0, F ( "Switch Presssed " ) );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 17, String ( SwitchPressed ) );
 	#endif
