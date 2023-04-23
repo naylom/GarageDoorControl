@@ -4,7 +4,6 @@
 	InputPin.cpp - implemntation of InputPin.h
 
 */
-
 void InputPinISR ( void *pParam )
 {
 	InputPin *pInputPinObj = (InputPin *)pParam;
@@ -17,6 +16,7 @@ InputPin::InputPin ( pin_size_t pin, uint32_t debouncems, PinStatus matchStatus,
 	m_LastPinRead		  = digitalRead ( m_Pin );
 	m_CurrentMatchedState = m_LastPinRead == m_MatchStatus ? true : false;
 	m_LastChangedTime	  = millis ();
+
 	attachInterruptParam ( digitalPinToInterrupt ( m_Pin ), InputPinISR, status, this );
 }
 

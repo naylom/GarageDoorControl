@@ -1,4 +1,5 @@
 {
     "board": "arduino:samd:mkrwifi1010",
-    "sketch": "GarageDoorControl.ino"
+    "sketch": "GarageDoorControl.ino",
+    "port": "COM13"
 }

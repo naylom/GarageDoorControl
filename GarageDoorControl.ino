@@ -93,17 +93,13 @@ constexpr uint8_t	 CLOSE_DOOR_OUTPUT_PIN	   = 8;
 constexpr uint8_t	 OPEN_DOOR_OUTPUT_PIN	   = 7;
 constexpr uint8_t	 STOP_DOOR_OUTPUT_PIN	   = 6;
 
-DoorStatusPin		*pDoorSwitchPin			   = nullptr;
-
-// debug - remove
-volatile uint32_t	 gSwitchCount			   = 0UL;
-
 constexpr uint8_t	 RED_PIN				   = A4;
 constexpr uint8_t	 GREEN_PIN				   = A5;
 constexpr uint8_t	 BLUE_PIN				   = A6;
 
 constexpr uint32_t	 SWITCH_DEBOUNCE_MS		   = 400; // min ms between consecutive pin interrupts before signal accepted from manual switch
 DoorState			*pGarageDoor			   = nullptr;
+DoorStatusPin		*pDoorSwitchPin			   = nullptr;
 MNRGBLEDBaseLib		*pMyLED					   = new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
 #endif
 /*
@@ -147,16 +143,11 @@ void			DisplayStats ( void )
 	ClearPartofLine ( 5, 10, 8 );
 	COLOUR_AT ( FG_CYAN, BG_BLACK, 5, 10, pGarageDoor->GetDoorDisplayState () );
 
-	// debug stats
-	noInterrupts ();
-	uint32_t SwitchPressed = gSwitchCount;
-	interrupts ();
-
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 40, F ( "Light Off count     " ) );
 	//COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 61, String ( pGarageDoor->GetLightOffCount () ) );
 	String result;
-	pGarageDoor->m_pDoorLightStatusPin->DebugStats( result);
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 61, result ) ;
+	
+	//COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 61, String ( glob ) ) ;
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 40, F ( "Light On count      " ) );
 	pGarageDoor->m_pDoorLightStatusPin->DebugStats( result);
 	COLOUR_AT ( FG_GREEN, BG_BLACK, 5, 61, result );
@@ -166,19 +157,21 @@ void			DisplayStats ( void )
 	COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 61, result );
 	//COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 61, String ( pGarageDoor->GetDoorOpenedCount () ) );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 7, 40, F ( "Door Opening count  " ) );
-	pGarageDoor->m_pDoorOpenStatusPin->DebugStats( result);
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 7, 61, result );
-	//COLOUR_AT ( FG_GREEN, BG_BLACK, 7, 61, String ( pGarageDoor->GetDoorOpeningCount () ) );
+	//pGarageDoor->m_pDoorOpenStatusPin->DebugStats( result);
+	//COLOUR_AT ( FG_GREEN, BG_BLACK, 7, 61, result );
+	//COLOUR_AT ( FG_GREEN, BG_BLACK, 7, 61, String ( result ) );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 8, 40, F ( "Door Closed count   " ) );
 	pGarageDoor->m_pDoorClosedStatusPin->DebugStats( result);
 	COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 61, result );
 	//COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 61, String ( pGarageDoor->GetDoorClosedCount () ) );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 40, F ( "Door Closing count  " ) );
-	pGarageDoor->m_pDoorClosedStatusPin->DebugStats( result);
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 61, result );
+	//pGarageDoor->m_pDoorClosedStatusPin->DebugStats( result);
+	//COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 61, result );
 	//COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 61, String ( pGarageDoor->GetDoorClosingCount () ) );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 0, F ( "Switch Presssed " ) );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 17, String ( SwitchPressed ) );
+	//COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 17, String ( SwitchPressed ) );
+	pDoorSwitchPin->DebugStats( result );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 17, result );
 	#endif
 	#ifdef TEMP_HUMIDITY_SUPPORT
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 12, 0, F ( "Temperature is " ) );
@@ -209,11 +202,7 @@ void setup ()
 #endif
 #ifdef UAP_SUPPORT
 	// Setup so we are called if the state of door changes
-	// PCIHandler.AddPin ( DOOR_SWITCH_INPUT_PIN, SwitchPressedISR, CHANGE, INPUT /*INPUT_PULLDOWN*/ );
-	pinMode ( DOOR_SWITCH_INPUT_PIN, INPUT );
-	attachInterrupt ( digitalPinToInterrupt ( DOOR_SWITCH_INPUT_PIN ), SwitchPressedISR, CHANGE );
-
-	pGarageDoor = new DoorState ( DOOR_IS_OPEN_STATUS_PIN, DOOR_IS_CLOSED_STATUS_PIN, LIGHT_IS_ON_STATUS_PIN, OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN );
+	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, DOOR_IS_OPEN_STATUS_PIN, DOOR_IS_CLOSED_STATUS_PIN, LIGHT_IS_ON_STATUS_PIN  );
 	pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::HIGH, PinMode::INPUT, PinStatus::CHANGE );
 
 	SetLED ();
@@ -429,21 +418,3 @@ void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
 		pMyUDPService->SendReply ( sResponse );
 	}
 }
-#ifdef UAP_SUPPORT
-// ISR to handle rocker switch Pin state change
-void SwitchPressedISR ()
-{
-	static unsigned long ulLastSPIntTime = 0UL;
-
-	unsigned long		 ulNow			 = millis ();
-	if ( ( ulNow - ulLastSPIntTime ) > SWITCH_DEBOUNCE_MS )
-	{
-		if ( digitalRead ( DOOR_SWITCH_INPUT_PIN ) == HIGH )
-		{
-			ulLastSPIntTime = ulNow;
-			gSwitchCount++;
-			// pGarageDoor->DoEvent ( DoorState::Event::SwitchPress );
-		}
-	}
-}
-#endif
