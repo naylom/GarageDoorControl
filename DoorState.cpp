@@ -42,9 +42,10 @@ DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopP
 	pinMode ( m_DoorCloseCtrlPin, OUTPUT );
 	pinMode ( m_DoorStopCtrlPin, OUTPUT );
 	pinMode ( m_DoorLightCtrlPin, OUTPUT );
-	m_theDoorState = GetDoorInitialState ();
 
 	TurnOffControlPins ();
+
+	m_theDoorState = GetDoorInitialState ();
 }
 
 // Find initial state of door
@@ -52,19 +53,14 @@ DoorState::State DoorState::GetDoorInitialState ()
 {
 	//  ensure we can read from pins connected to UAP1 outputs
 	// pinMode ( DOOR_IS_OPEN_INPUT_PIN, INPUT /*INPUT_PULLDOWN*/ );
-	int		OpenState;
+	bool		OpenState;
 	// pinMode ( DOOR_IS_CLOSED_INPUT_PIN, INPUT /*INPUT_PULLDOWN*/ );
-	int		CloseState;
+	bool		CloseState;
 
 	uint8_t iCount = 0;
-	// while ( ( CloseState = digitalRead ( DOOR_IS_CLOSED_INPUT_PIN ) ) == ( OpenState = digitalRead ( DOOR_IS_OPEN_INPUT_PIN ) ) && iCount < ( 15 * ( 1000 / 500 ) ) )
-	while ( ( CloseState = m_pDoorClosedStatusPin->IsMatched () ) == ( OpenState = m_pDoorOpenStatusPin->IsMatched () ) && iCount < ( 15 * ( 1000 / 500 ) ) )
-	{
-		// door is either in bad state, stopped or opening / closing, wait for state to change for max 15 seconds which
-		// is enough for door to complete normal closing
-		delay ( 500 );
-		iCount++;
-	}
+	CloseState = m_pDoorClosedStatusPin->IsMatched ();
+	OpenState = m_pDoorOpenStatusPin->IsMatched ();
+
 	if ( OpenState == CloseState )
 	{
 		// still not resolved, assume stopped
@@ -72,7 +68,7 @@ DoorState::State DoorState::GetDoorInitialState ()
 	}
 	else
 	{
-		if ( OpenState == UAP_TRUE )
+		if ( OpenState )
 		{
 			return DoorState::State::Open;
 		}
@@ -143,14 +139,15 @@ void DoorState::NowOpening ( Event )
 void DoorState::SwitchPressed ( Event )
 {
 	Error ( "Switch Pressed                  " );
-#ifndef MNDEBUG
+#ifndef MNDEBUGxx
 	switch ( m_theDoorState )
 	{
 		case State::Closed:
 			// Open door
 			ResetTimer ();
 			// rely on UAP outpins to signal this is happening
-			SetRelayPin ( m_OpenPin );
+			Error ( "Door closed - open pin on                  " );
+			SetRelayPin (  m_DoorOpenCtrlPin );
 			break;
 
 		case State::Open:
@@ -158,14 +155,14 @@ void DoorState::SwitchPressed ( Event )
 			ResetTimer ();
 			// rely on UAP outpins to signal this is happening
 			Error ( "Door open - close pin on                  " );
-			SetRelayPin ( m_ClosePin );
+			SetRelayPin ( m_DoorCloseCtrlPin );
 			break;
 
 		case State::Opening:
 		case State::Closing:
 			// Stop Door
 			ResetTimer ();
-			SetRelayPin ( m_StopPin );
+			SetRelayPin ( m_DoorStopCtrlPin );
 			// Have to set state since there is no UAP output that signals when this happens
 			m_theDoorState = Stopped;
 			break;
@@ -178,13 +175,13 @@ void DoorState::SwitchPressed ( Event )
 					// Were closing so now open
 					ResetTimer ();
 					Error ( "Door stopped, was going down - open pin on" );
-					SetRelayPin ( m_OpenPin );
+					SetRelayPin ( m_DoorOpenCtrlPin );
 					break;
 
 				case Direction::Up:
 					ResetTimer ();
 					Error ( "Door stopped, was going up - close pin on" );
-					SetRelayPin ( m_ClosePin );
+					SetRelayPin ( m_DoorCloseCtrlPin );
 					break;
 
 				default:
