@@ -18,6 +18,7 @@ History:
 #include <stdint.h>
 #include <MNRGBLEDBaseLib.h>
 #include "InputPin.h"
+#include "OutputPin.h"
 
 typedef uint8_t pin_size_t;
 #ifndef NOT_A_PIN
@@ -25,16 +26,16 @@ const uint8_t NOT_A_PIN = 255;
 #endif
 
 // Colours used on MKR RGB LED to indicate status
-constexpr RGBType STATE_UNKNOWN_COLOUR		= MNRGBLEDBaseLib::WHITE;
-constexpr RGBType DOOR_CLOSED_COLOUR		= MNRGBLEDBaseLib::GREEN;
-constexpr RGBType DOOR_OPEN_COLOUR			= MNRGBLEDBaseLib::RED;
-constexpr RGBType DOOR_STOPPED_COLOUR		= MNRGBLEDBaseLib::DARK_MAGENTA;
-constexpr RGBType DOOR_BAD_COLOUR			= MNRGBLEDBaseLib::DARK_YELLOW;
-constexpr RGBType DOOR_UNKNOWN_COLOUR		= MNRGBLEDBaseLib::BLUE;
-constexpr uint8_t DOOR_STATIONARY_FLASHTIME = 0;
-constexpr uint8_t DOOR_MOVING_FLASHTIME		= 10; // 20 = 1 sec
-constexpr PinStatus RELAY_ON					= LOW;
-constexpr PinStatus RELAY_OFF					= HIGH;
+constexpr RGBType	STATE_UNKNOWN_COLOUR	  = MNRGBLEDBaseLib::WHITE;
+constexpr RGBType	DOOR_CLOSED_COLOUR		  = MNRGBLEDBaseLib::GREEN;
+constexpr RGBType	DOOR_OPEN_COLOUR		  = MNRGBLEDBaseLib::RED;
+constexpr RGBType	DOOR_STOPPED_COLOUR		  = MNRGBLEDBaseLib::DARK_MAGENTA;
+constexpr RGBType	DOOR_BAD_COLOUR			  = MNRGBLEDBaseLib::DARK_YELLOW;
+constexpr RGBType	DOOR_UNKNOWN_COLOUR		  = MNRGBLEDBaseLib::BLUE;
+constexpr uint8_t	DOOR_STATIONARY_FLASHTIME = 0;
+constexpr uint8_t	DOOR_MOVING_FLASHTIME	  = 10; // 20 = 1 sec
+constexpr PinStatus RELAY_ON				  = LOW;
+constexpr PinStatus RELAY_OFF				  = HIGH;
 
 class DoorStatusPin;
 
@@ -59,39 +60,51 @@ class DoorState
 
 		DoorState::State GetDoorInitialState ();
 
-		typedef void ( DoorState::*StateFunction ) ( Event );																						  // prototype of function to handle event
-		const StateFunction StateTableFn [ 7 ][ 6 ] = { // [State][Event]
-			{&DoorState::DoNowt,	  &DoorState::NowClosing, &DoorState::NowClosed, &DoorState::DoNowt,	 &DoorState::SwitchPressed, &DoorState::DoNowt}, // Actions when current state is Open
-			{ &DoorState::NowOpen, &DoorState::DoNowt,	   &DoorState::NowClosed, &DoorState::DoNowt,	  &DoorState::SwitchPressed, &DoorState::DoNowt}, // Actions when current state is Opening
-			{ &DoorState::NowOpen, &DoorState::DoNowt,	   &DoorState::DoNowt,	   &DoorState::NowOpening, &DoorState::SwitchPressed, &DoorState::DoNowt}, // Actions when current state is Closed
-			{ &DoorState::NowOpen, &DoorState::DoNowt,	   &DoorState::NowClosed, &DoorState::DoNowt,	  &DoorState::SwitchPressed, &DoorState::DoNowt}, // Actions when current state is Closing
-			{ &DoorState::NowOpen, &DoorState::DoNowt,	   &DoorState::NowClosed, &DoorState::DoNowt,	  &DoorState::SwitchPressed, &DoorState::DoNowt,},  // Actions when current state is Stopped
-			{ &DoorState::NowOpen, &DoorState::NowClosing, &DoorState::NowClosed, &DoorState::NowOpening,  &DoorState::SwitchPressed, &DoorState::DoNowt},  // Actions when current state is Unknown
-			{ &DoorState::NowOpen, &DoorState::NowClosing, &DoorState::NowClosed, &DoorState::NowOpening,  &DoorState::SwitchPressed, &DoorState::DoNowt}  // Actions when current state is Bad
+		typedef void ( DoorState::*StateFunction ) ( Event ); // prototype of function to handle event
+		const StateFunction StateTableFn [ 7 ][ 6 ] = {
+	// [State][Event]
+			{ &DoorState::DoNowt, &DoorState::NowClosing, &DoorState::NowClosed, &DoorState::DoNowt, &DoorState::SwitchPressed, &DoorState::DoNowt }, // Actions when current state is Open
+			{ &DoorState::NowOpen, &DoorState::DoNowt, &DoorState::NowClosed, &DoorState::DoNowt, &DoorState::SwitchPressed, &DoorState::DoNowt }, // Actions when current state is Opening
+			{ &DoorState::NowOpen, &DoorState::DoNowt, &DoorState::DoNowt, &DoorState::NowOpening, &DoorState::SwitchPressed, &DoorState::DoNowt }, // Actions when current state is Closed
+			{ &DoorState::NowOpen, &DoorState::DoNowt, &DoorState::NowClosed, &DoorState::DoNowt, &DoorState::SwitchPressed, &DoorState::DoNowt }, // Actions when current state is Closing
+			{
+				&DoorState::NowOpen,
+				&DoorState::DoNowt,
+				&DoorState::NowClosed,
+				&DoorState::DoNowt,
+				&DoorState::SwitchPressed,
+				&DoorState::DoNowt,
+			 }, // Actions when current state is Stopped
+			{ &DoorState::NowOpen, &DoorState::NowClosing, &DoorState::NowClosed, &DoorState::NowOpening, &DoorState::SwitchPressed, &DoorState::DoNowt }, // Actions when current state is Unknown
+			{ &DoorState::NowOpen, &DoorState::NowClosing, &DoorState::NowClosed, &DoorState::NowOpening, &DoorState::SwitchPressed, &DoorState::DoNowt }  // Actions when current state is Bad
 		};
 
 		volatile State	 m_theDoorState		 = State::Unknown;
 		volatile bool	 m_bDoorStateChanged = true;
-		const pin_size_t m_DoorOpenCtrlPin;				   // Used to request door is opened
-		const pin_size_t m_DoorCloseCtrlPin;			   // Used to request door is closed
-		const pin_size_t m_DoorStopCtrlPin;				   // Used to request door is stopped
-		const pin_size_t m_DoorLightCtrlPin;			   // Used to request light is turned on or off
-		const pin_size_t m_DoorOpenStatusPin;			   // Used to get status if door is open or not
-		const pin_size_t m_DoorClosedStatusPin;			   // Used to get status if door is closed or not
-		const pin_size_t m_DoorLightStatusPin;			   // Used to get status if door light is on or not
+		const pin_size_t m_DoorOpenCtrlPin;		// Used to request door is opened
+		const pin_size_t m_DoorCloseCtrlPin;	// Used to request door is closed
+		const pin_size_t m_DoorStopCtrlPin;		// Used to request door is stopped
+		const pin_size_t m_DoorLightCtrlPin;	// Used to request light is turned on or off
+		const pin_size_t m_DoorOpenStatusPin;	// Used to get status if door is open or not
+		const pin_size_t m_DoorClosedStatusPin; // Used to get status if door is closed or not
+		const pin_size_t m_DoorLightStatusPin;	// Used to get status if door light is on or not
 
 		enum Direction : uint8_t { Up, Down, None };
 
 		volatile Direction m_LastDirection = Direction::None;
-		void			   ClearRelayPin ( pin_size_t thePin );
+		//void			   ClearRelayPin ( pin_size_t thePin );
 		void			   ResetTimer ();
-		void			   SetRelayPin ( pin_size_t thePin );
+		//void			   SetRelayPin ( pin_size_t thePin );
 		void			   TurnOffControlPins (); // bring low all pins controlling garage functions
 
 	public:
-		DoorStatusPin	*m_pDoorOpenStatusPin	= nullptr; // Objects to handle pins giving door status
-		DoorStatusPin	*m_pDoorClosedStatusPin = nullptr;
-		DoorStatusPin	*m_pDoorLightStatusPin	= nullptr;
+		DoorStatusPin *m_pDoorOpenStatusPin	  = nullptr; // Objects to handle pins giving door status
+		DoorStatusPin *m_pDoorClosedStatusPin = nullptr;
+		DoorStatusPin *m_pDoorLightStatusPin  = nullptr;
+		OutputPin	  *m_pDoorOpenCtrlPin	  = nullptr; // Objects to handle controlling door actions
+		OutputPin	  *m_pDoorCloseCtrlPin	  = nullptr;
+		OutputPin	  *m_pDoorStopCtrlPin	  = nullptr;
+		OutputPin	  *m_pDoorLightCtrlPin	  = nullptr;
 
 		DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopPin, pin_size_t LightPin, pin_size_t DoorOpenStatusPin, pin_size_t DoorClosedStatusPin, pin_size_t DoorLightStatusPin );
 		void		DoEvent ( Event eEvent );

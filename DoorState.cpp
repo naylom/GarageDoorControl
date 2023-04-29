@@ -37,12 +37,16 @@ DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopP
 	m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::DoorOpenTrue, DoorState::Event::DoorOpenFalse, m_DoorOpenStatusPin, DEBOUNCE_MS, UAP_TRUE, PinMode::INPUT, PinStatus::CHANGE );
 	m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::DoorClosedTrue, DoorState::Event::DoorClosedFalse, m_DoorClosedStatusPin, DEBOUNCE_MS, UAP_TRUE, PinMode::INPUT, PinStatus::CHANGE );
 	m_pDoorLightStatusPin  = new DoorStatusPin ( nullptr, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorLightStatusPin, DEBOUNCE_MS, UAP_TRUE, PinMode::INPUT, PinStatus::CHANGE );
-
-	pinMode ( m_DoorOpenCtrlPin, OUTPUT );
-	pinMode ( m_DoorCloseCtrlPin, OUTPUT );
-	pinMode ( m_DoorStopCtrlPin, OUTPUT );
-	pinMode ( m_DoorLightCtrlPin, OUTPUT );
-
+	m_pDoorOpenCtrlPin	   = new OutputPin ( m_DoorOpenCtrlPin, RELAY_ON );
+	m_pDoorCloseCtrlPin	   = new OutputPin ( m_DoorCloseCtrlPin, RELAY_ON );
+	m_pDoorStopCtrlPin	   = new OutputPin ( m_DoorStopCtrlPin, RELAY_ON );
+	m_pDoorLightCtrlPin	   = new OutputPin ( m_DoorLightCtrlPin, RELAY_ON );
+	/*
+		pinMode ( m_DoorOpenCtrlPin, OUTPUT );
+		pinMode ( m_DoorCloseCtrlPin, OUTPUT );
+		pinMode ( m_DoorStopCtrlPin, OUTPUT );
+		pinMode ( m_DoorLightCtrlPin, OUTPUT );
+	*/
 	TurnOffControlPins ();
 
 	m_theDoorState = GetDoorInitialState ();
@@ -52,14 +56,13 @@ DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopP
 DoorState::State DoorState::GetDoorInitialState ()
 {
 	//  ensure we can read from pins connected to UAP1 outputs
-	// pinMode ( DOOR_IS_OPEN_INPUT_PIN, INPUT /*INPUT_PULLDOWN*/ );
-	bool		OpenState;
-	// pinMode ( DOOR_IS_CLOSED_INPUT_PIN, INPUT /*INPUT_PULLDOWN*/ );
-	bool		CloseState;
+
+	bool	OpenState;
+	bool	CloseState;
 
 	uint8_t iCount = 0;
-	CloseState = m_pDoorClosedStatusPin->IsMatched ();
-	OpenState = m_pDoorOpenStatusPin->IsMatched ();
+	CloseState	   = m_pDoorClosedStatusPin->IsMatched ();
+	OpenState	   = m_pDoorOpenStatusPin->IsMatched ();
 
 	if ( OpenState == CloseState )
 	{
@@ -78,7 +81,7 @@ DoorState::State DoorState::GetDoorInitialState ()
 		}
 	}
 }
-
+/*
 // called to turn relay off
 void DoorState::ClearRelayPin ( pin_size_t thePin )
 {
@@ -96,7 +99,7 @@ void DoorState::SetRelayPin ( pin_size_t thePin )
 		digitalWrite ( thePin, (PinStatus)RELAY_ON );
 	}
 }
-
+*/
 // routines called when event occurs, these are called from within an interrupt and need to be short
 // care to be taken to not invoke WifiNina calls or SPI calls to built in LED.
 void DoorState::NowOpen ( Event )
@@ -147,7 +150,8 @@ void DoorState::SwitchPressed ( Event )
 			ResetTimer ();
 			// rely on UAP outpins to signal this is happening
 			Error ( "Door closed - open pin on                  " );
-			SetRelayPin (  m_DoorOpenCtrlPin );
+			m_pDoorOpenCtrlPin->On();
+			//SetRelayPin ( m_DoorOpenCtrlPin );
 			break;
 
 		case State::Open:
@@ -155,14 +159,16 @@ void DoorState::SwitchPressed ( Event )
 			ResetTimer ();
 			// rely on UAP outpins to signal this is happening
 			Error ( "Door open - close pin on                  " );
-			SetRelayPin ( m_DoorCloseCtrlPin );
+			m_pDoorCloseCtrlPin->On();
+			//SetRelayPin ( m_DoorCloseCtrlPin );
 			break;
 
 		case State::Opening:
 		case State::Closing:
 			// Stop Door
 			ResetTimer ();
-			SetRelayPin ( m_DoorStopCtrlPin );
+			m_pDoorStopCtrlPin->On();
+			//SetRelayPin ( m_DoorStopCtrlPin );
 			// Have to set state since there is no UAP output that signals when this happens
 			m_theDoorState = Stopped;
 			break;
@@ -175,13 +181,15 @@ void DoorState::SwitchPressed ( Event )
 					// Were closing so now open
 					ResetTimer ();
 					Error ( "Door stopped, was going down - open pin on" );
-					SetRelayPin ( m_DoorOpenCtrlPin );
+					m_pDoorOpenCtrlPin->On();
+					//SetRelayPin ( m_DoorOpenCtrlPin );
 					break;
 
 				case Direction::Up:
 					ResetTimer ();
 					Error ( "Door stopped, was going up - close pin on" );
-					SetRelayPin ( m_DoorCloseCtrlPin );
+					m_pDoorCloseCtrlPin->On();
+					//SetRelayPin ( m_DoorCloseCtrlPin );
 					break;
 
 				default:
@@ -231,26 +239,31 @@ void DoorState::DoRequest ( Request eRequest )
 	{
 		case Request::LightOn:
 			ResetTimer ();
-			SetRelayPin ( m_DoorLightCtrlPin );
+			m_pDoorLightCtrlPin->On();
+			//SetRelayPin ( m_DoorLightCtrlPin );
 			break;
 
 		case Request::LightOff:
-			ClearRelayPin ( m_DoorLightCtrlPin );
+			//ClearRelayPin ( m_DoorLightCtrlPin );
+			m_pDoorLightCtrlPin->Off();
 			break;
 
 		case Request::CloseDoor:
 			ResetTimer ();
-			SetRelayPin ( m_DoorCloseCtrlPin );
+			m_pDoorCloseCtrlPin->On();
+			//SetRelayPin ( m_DoorCloseCtrlPin );
 			break;
 
 		case Request::OpenDoor:
 			ResetTimer ();
-			SetRelayPin ( m_DoorOpenCtrlPin );
+			m_pDoorOpenCtrlPin->On();
+			//SetRelayPin ( m_DoorOpenCtrlPin );
 			break;
 
 		case Request::StopDoor:
 			ResetTimer ();
-			SetRelayPin ( m_DoorStopCtrlPin );
+			m_pDoorStopCtrlPin->On();
+			//SetRelayPin ( m_DoorStopCtrlPin );
 			break;
 	}
 }
@@ -309,44 +322,44 @@ bool DoorState::IsLit ()
 
 /// @brief get the number of time the Light has switched on
 /// @return count of times the light was on
-uint32_t	DoorState::GetLightOnCount ()
+uint32_t DoorState::GetLightOnCount ()
 {
-	return m_pDoorLightStatusPin->GetMatchedCount();
+	return m_pDoorLightStatusPin->GetMatchedCount ();
 }
 
 /// @brief get the number of time the Light has switched off
 /// @return count of times the light was off
-uint32_t	DoorState::GetLightOffCount ()
+uint32_t DoorState::GetLightOffCount ()
 {
-	return m_pDoorLightStatusPin->GetUnmatchedCount();
+	return m_pDoorLightStatusPin->GetUnmatchedCount ();
 }
 
 /// @brief get the number of time the Door Opened
 /// @return count of times the door was in fully opened state
-uint32_t	DoorState::GetDoorOpenedCount ()
+uint32_t DoorState::GetDoorOpenedCount ()
 {
-	return m_pDoorOpenStatusPin->GetMatchedCount();
+	return m_pDoorOpenStatusPin->GetMatchedCount ();
 }
 
 /// @brief get the number of time the door started opening
 /// @return count of times the door was no longer closed
-uint32_t	DoorState::GetDoorOpeningCount ()
+uint32_t DoorState::GetDoorOpeningCount ()
 {
-	return m_pDoorClosedStatusPin->GetUnmatchedCount();
+	return m_pDoorClosedStatusPin->GetUnmatchedCount ();
 }
 
 /// @brief get the number of time the door Closed
 /// @return count of times the light was fully closed
-uint32_t	DoorState::GetDoorClosedCount ()
+uint32_t DoorState::GetDoorClosedCount ()
 {
-	return m_pDoorClosedStatusPin->GetMatchedCount();
+	return m_pDoorClosedStatusPin->GetMatchedCount ();
 }
 
 /// @brief get the number of time the door started closing
 /// @return count of times the foor was not fully open
-uint32_t	DoorState::GetDoorClosingCount ()
+uint32_t DoorState::GetDoorClosingCount ()
 {
-	return m_pDoorOpenStatusPin->GetUnmatchedCount();
+	return m_pDoorOpenStatusPin->GetUnmatchedCount ();
 }
 
 /// <summary>
@@ -356,10 +369,16 @@ uint32_t	DoorState::GetDoorClosingCount ()
 void DoorState::TurnOffControlPins ()
 {
 	TheTimer.RemoveCallBack ( (MNTimerClass *)this, (aMemberFunction)&DoorState::TurnOffControlPins );
+	m_pDoorOpenCtrlPin->Off();
+	m_pDoorCloseCtrlPin->Off();
+	m_pDoorStopCtrlPin->Off();
+	m_pDoorLightCtrlPin->Off();
+/*	
 	ClearRelayPin ( m_DoorCloseCtrlPin );
 	ClearRelayPin ( m_DoorStopCtrlPin );
 	ClearRelayPin ( m_DoorLightCtrlPin );
 	ClearRelayPin ( m_DoorOpenCtrlPin );
+*/
 }
 
 DoorStatusPin::DoorStatusPin ( DoorState *pDoor, DoorState::Event matchEvent, DoorState::Event unmatchEvent, pin_size_t pin, uint32_t debouncems, PinStatus matchStatus, PinMode mode, PinStatus status )
