@@ -7,13 +7,13 @@ OutputPin::OutputPin ( pin_size_t Pin, PinStatus OnStatus ) : m_Pin ( Pin ), m_O
 }
 
 /// @brief Sets the pin to the ON value provided in the constructor
-inline void OutputPin::On ()
+void OutputPin::On ()
 {
 	Write ( m_OnStatus ==  HIGH ? HIGH : LOW );	// Set to ON
 }
 
 /// @brief Sets the pin the logical NOT of the ON value provided in the constructor
-inline void OutputPin::Off ()
+void OutputPin::Off ()
 {
 	Write ( m_OnStatus ==  HIGH ? LOW : HIGH );	// Set to OFF
 }
