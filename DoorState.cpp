@@ -23,6 +23,13 @@ History:
 	Ver 1.0			Initial version
 */
 #define CALL_MEMBER_FN( object, ptrToMember ) ( ( object )->*( ptrToMember ) )
+#include "WiFiService.h"
+extern UDPWiFiService *pMyUDPService;
+// Error message
+extern String ErrorMsg;
+extern bool IsError;
+extern time_t timeError;
+
 constexpr auto		DOOR_FLASHTIME = 10;			 // every 2 seconds
 const int16_t		SIGNAL_PULSE   = 2000 * 5;		 // 2000 per sec, so every 1/5 sec, 200 ms
 constexpr uint32_t	DEBOUNCE_MS	   = 75;			 // min ms between consecutive pin interrupts before signal accepted
@@ -34,19 +41,13 @@ const char		   *StateNames []  =				 // In order of State enums!
 DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopPin, pin_size_t LightPin, pin_size_t DoorOpenStatusPin, pin_size_t DoorClosedStatusPin, pin_size_t DoorLightStatusPin )
 	: m_DoorOpenCtrlPin ( OpenPin ), m_DoorCloseCtrlPin ( ClosePin ), m_DoorStopCtrlPin ( StopPin ), m_DoorLightCtrlPin ( LightPin ), m_DoorOpenStatusPin ( DoorOpenStatusPin ), m_DoorClosedStatusPin ( DoorClosedStatusPin ), m_DoorLightStatusPin ( DoorLightStatusPin )
 {
-	m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::DoorOpenTrue, DoorState::Event::DoorOpenFalse, m_DoorOpenStatusPin, DEBOUNCE_MS, UAP_TRUE, PinMode::INPUT, PinStatus::CHANGE );
-	m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::DoorClosedTrue, DoorState::Event::DoorClosedFalse, m_DoorClosedStatusPin, DEBOUNCE_MS, UAP_TRUE, PinMode::INPUT, PinStatus::CHANGE );
-	m_pDoorLightStatusPin  = new DoorStatusPin ( nullptr, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorLightStatusPin, DEBOUNCE_MS, UAP_TRUE, PinMode::INPUT, PinStatus::CHANGE );
+	m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::DoorOpenTrue, DoorState::Event::DoorOpenFalse, m_DoorOpenStatusPin, /*DEBOUNCE_MS*/0, UAP_TRUE, PinMode::INPUT, PinStatus::CHANGE );
+	m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::DoorClosedTrue, DoorState::Event::DoorClosedFalse, m_DoorClosedStatusPin, /*DEBOUNCE_MS*/0, UAP_TRUE, PinMode::INPUT, PinStatus::CHANGE );
+	m_pDoorLightStatusPin  = new DoorStatusPin ( nullptr, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorLightStatusPin, /*DEBOUNCE_MS*/0, UAP_TRUE, PinMode::INPUT, PinStatus::CHANGE );
 	m_pDoorOpenCtrlPin	   = new OutputPin ( m_DoorOpenCtrlPin, RELAY_ON );
 	m_pDoorCloseCtrlPin	   = new OutputPin ( m_DoorCloseCtrlPin, RELAY_ON );
 	m_pDoorStopCtrlPin	   = new OutputPin ( m_DoorStopCtrlPin, RELAY_ON );
 	m_pDoorLightCtrlPin	   = new OutputPin ( m_DoorLightCtrlPin, RELAY_ON );
-	/*
-		pinMode ( m_DoorOpenCtrlPin, OUTPUT );
-		pinMode ( m_DoorCloseCtrlPin, OUTPUT );
-		pinMode ( m_DoorStopCtrlPin, OUTPUT );
-		pinMode ( m_DoorLightCtrlPin, OUTPUT );
-	*/
 	TurnOffControlPins ();
 
 	m_theDoorState = GetDoorInitialState ();
@@ -140,8 +141,16 @@ void DoorState::NowOpening ( Event )
 /// <returns>None
 void DoorState::SwitchPressed ( Event )
 {
-	Error ( "Switch Pressed                  " );
-#ifndef MNDEBUGxx
+	String Result;
+	if ( pMyUDPService != nullptr && IsError == false )
+	{
+		//timeError = pMyUDPService->GetTime();
+		//pMyUDPService->GetLocalTime( Result ) ;
+		ErrorMsg += " Switch Pressed";
+		IsError = true;
+	}
+	//Error ( Result );
+#ifndef MNDEBUG
 	switch ( m_theDoorState )
 	{
 		case State::Closed:
@@ -234,37 +243,49 @@ void DoorState::DoEvent ( DoorState::Event eEvent )
 /// <returns>None
 void DoorState::DoRequest ( Request eRequest )
 {
+	String Result;
+	if ( pMyUDPService != nullptr )
+	{
+		pMyUDPService->GetLocalTime( Result ) ;
+	}
+
 	switch ( eRequest )
 	{
 		case Request::LightOn:
 			ResetTimer ();
+			Result += " Turn Light On      ";
 			m_pDoorLightCtrlPin->On();
 			//SetRelayPin ( m_DoorLightCtrlPin );
 			break;
 
 		case Request::LightOff:
+			Result += " Turn Light Off     ";
 			//ClearRelayPin ( m_DoorLightCtrlPin );
 			m_pDoorLightCtrlPin->Off();
 			break;
 
 		case Request::CloseDoor:
+			Result += " Close Door         ";
 			ResetTimer ();
 			m_pDoorCloseCtrlPin->On();
 			//SetRelayPin ( m_DoorCloseCtrlPin );
 			break;
 
 		case Request::OpenDoor:
+			Result += " Open Door          ";
 			ResetTimer ();
 			m_pDoorOpenCtrlPin->On();
 			//SetRelayPin ( m_DoorOpenCtrlPin );
 			break;
 
 		case Request::StopDoor:
+			Result += " Stop Door          ";
 			ResetTimer ();
 			m_pDoorStopCtrlPin->On();
 			//SetRelayPin ( m_DoorStopCtrlPin );
 			break;
 	}
+	Error ( Result );	
 }
 
 /// <summary>

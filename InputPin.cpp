@@ -22,6 +22,47 @@ InputPin::InputPin ( pin_size_t pin, uint32_t debouncems, PinStatus matchStatus,
 
 void InputPin::ProcessISR ( void )
 {
+	PinStatus	  newReading = digitalRead ( m_Pin );
+
+	m_ISRCalledCount++;
+	if ( newReading != m_LastPinRead )
+	{
+		// different reading from last time, so check it
+		unsigned long ulNow		 = millis ();
+		if ( newReading == m_MatchStatus )
+		{
+			if ( ulNow - m_LastChangedTime >= m_Debouncems && ulNow - m_LastChangedTime < 1000UL )
+			{
+				// Wanted state
+				m_MatchedCount++;
+				m_CurrentMatchedState = true;
+				m_MatchedDuration = ulNow - m_LastChangedTime;
+				MatchAction ();
+			}
+			else
+			{
+				// changed state to wanted state but too quickly, ignore as a spurious chnage
+				m_SpuriousCount++;
+			}
+		}
+		else
+		{
+			m_UnmatchedCount++;
+			m_CurrentMatchedState = false;
+			UnmatchAction ();
+		}
+		m_LastChangedTime = ulNow;
+		m_LastPinRead = newReading;
+	}
+	else
+	{
+		// repeat value
+		m_DiscardedUnchangedCount++;
+	}
+}
+/*
+void InputPin::ProcessISR ( void )
+{
 	unsigned long ulNow = millis ();
 
 	m_ISRCalledCount++;
@@ -54,7 +95,7 @@ void InputPin::ProcessISR ( void )
 		}
 	}
 }
-
+*/
 bool InputPin::IsMatched ()
 {
 	return m_CurrentMatchedState;
@@ -75,9 +116,9 @@ uint32_t InputPin::GetInvokedCount ()
 	return m_ISRCalledCount;
 }
 
-uint32_t InputPin::GetPostDebounceCount ()
+uint32_t InputPin::GetSpuriousCount ()
 {
-	return m_AfterDebounceCount;
+	return m_SpuriousCount;
 }
 
 uint32_t InputPin::GetDiscardUnchangedCount ()
@@ -85,11 +126,17 @@ uint32_t InputPin::GetDiscardUnchangedCount ()
 	return m_DiscardedUnchangedCount;
 }
 
+uint32_t InputPin::GetLastMatchedDuration ()
+{
+	return m_MatchedDuration;
+}
+
 void InputPin::DebugStats ( String &result )
 {
-	result = String ( m_ISRCalledCount) + " : ";
-	result += String ( m_AfterDebounceCount ) + " : ";
+	result	= String ( m_ISRCalledCount ) + " : ";
 	result += String ( m_DiscardedUnchangedCount ) + " : ";
 	result += String ( m_MatchedCount ) + " : ";
-	result += String ( m_UnmatchedCount );
+	result += String ( m_SpuriousCount ) + " : ";	
+	result += String ( m_UnmatchedCount ) + " : ";
+	result += String ( m_MatchedDuration );
 }

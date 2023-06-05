@@ -14,8 +14,9 @@ class InputPin
 		uint32_t GetMatchedCount ();
 		uint32_t GetUnmatchedCount ();
 		uint32_t GetInvokedCount ();
-		uint32_t GetPostDebounceCount ();
+		uint32_t GetSpuriousCount ();
 		uint32_t GetDiscardUnchangedCount ();
+		uint32_t GetLastMatchedDuration();
 		void	 DebugStats ( String &result );
 
 	private:
@@ -32,7 +33,8 @@ class InputPin
 		// stat counters
 		volatile uint32_t  m_ISRCalledCount			 = 0UL;
 		volatile uint32_t  m_DiscardedUnchangedCount = 0UL;
-		volatile uint32_t  m_AfterDebounceCount		 = 0UL;
 		volatile uint32_t  m_MatchedCount			 = 0UL;
 		volatile uint32_t  m_UnmatchedCount			 = 0UL;
+		volatile uint32_t  m_SpuriousCount			 = 0UL;
+		volatile uint32_t  m_MatchedDuration		 = 0UL;
 };

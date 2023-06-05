@@ -97,7 +97,7 @@ constexpr uint8_t	 RED_PIN				   = A4;
 constexpr uint8_t	 GREEN_PIN				   = A5;
 constexpr uint8_t	 BLUE_PIN				   = A6;
 
-constexpr uint32_t	 SWITCH_DEBOUNCE_MS		   = 100; // min ms between consecutive pin interrupts before signal accepted from manual switch
+constexpr uint32_t	 SWITCH_DEBOUNCE_MS		   = 50; // min ms between consecutive pin interrupts before signal accepted from manual switch
 DoorState			*pGarageDoor			   = nullptr;
 DoorStatusPin		*pDoorSwitchPin			   = nullptr;
 MNRGBLEDBaseLib		*pMyLED					   = new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
@@ -113,6 +113,11 @@ UDPWiFiService *pMyUDPService	= nullptr;
 
 unsigned long	ulLastClientReq = 0UL; // millis of last wifi incoming message
 
+// Error message
+String ErrorMsg;
+bool IsError = false;
+time_t timeError;
+
 // Debug information for ANSI screen with cursor control
 void			DisplayStats ( void )
 {
@@ -125,7 +130,7 @@ void			DisplayStats ( void )
 	#endif
 	Heading += String ( VERSION );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 0, 20, Heading );
-
+/*
 	time_t tNow = (time_t)pMyUDPService->GetTime ();
 	if ( tNow > LastTime )
 	{
@@ -135,6 +140,10 @@ void			DisplayStats ( void )
 		sprintf ( sTime, "%02d/%02d/%02d %02d:%02d:%02d", localtm->tm_mday, localtm->tm_mon + 1, ( localtm->tm_year - 100 ), localtm->tm_hour, localtm->tm_min, localtm->tm_sec );
 		COLOUR_AT ( FG_WHITE, BG_BLACK, 0, 60, sTime );
 	}
+*/	
+	String sTime;
+	pMyUDPService->GetLocalTime( sTime );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 0, 60, sTime );
 	#ifdef UAP_SUPPORT
 	String result;
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 0, F ( "Light is " ) );
@@ -144,34 +153,34 @@ void			DisplayStats ( void )
 	ClearPartofLine ( 5, 10, 8 );
 	COLOUR_AT ( FG_CYAN, BG_BLACK, 5, 10, pGarageDoor->GetDoorDisplayState () );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 30, F ( "Light Off count     " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 51, String ( pGarageDoor->GetLightOffCount () ) );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 20, F ( "Light Off count     " ) );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 41, String ( pGarageDoor->GetLightOffCount () ) );
 	pGarageDoor->m_pDoorLightStatusPin->DebugStats( result);
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 55, result );	
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 45, result );	
 	
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 30, F ( "Light On count      " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 5, 51, String ( pGarageDoor->GetLightOnCount () ) );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 20, F ( "Light On count      " ) );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 5, 41, String ( pGarageDoor->GetLightOnCount () ) );
 	
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 6, 30, F ( "Door Opened count   " ) );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 6, 20, F ( "Door Opened count   " ) );
 	pGarageDoor->m_pDoorOpenStatusPin->DebugStats( result);
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 51, String ( pGarageDoor->GetDoorOpenedCount () ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 55, result );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 41, String ( pGarageDoor->GetDoorOpenedCount () ) );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 45, result );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 7, 30, F ( "Door Opening count  " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 7, 51, String ( pGarageDoor->GetDoorOpeningCount () ) );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 7, 20, F ( "Door Opening count  " ) );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 7, 41, String ( pGarageDoor->GetDoorOpeningCount () ) );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 8, 30, F ( "Door Closed count   " ) );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 8, 20, F ( "Door Closed count   " ) );
 	pGarageDoor->m_pDoorClosedStatusPin->DebugStats( result);
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 51, String ( pGarageDoor->GetDoorClosedCount () ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 55, result );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 41, String ( pGarageDoor->GetDoorClosedCount () ) );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 45, result );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 30, F ( "Door Closing count  " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 51, String ( pGarageDoor->GetDoorClosingCount () ) );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 20, F ( "Door Closing count  " ) );
+	COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 41, String ( pGarageDoor->GetDoorClosingCount () ) );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 30, F ( "Switch Presssed " ) );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 51, String ( pDoorSwitchPin->GetMatchedCount() ) );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 20, F ( "Switch Presssed " ) );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 41, String ( pDoorSwitchPin->GetMatchedCount() ) );
 	pDoorSwitchPin->DebugStats( result );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 55, result );
+	COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 45, result );
 	#endif
 
 	#ifdef TEMP_HUMIDITY_SUPPORT
@@ -187,6 +196,15 @@ void			DisplayStats ( void )
 	ClearPartofLine ( 14, 16, 7 );
 	COLOUR_AT ( FG_CYAN, BG_BLACK, 14, 16, String ( fLatestPressure ) );
 	#endif
+	if ( IsError )
+	{
+		IsError = false;
+		String result;
+		pMyUDPService->GetLocalTime ( result, timeError );
+		result += ErrorMsg;
+		Error ( result );
+		ErrorMsg = "";
+	}
 	pMyUDPService->DisplayStatus ();
 #endif
 }
@@ -204,7 +222,7 @@ void setup ()
 #ifdef UAP_SUPPORT
 	// Setup so we are called if the state of door changes
 	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, DOOR_IS_OPEN_STATUS_PIN, DOOR_IS_CLOSED_STATUS_PIN, LIGHT_IS_ON_STATUS_PIN  );
-	pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::HIGH, PinMode::INPUT, PinStatus::CHANGE );
+	pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::LOW, PinMode::INPUT, PinStatus::CHANGE );
 
 	SetLED ();
 #endif

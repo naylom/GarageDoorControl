@@ -10,6 +10,7 @@ History:
 	Ver 1.0			Initial version
 */
 #include <WiFiNINA.h>
+#include <time.h>
 #include "WiFiService.h"
 #include "DoorState.h"
 
@@ -49,6 +50,7 @@ void TerminateProgram ( const __FlashStringHelper *pErrMsg )
 
 WiFiService::WiFiService ()
 {
+	setenv("TZ","GMTGMT-1,M3.4.0/01,M10.4.0/02",1);
 }
 
 const char *WiFiService::WiFiStatusToString ( uint8_t iState )
@@ -197,7 +199,7 @@ bool WiFiService::WiFiConnect ()
 			CalcMyMulticastAddress ( m_multicastAddr );
 			Error ( "Connected to " + String ( m_SSID ) );
 			iStartCount = 0UL;
-			m_beginConnects++;
+			m_beginConnects++;		
 		}
 	}
 
@@ -330,6 +332,19 @@ void UDPWiFiService::DisplayStatus ()
 	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 8, 41, F ( "WiFi Service State: " ) );
 	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 8, 61, String ( GetState () ) );
 #endif
+}
+
+/// Appends local time to provided String
+void UDPWiFiService::GetLocalTime ( String & result, time_t timeError )
+{
+	if ( timeError == 0 )
+	{
+		timeError = (time_t)GetTime ();
+	}
+	tm	*localtm = localtime ( &timeError );
+	char sTime [ 20 ];
+	sprintf ( sTime, "%02d/%02d/%02d %02d:%02d:%02d", localtm->tm_mday, localtm->tm_mon + 1, ( localtm->tm_year - 100 ), localtm->tm_hour, localtm->tm_min, localtm->tm_sec );
+	result += sTime;
 }
 
 bool UDPWiFiService::GetUDPMessage ( String *pRecvMessage )
