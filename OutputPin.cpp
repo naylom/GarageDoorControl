@@ -13,7 +13,7 @@ void OutputPin::On ()
 }
 
 /// @brief Sets the pin the logical NOT of the ON value provided in the constructor
-inline void OutputPin::Off ()
+void OutputPin::Off ()
 {
 	Write ( m_OnStatus ==  HIGH ? LOW : HIGH );	// Set to OFF
 }

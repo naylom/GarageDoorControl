@@ -60,7 +60,6 @@ DoorState::State DoorState::GetDoorInitialState ()
 	bool	OpenState;
 	bool	CloseState;
 
-	uint8_t iCount = 0;
 	CloseState	   = m_pDoorClosedStatusPin->IsMatched ();
 	OpenState	   = m_pDoorOpenStatusPin->IsMatched ();
 
