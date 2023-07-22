@@ -129,7 +129,7 @@ void InputPin::ProcessISR ( void )
 			m_DiscardedUnchangedCount++;
 		}
 	}
-*/	
+
 }
 */
 bool InputPin::IsMatched ()
