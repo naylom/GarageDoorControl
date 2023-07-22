@@ -66,6 +66,41 @@ void InputPin::ProcessISR ( void )
 	unsigned long ulNow = millis ();
 
 	m_ISRCalledCount++;
+	PinStatus newReading = digitalRead ( m_Pin );
+	if ( newReading != m_LastPinRead )
+	{
+		// pin has changed state 
+		m_LastChangedTime = ulNow;
+		m_LastPinRead	  = newReading;
+		// Check if this change lasted long enough
+		if ( ulNow - m_LastChangedTime > m_Debouncems )
+		{
+			m_AfterDebounceCount++;
+			if ( newReading == m_MatchStatus )
+			{
+				m_MatchedCount++;
+				m_CurrentMatchedState = true;
+				MatchAction ();
+			}
+			else
+			{
+				m_UnmatchedCount++;
+				m_CurrentMatchedState = false;
+				UnmatchAction ();
+			}
+		}
+		else
+		{
+			// discard as spurious change
+			m_ToQuick++;
+		}
+	}
+	else
+	{
+		// Reading unchanged
+		m_DiscardedUnchangedCount++;
+	}
+/*
 	if ( ( ulNow - m_LastChangedTime ) > m_Debouncems )
 	{
 		// ISR fired and debouce threshold has passed
@@ -94,6 +129,7 @@ void InputPin::ProcessISR ( void )
 			m_DiscardedUnchangedCount++;
 		}
 	}
+*/	
 }
 */
 bool InputPin::IsMatched ()

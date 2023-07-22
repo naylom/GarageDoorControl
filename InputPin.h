@@ -37,4 +37,5 @@ class InputPin
 		volatile uint32_t  m_UnmatchedCount			 = 0UL;
 		volatile uint32_t  m_SpuriousCount			 = 0UL;
 		volatile uint32_t  m_MatchedDuration		 = 0UL;
+		volatile uint32_t  m_ToQuick				 = 0UL;
 };
