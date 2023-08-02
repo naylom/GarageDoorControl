@@ -114,9 +114,9 @@ UDPWiFiService *pMyUDPService	= nullptr;
 unsigned long	ulLastClientReq = 0UL; // millis of last wifi incoming message
 
 // Error message
-String ErrorMsg;
-bool IsError = false;
-time_t timeError;
+String			ErrorMsg;
+bool			IsError = false;
+time_t			timeError;
 
 // Debug information for ANSI screen with cursor control
 void			DisplayStats ( void )
@@ -130,57 +130,53 @@ void			DisplayStats ( void )
 	#endif
 	Heading += String ( VERSION );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 0, 20, Heading );
-/*
-	time_t tNow = (time_t)pMyUDPService->GetTime ();
-	if ( tNow > LastTime )
-	{
-		LastTime	 = tNow;
-		tm	*localtm = localtime ( &tNow );
-		char sTime [ 20 ];
-		sprintf ( sTime, "%02d/%02d/%02d %02d:%02d:%02d", localtm->tm_mday, localtm->tm_mon + 1, ( localtm->tm_year - 100 ), localtm->tm_hour, localtm->tm_min, localtm->tm_sec );
-		COLOUR_AT ( FG_WHITE, BG_BLACK, 0, 60, sTime );
-	}
-*/	
+
 	String sTime;
-	pMyUDPService->GetLocalTime( sTime );
+	pMyUDPService->GetLocalTime ( sTime );
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 0, 60, sTime );
+	
 	#ifdef UAP_SUPPORT
 	String result;
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 0, F ( "Light is " ) );
-	ClearPartofLine ( 4, 10, 8 );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, 4, 10, pGarageDoor->IsLit () ? "On" : "Off" );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 0, F ( "State is " ) );
-	ClearPartofLine ( 5, 10, 8 );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, 5, 10, pGarageDoor->GetDoorDisplayState () );
+	if ( pGarageDoor != nullptr )
+	{
+		COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 0, F ( "Light is " ) );
+		ClearPartofLine ( 4, 10, 8 );
+		COLOUR_AT ( FG_CYAN, BG_BLACK, 4, 10, pGarageDoor->IsLit () ? "On" : "Off" );
+		COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 0, F ( "State is " ) );
+		ClearPartofLine ( 5, 10, 8 );
+		COLOUR_AT ( FG_CYAN, BG_BLACK, 5, 10, pGarageDoor->GetDoorDisplayState () );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 20, F ( "Light Off count     " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 41, String ( pGarageDoor->GetLightOffCount () ) );
-	pGarageDoor->m_pDoorLightStatusPin->DebugStats( result);
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 45, result );	
-	
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 20, F ( "Light On count      " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 5, 41, String ( pGarageDoor->GetLightOnCount () ) );
-	
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 6, 20, F ( "Door Opened count   " ) );
-	pGarageDoor->m_pDoorOpenStatusPin->DebugStats( result);
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 41, String ( pGarageDoor->GetDoorOpenedCount () ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 45, result );
+		COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 20, F ( "Light Off count     " ) );
+		COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 41, String ( pGarageDoor->GetLightOffCount () ) );
+		pGarageDoor->m_pDoorLightStatusPin->DebugStats ( result );
+		COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 45, result );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 7, 20, F ( "Door Opening count  " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 7, 41, String ( pGarageDoor->GetDoorOpeningCount () ) );
+		COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 20, F ( "Light On count      " ) );
+		COLOUR_AT ( FG_GREEN, BG_BLACK, 5, 41, String ( pGarageDoor->GetLightOnCount () ) );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 8, 20, F ( "Door Closed count   " ) );
-	pGarageDoor->m_pDoorClosedStatusPin->DebugStats( result);
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 41, String ( pGarageDoor->GetDoorClosedCount () ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 45, result );
+		COLOUR_AT ( FG_WHITE, BG_BLACK, 6, 20, F ( "Door Opened count   " ) );
+		pGarageDoor->m_pDoorOpenStatusPin->DebugStats ( result );
+		COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 41, String ( pGarageDoor->GetDoorOpenedCount () ) );
+		COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 45, result );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 20, F ( "Door Closing count  " ) );
-	COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 41, String ( pGarageDoor->GetDoorClosingCount () ) );
+		COLOUR_AT ( FG_WHITE, BG_BLACK, 7, 20, F ( "Door Opening count  " ) );
+		COLOUR_AT ( FG_GREEN, BG_BLACK, 7, 41, String ( pGarageDoor->GetDoorOpeningCount () ) );
 
+		COLOUR_AT ( FG_WHITE, BG_BLACK, 8, 20, F ( "Door Closed count   " ) );
+		pGarageDoor->m_pDoorClosedStatusPin->DebugStats ( result );
+		COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 41, String ( pGarageDoor->GetDoorClosedCount () ) );
+		COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 45, result );
+
+		COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 20, F ( "Door Closing count  " ) );
+		COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 41, String ( pGarageDoor->GetDoorClosingCount () ) );
+	}
 	COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 20, F ( "Switch Presssed " ) );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 41, String ( pDoorSwitchPin->GetMatchedCount() ) );
-	pDoorSwitchPin->DebugStats( result );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 45, result );
+	if ( pDoorSwitchPin != nullptr )
+	{
+		COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 41, String ( pDoorSwitchPin->GetMatchedCount () ) );
+		pDoorSwitchPin->DebugStats ( result );
+		COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 45, result );
+	}
 	#endif
 
 	#ifdef TEMP_HUMIDITY_SUPPORT
@@ -221,9 +217,9 @@ void setup ()
 #endif
 #ifdef UAP_SUPPORT
 	// Setup so we are called if the state of door changes
-	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, DOOR_IS_OPEN_STATUS_PIN, DOOR_IS_CLOSED_STATUS_PIN, LIGHT_IS_ON_STATUS_PIN  );
-	pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::LOW, PinMode::INPUT, PinStatus::CHANGE );
-
+	// pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, DOOR_IS_OPEN_STATUS_PIN, DOOR_IS_CLOSED_STATUS_PIN, LIGHT_IS_ON_STATUS_PIN  );
+	// pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::LOW, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
+	pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	SetLED ();
 #endif
 
@@ -247,7 +243,11 @@ void setup ()
 void SetLED ()
 {
 	static DoorState::State OldState	 = DoorState::State::Opening;
-	DoorState::State		currentState = pGarageDoor->GetDoorState ();
+	DoorState::State		currentState = DoorState::State::Unknown;
+	if ( pGarageDoor != nullptr )
+	{
+		currentState = pGarageDoor->GetDoorState ();
+	}
 
 	if ( currentState != OldState )
 	{
@@ -294,11 +294,11 @@ void loop ()
 #endif
 	static unsigned long ulLastDisplayTime = 0UL;
 #ifdef UAP_SUPPORT
-	static DoorState::State LastDoorState = DoorState::Unknown;
-	static bool				LastLightState;
+	static DoorState::State LastDoorState  = DoorState::Unknown;
+	static bool				LastLightState = false;
 
 	// set initial light state
-	if ( ulLastDisplayTime == 0UL )
+	if ( pGarageDoor != nullptr && ulLastDisplayTime == 0UL )
 	{
 		LastLightState = !pGarageDoor->IsLit ();
 	}
@@ -312,7 +312,7 @@ void loop ()
 #if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT
 	if ( millis () - ulLastSensorTime > 30 * 1000 )
 	{
-		//  30 secs have passed to get latest sesnor readings
+		//  30 secs have passed to get latest sensor readings
 	#ifdef BAROMETRIC_SUPPORT
 		fLatestPressure = ( lps25hb.readPressure () + ALTITUDE_COMPENSATION );
 	#endif
@@ -333,11 +333,31 @@ void loop ()
 	}
 #ifdef UAP_SUPPORT
 	// if door state has changed, multicast news
-	if ( pGarageDoor->GetDoorState () != LastDoorState || LastLightState != pGarageDoor->IsLit () )
+	if ( pGarageDoor != nullptr )
 	{
-		LastDoorState  = pGarageDoor->GetDoorState ();
-		LastLightState = pGarageDoor->IsLit ();
-		MulticastMsg ( UDPWiFiService::ReqMsgType::DOORDATA );
+		if ( pGarageDoor->GetDoorState () != LastDoorState || LastLightState != pGarageDoor->IsLit () )
+		{
+			LastDoorState  = pGarageDoor->GetDoorState ();
+			LastLightState = pGarageDoor->IsLit ();
+			MulticastMsg ( UDPWiFiService::ReqMsgType::DOORDATA );
+		}
+	}
+	if ( pDoorSwitchPin != nullptr && pMyUDPService != nullptr )
+	{
+		static uint16_t SwitchPressedCount		 = 0;
+		uint16_t		LatestSwitchPressedCount = pDoorSwitchPin->GetMatchedCount ();
+		if ( LatestSwitchPressedCount > SwitchPressedCount )
+		{
+			if ( pDoorSwitchPin->GetCurrentMatchedState () )
+			{
+				String Result;
+				timeError = pMyUDPService->GetTime ();
+				pMyUDPService->GetLocalTime ( Result );
+				Result += "Switch pressed";
+				Error ( Result );
+			}
+			SwitchPressedCount = LatestSwitchPressedCount;
+		}
 	}
 #endif
 }
@@ -380,39 +400,61 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 #endif
 #ifdef UAP_SUPPORT
 		case UDPWiFiService::ReqMsgType::DOORDATA:
-			sResponse  = F ( "S=" );
-			sResponse += pGarageDoor->GetDoorDisplayState ();			   // Door State
-			sResponse += F ( ",L=" );
-			sResponse += pGarageDoor->IsLit () ? "On" : "Off";			   // Light on or not
-			sResponse += F ( ",C=" );
-			sResponse += pGarageDoor->IsClosed () ? F ( "Y" ) : F ( "N" ); // Closed or not
-			sResponse += F ( ",O=" );
-			sResponse += pGarageDoor->IsOpen () ? F ( "Y" ) : F ( "N" );   // Open or not
-			sResponse += F ( ",M=" );
-			sResponse += pGarageDoor->IsMoving () ? F ( "Y" ) : F ( "N" ); // Moving or not
-			sResponse += F ( ",A=" );
-			sResponse += pMyUDPService->GetTime ();						   // current epoch time
-			sResponse += F ( "\r" );
+			if ( pGarageDoor != nullptr )
+			{
+				sResponse  = F ( "S=" );
+				sResponse += pGarageDoor->GetDoorDisplayState ();			   // Door State
+				sResponse += F ( ",L=" );
+				sResponse += pGarageDoor->IsLit () ? "On" : "Off";			   // Light on or not
+				sResponse += F ( ",C=" );
+				sResponse += pGarageDoor->IsClosed () ? F ( "Y" ) : F ( "N" ); // Closed or not
+				sResponse += F ( ",O=" );
+				sResponse += pGarageDoor->IsOpen () ? F ( "Y" ) : F ( "N" );   // Open or not
+				sResponse += F ( ",M=" );
+				sResponse += pGarageDoor->IsMoving () ? F ( "Y" ) : F ( "N" ); // Moving or not
+				sResponse += F ( ",A=" );
+				sResponse += pMyUDPService->GetTime ();						   // current epoch time
+				sResponse += F ( "\r" );
+			}
+			else
+			{
+				Error ( "Doordata unavailable" );
+			}
 			break;
 
 		case UDPWiFiService::ReqMsgType::DOOROPEN:
-			pGarageDoor->DoRequest ( DoorState::Request::OpenDoor );
+			if ( pGarageDoor != nullptr )
+			{
+				pGarageDoor->DoRequest ( DoorState::Request::OpenDoor );
+			}
 			break;
 
 		case UDPWiFiService::ReqMsgType::DOORCLOSE:
-			pGarageDoor->DoRequest ( DoorState::Request::CloseDoor );
+			if ( pGarageDoor != nullptr )
+			{
+				pGarageDoor->DoRequest ( DoorState::Request::CloseDoor );
+			}
 			break;
 
 		case UDPWiFiService::ReqMsgType::DOORSTOP:
-			pGarageDoor->DoRequest ( DoorState::Request::StopDoor );
+			if ( pGarageDoor != nullptr )
+			{
+				pGarageDoor->DoRequest ( DoorState::Request::StopDoor );
+			}
 			break;
 
 		case UDPWiFiService::ReqMsgType::LIGHTON:
-			pGarageDoor->DoRequest ( DoorState::Request::LightOn );
+			if ( pGarageDoor != nullptr )
+			{
+				pGarageDoor->DoRequest ( DoorState::Request::LightOn );
+			}
 			break;
 
 		case UDPWiFiService::ReqMsgType::LIGHTOFF:
-			pGarageDoor->DoRequest ( DoorState::Request::LightOff );
+			if ( pGarageDoor != nullptr )
+			{
+				pGarageDoor->DoRequest ( DoorState::Request::LightOff );
+			}
 			break;
 #endif
 	}

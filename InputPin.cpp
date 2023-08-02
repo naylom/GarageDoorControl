@@ -31,7 +31,7 @@ void InputPin::ProcessISR ( void )
 		unsigned long ulNow		 = millis ();
 		if ( newReading == m_MatchStatus )
 		{
-			if ( ulNow - m_LastChangedTime >= m_Debouncems && ulNow - m_LastChangedTime < 1000UL )
+			if ( ulNow - m_LastChangedTime >= m_Debouncems /* && ulNow - m_LastChangedTime < 1000UL */ )
 			{
 				// Wanted state
 				m_MatchedCount++;
@@ -165,6 +165,11 @@ uint32_t InputPin::GetDiscardUnchangedCount ()
 uint32_t InputPin::GetLastMatchedDuration ()
 {
 	return m_MatchedDuration;
+}
+
+bool	 InputPin::GetCurrentMatchedState()
+{
+	return digitalRead ( m_Pin ) == m_MatchStatus;
 }
 
 void InputPin::DebugStats ( String &result )
