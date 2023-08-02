@@ -141,7 +141,7 @@ class ansiVT220Logger : public SerialLogger
 
 		// defines for ansi terminal sequences
 		// colours
-		enum colours : uint8_t { FG_BLACK = 30, FG_RED, FG_GREEN, FG_YELLOW, FG_BLUE, FG_CYAN, FG_WHITE, BG_BLACK = 40, BG_RED, BG_GREEN, BG_YELLOW, BG_BLUE, BG_MAGENTA, BG_CYAN, BG_WHITE };
+		enum colours : uint8_t { FG_BLACK = 30, FG_RED, FG_GREEN, FG_YELLOW, FG_BLUE, FG_MAGENTA, FG_CYAN, FG_WHITE, BG_BLACK = 40, BG_RED, BG_GREEN, BG_YELLOW, BG_BLUE, BG_MAGENTA, BG_CYAN, BG_WHITE };
 
 		const static uint8_t MAX_COLS = 80;
 		const static uint8_t MAX_ROWS = 25;
