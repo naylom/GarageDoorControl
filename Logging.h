@@ -23,7 +23,8 @@ History:
 */
 constexpr auto BAUD_RATE = 115200;
 #include <Arduino.h>
-#include "CTelnet.h"
+#include <WiFiNINA.h>
+// #include "CTelnet.h"
 #define MNDEBUG
 #undef TELNET
 /*
@@ -34,76 +35,40 @@ constexpr auto BAUD_RATE = 115200;
 		#define Logln( x )	 Telnet.Logln ( x )
 		#define LogFlush
 		#define LogStart() Telnet.begin ( 0xFEEE )
-	#else
-		#define Log( x )	 Serial.print ( x )
-		#define Log2( x, y ) Serial.print ( x, y )
-		#define Logln( x )	 Serial.Logln ( x )
-		#define LogFlush	 Serial.flush ()
-		#define LogStart()	 Serial.begin ( BAUD_RATE ); while ( !Serial )
 	#endif
-#else
-	#define Log( x )
-	#define Log2( x, y )
-	#define Logln( x )
-	#define LogFlush
-	#define LogStart()
 #endif
 */
 void ResetBoard ( const __FlashStringHelper *pErrMsg );
 
-/*  ---------------------------------------  */
-// For ansi colour and cursor movement
-/*  ---------------------------------------  */
-/*
-// code to draw screen
-constexpr auto ERROR_ROW		= 25;
-constexpr auto ERROR_COL		= 1;
-constexpr auto STATUS_LINE		= 24;
-constexpr auto STATUS_START_COL = 30;
-constexpr auto STATS_ROW		= 8;
-constexpr auto STATS_RESULT_COL = 70;
-constexpr auto MODE_ROW			= 20;
-constexpr auto MODE_RESULT_COL	= 45;
-constexpr auto MAX_COLS			= 80;
-constexpr auto MAX_ROWS			= 25;
+class Logger
+{
+	public:
+		virtual size_t Log ( const __FlashStringHelper *ifsh ) = 0;
+		virtual size_t Log ( const String &s )				   = 0;
+		virtual size_t Log ( char c )						   = 0;
+		virtual size_t Log ( const char str [] )			   = 0;
+		virtual size_t Log ( unsigned char b, int base )	   = 0;
+		virtual size_t Log ( int n, int base )				   = 0;
+		virtual size_t Log ( unsigned int n, int base )		   = 0;
+		virtual size_t Log ( long n, int base )				   = 0;
+		virtual size_t Log ( unsigned long num, int base )	   = 0;
+		virtual size_t Logln ( char x )						   = 0;
+		virtual size_t Logln ( const char c [] )			   = 0;
+		virtual size_t Logln ( const String &s )			   = 0;
+		virtual size_t Logln ( void )						   = 0;
+		virtual size_t Logln ( unsigned char b, int base )	   = 0;
+		virtual size_t Logln ( int num, int base )			   = 0;
+		virtual size_t Logln ( unsigned int num, int base )	   = 0;
+		virtual size_t Logln ( long num, int base )			   = 0;
+		virtual size_t Logln ( unsigned long num, int base )   = 0;
+		virtual size_t Logln ( double num, int digits )		   = 0;
+		virtual void   flush ()								   = 0;
+		virtual void   LogStart ()							   = 0;
 
-// defines for ansi terminal sequences
-// #define CSI				F("\x1b[")
-const auto	   CSI				= F ( "\x1b[" );
-const auto	   SAVE_CURSOR		= F ( "\x1b[s" );
-const auto	   RESTORE_CURSOR	= F ( "\x1b[u" );
-const auto	   CLEAR_LINE		= F ( "\x1b[2K" );
-const auto	   RESET_COLOURS	= F ( "\x1b[0m" );
+	private:
+};
 
-// colors
-constexpr auto FG_BLACK			= 30;
-constexpr auto FG_RED			= 31;
-constexpr auto FG_GREEN			= 32;
-constexpr auto FG_YELLOW		= 33;
-constexpr auto FG_BLUE			= 34;
-constexpr auto FG_MAGENTA		= 35;
-constexpr auto FG_CYAN			= 36;
-constexpr auto FG_WHITE			= 37;
-
-constexpr auto BG_BLACK			= 40;
-constexpr auto BG_RED			= 41;
-constexpr auto BG_GREEN			= 42;
-constexpr auto BG_YELLOW		= 43;
-constexpr auto BG_BLUE			= 44;
-constexpr auto BG_MAGENTA		= 45;
-constexpr auto BG_CYAN			= 46;
-constexpr auto BG_WHITE			= 47;
-
-void		   ClearScreen ();
-void		   AT ( uint8_t row, uint8_t col, String s );
-void		   COLOUR_AT ( uint8_t FGColour, uint8_t BGColour, uint8_t row, uint8_t col, String s );
-void		   RestoreCursor ( void );
-void		   SaveCursor ( void );
-void		   ClearLine ( uint8_t row );
-void		   ClearPartofLine ( uint8_t row, uint8_t start_col, uint8_t toclear );
-void		   Error ( String s );
-*/
-class SerialLogger
+class SerialLogger : public Logger
 {
 	public:
 		const uint32_t BAUD_RATE = 115200;
@@ -125,17 +90,60 @@ class SerialLogger
 		size_t		   Logln ( unsigned int num, int base );
 		size_t		   Logln ( long num, int base );
 		size_t		   Logln ( unsigned long num, int base );
-		size_t		   Logln ( long long num, int base );
-		size_t		   Logln ( unsigned long long num, int base );
 		size_t		   Logln ( double num, int digits );
-		size_t		   Logln ( const Printable &x );
 		void		   flush ();
 		void		   LogStart ();
-
-	private:
 };
 
-class ansiVT220Logger : public SerialLogger
+/*
+	Telnet
+	This class is used to allow an incoming telnet connection. It only outputs and does not process incoming data
+	It does require an active (connected) network WiFi session
+*/
+constexpr uint16_t default_mcast_port = 0xFEEE;
+
+class CTelnet : public Logger
+{
+	public:
+		operator bool ();
+		void   begin ( uint32_t s = default_mcast_port );
+		size_t Log ( const __FlashStringHelper *ifsh );
+		size_t Log ( const String &s );
+		size_t Log ( char c );
+		size_t Log ( const char str [] );
+		size_t Log ( unsigned char b, int base );
+		size_t Log ( int n, int base );
+		size_t Log ( unsigned int n, int base );
+		size_t Log ( long n, int base );
+		size_t Log ( unsigned long num, int base );
+		size_t Logln ( char x );
+		size_t Logln ( const char c [] );
+		size_t Logln ( const String &s );
+		size_t Logln ( void );
+		size_t Logln ( unsigned char b, int base );
+		size_t Logln ( int num, int base );
+		size_t Logln ( unsigned int num, int base );
+		size_t Logln ( long num, int base );
+		size_t Logln ( unsigned long num, int base );
+		size_t Logln ( double num, int digits );
+		void   flush ();
+		void   LogStart ();
+
+	private:
+		char		buff [ 32 ];
+		bool		isConnected ();
+		size_t		Send ( String Msg );
+		size_t		Send ( char c );
+		size_t		Send ( const uint8_t *buffer, size_t size );
+		WiFiServer *m_pmyServer = nullptr;
+		WiFiClient	m_myClient;
+		uint16_t	m_telnetPort;
+		bool		m_bClientConnected = false;
+};
+
+extern CTelnet Telnet;
+
+class ansiVT220Logger
 {
 	public:
 
@@ -145,16 +153,18 @@ class ansiVT220Logger : public SerialLogger
 
 		const static uint8_t MAX_COLS = 80;
 		const static uint8_t MAX_ROWS = 25;
-
-		void				 ClearScreen ();
-		void				 AT ( uint8_t row, uint8_t col, String s );
-		void				 COLOUR_AT ( colours FGColour, colours BGColour, uint8_t row, uint8_t col, String s );
-		void				 RestoreCursor ( void );
-		void				 SaveCursor ( void );
-		void				 ClearLine ( uint8_t row );
-		void				 ClearPartofLine ( uint8_t row, uint8_t start_col, uint8_t toclear );
+		ansiVT220Logger ( Logger &logger ) : m_logger ( logger ) {};
+		void ClearScreen ();
+		void AT ( uint8_t row, uint8_t col, String s );
+		void COLOUR_AT ( colours FGColour, colours BGColour, uint8_t row, uint8_t col, String s );
+		void RestoreCursor ( void );
+		void SaveCursor ( void );
+		void ClearLine ( uint8_t row );
+		void ClearPartofLine ( uint8_t row, uint8_t start_col, uint8_t toclear );
+		void LogStart ();
 
 	private:
+		Logger		&m_logger;
 		const String CSI			= F ( "\x1b[" );
 		const String SAVE_CURSOR	= F ( "\x1b[s" );
 		const String RESTORE_CURSOR = F ( "\x1b[u" );

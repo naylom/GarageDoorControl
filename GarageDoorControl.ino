@@ -39,8 +39,15 @@ History:
 	Ver 1.0.8		Moved logging to object SerialLogger
 */
 #define VERSION "1.0.8 Beta"
-
-ansiVT220Logger MyLogger;
+#undef TELNET
+#ifdef MNDEBUG
+	#ifdef TELNET
+ansiVT220Logger MyLogger ( Telnet );
+	#else
+SerialLogger			slog;
+ansiVT220Logger			MyLogger ( slog );		   // create serial comms object to log to
+	#endif
+#endif
 
 #define UAP_SUPPORT
 #define BAROMETRIC_SUPPORT
