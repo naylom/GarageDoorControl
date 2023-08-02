@@ -39,11 +39,10 @@ constexpr uint8_t PrintStartLine		= 15;
 enum eResponseMessage { TEMPDATA, DOORDATA };
 
 #define CALL_MEMBER_FN_BY_PTR( object, ptrToMember ) ( ( object )->*( ptrToMember ) )
-
+extern void Error ( String s );
 void TerminateProgram ( const __FlashStringHelper *pErrMsg )
 {
 	Error ( pErrMsg );
-	LogFlush;
 	while ( true )
 		;
 }
@@ -267,70 +266,70 @@ void UDPWiFiService::CheckUDP ()
 	}
 }
 
-void UDPWiFiService::DisplayStatus ()
+void UDPWiFiService::DisplayStatus ( ansiVT220Logger logger )
 {
 #ifdef MNDEBUG
 	// print the SSID of the network you're attached to:
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine, 0, F ( "SSID: " ) );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine, 23, WiFi.SSID () );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine, 0, F ( "SSID: " ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine, 23, WiFi.SSID () );
 	if ( m_pMulticastDestList != nullptr )
 	{
 		uint8_t	  iterator = m_pMulticastDestList->GetIterator ();
 		IPAddress mcastDest;
 		while ( (long unsigned int)( mcastDest = m_pMulticastDestList->GetNext ( iterator ) ) != 0UL )
 		{
-			COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + iterator - 1, 41, "Mcast #" + String ( iterator ) + ": " );
-			ClearPartofLine ( PrintStartLine + iterator - 1, 61, 15 );
-			COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + iterator - 1, 61, ToIPString ( mcastDest ) );
+			logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + iterator - 1, 41, "Mcast #" + String ( iterator ) + ": " );
+			logger.ClearPartofLine ( PrintStartLine + iterator - 1, 61, 15 );
+			logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + iterator - 1, 61, ToIPString ( mcastDest ) );
 		}
 	}
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 1, 0, F ( "My Hostname: " ) );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 1, 23, GetHostName () );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 1, 0, F ( "My Hostname: " ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 1, 23, GetHostName () );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 2, 0, F ( "IP Address: " ) );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 2, 23, ToIPString ( WiFi.localIP () ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 2, 0, F ( "IP Address: " ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 2, 23, ToIPString ( WiFi.localIP () ) );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 3, 0, "Subnet Mask: " );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 3, 23, ToIPString ( WiFi.subnetMask () ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 3, 0, "Subnet Mask: " );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 3, 23, ToIPString ( WiFi.subnetMask () ) );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 4, 0, "Local Multicast Addr: " );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 4, 23, ToIPString ( GetMulticastAddress () ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 4, 0, "Local Multicast Addr: " );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 4, 23, ToIPString ( GetMulticastAddress () ) );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 4, 41, "WiFi connect/fail: " );
-	ClearPartofLine ( PrintStartLine + 4, 61, 10 );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 4, 61, String ( m_beginConnects ) + "/" + String ( m_beginTimeouts ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 4, 41, "WiFi connect/fail: " );
+	logger.ClearPartofLine ( PrintStartLine + 4, 61, 10 );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 4, 61, String ( m_beginConnects ) + "/" + String ( m_beginTimeouts ) );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 5, 41, "Multicasts sent: " );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 5, 61, String ( m_ulMCastSentCount ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 5, 41, "Multicasts sent: " );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 5, 61, String ( m_ulMCastSentCount ) );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 6, 41, "Requests recvd: " );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 6, 61, String ( m_ulReqCount ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 6, 41, "Requests recvd: " );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 6, 61, String ( m_ulReqCount ) );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 7, 41, "Replies sent: " );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 7, 61, String ( m_ulReplyCount ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 7, 41, "Replies sent: " );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 7, 61, String ( m_ulReplyCount ) );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 5, 0, F ( "Mac address: " ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 5, 0, F ( "Mac address: " ) );
 	byte bMac [ 6 ];
 	WiFi.macAddress ( bMac );
 	char s [ 18 ];
 	sprintf ( s, "%02X:%02X:%02X:%02X:%02X:%02X", bMac [ 5 ], bMac [ 4 ], bMac [ 3 ], bMac [ 2 ], bMac [ 1 ], bMac [ 0 ] );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 5, 23, s );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 5, 23, s );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 6, 0, F ( "Gateway Address: " ) );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 6, 23, ToIPString ( WiFi.gatewayIP () ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 6, 0, F ( "Gateway Address: " ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 6, 23, ToIPString ( WiFi.gatewayIP () ) );
 	// print the received signal strength:
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 7, 0, F ( "Signal strength (RSSI):" ) );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 7, 23, String ( WiFi.RSSI () ) );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 7, 30, F ( " dBm" ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 7, 0, F ( "Signal strength (RSSI):" ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 7, 23, String ( WiFi.RSSI () ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 7, 30, F ( " dBm" ) );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 8, 0, F ( "WiFi Status: " ) );
-	ClearPartofLine ( PrintStartLine + 8, 23, 15 );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 8, 23, WiFiStatusToString ( WiFi.status () ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 8, 0, F ( "WiFi Status: " ) );
+	logger.ClearPartofLine ( PrintStartLine + 8, 23, 15 );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 8, 23, WiFiStatusToString ( WiFi.status () ) );
 
-	COLOUR_AT ( FG_WHITE, BG_BLACK, PrintStartLine + 8, 41, F ( "WiFi Service State: " ) );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, PrintStartLine + 8, 61, String ( GetState () ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 8, 41, F ( "WiFi Service State: " ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 8, 61, String ( GetState () ) );
 #endif
 }
 

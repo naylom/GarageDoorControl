@@ -6,6 +6,9 @@
 		".ino": "c",
 		".clang-format": "plaintext",
 		"*.h": "cpp",
-		"*.tcc": "cpp"
+		"*.tcc": "cpp",
+		"calliper2,cpp": "cpp",
+		"limits": "cpp",
+		"type_traits": "cpp"
 	}
 }

@@ -35,9 +35,12 @@ History:
 	Ver 1.0.4		Supports config to add/remove UAP, Distance Centre, Barometruc sensor
 	Ver 1.0.5		Add ability to get loggging data over a telnet connection on 0xFEEE
 	Ver 1.0.6       Changed input pins to be simply INPUT and use external pulldown resistors
-	Cer 1.0.7		Moved all input and out pins into DoorState, added InputPin class
+	Ver 1.0.7		Moved all input and out pins into DoorState, added InputPin class
+	Ver 1.0.8		Moved logging to object SerialLogger
 */
-#define VERSION "1.0.7 Beta"
+#define VERSION "1.0.8 Beta"
+
+ansiVT220Logger MyLogger;
 
 #define UAP_SUPPORT
 #define BAROMETRIC_SUPPORT
@@ -105,21 +108,28 @@ MNRGBLEDBaseLib		*pMyLED					   = new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
 /*
 	WiFi config
 */
-constexpr char	ssid []			= "Naylorfamily"; // your network SSID (name)
-constexpr char	pass []			= "welcome1";	  // your network password
-constexpr char	MyHostName []	= "GarageControl";
+constexpr char	  ssid []		  = "Naylorfamily"; // your network SSID (name)
+constexpr char	  pass []		  = "welcome1";		// your network password
+constexpr char	  MyHostName []	  = "GarageControl";
 
-UDPWiFiService *pMyUDPService	= nullptr;
+UDPWiFiService	 *pMyUDPService	  = nullptr;
 
-unsigned long	ulLastClientReq = 0UL; // millis of last wifi incoming message
+unsigned long	  ulLastClientReq = 0UL; // millis of last wifi incoming message
 
 // Error message
-String			ErrorMsg;
-bool			IsError = false;
-time_t			timeError;
+constexpr uint8_t ERROR_LINE	  = 25;
+String			  ErrorMsg;
+bool			  IsError = false;
+time_t			  timeError;
+
+void			  Error ( String s )
+{
+	MyLogger.ClearLine ( ERROR_LINE );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_RED, ERROR_LINE, 1, s );
+}
 
 // Debug information for ANSI screen with cursor control
-void			DisplayStats ( void )
+void DisplayStats ( void )
 {
 #ifdef MNDEBUG
 	static time_t LastTime = 0;
@@ -129,68 +139,68 @@ void			DisplayStats ( void )
 	String Heading = F ( "Temp Sensor - ver " );
 	#endif
 	Heading += String ( VERSION );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 0, 20, Heading );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 0, 20, Heading );
 
 	String sTime;
 	pMyUDPService->GetLocalTime ( sTime );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 0, 60, sTime );
-	
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 0, 60, sTime );
+
 	#ifdef UAP_SUPPORT
 	String result;
 	if ( pGarageDoor != nullptr )
 	{
-		COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 0, F ( "Light is " ) );
-		ClearPartofLine ( 4, 10, 8 );
-		COLOUR_AT ( FG_CYAN, BG_BLACK, 4, 10, pGarageDoor->IsLit () ? "On" : "Off" );
-		COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 0, F ( "State is " ) );
-		ClearPartofLine ( 5, 10, 8 );
-		COLOUR_AT ( FG_CYAN, BG_BLACK, 5, 10, pGarageDoor->GetDoorDisplayState () );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 4, 0, F ( "Light is " ) );
+		MyLogger.ClearPartofLine ( 4, 10, 8 );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 4, 10, pGarageDoor->IsLit () ? "On" : "Off" );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 0, F ( "State is " ) );
+		MyLogger.ClearPartofLine ( 5, 10, 8 );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 5, 10, pGarageDoor->GetDoorDisplayState () );
 
-		COLOUR_AT ( FG_WHITE, BG_BLACK, 4, 20, F ( "Light Off count     " ) );
-		COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 41, String ( pGarageDoor->GetLightOffCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 4, 20, F ( "Light Off count     " ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 41, String ( pGarageDoor->GetLightOffCount () ) );
 		pGarageDoor->m_pDoorLightStatusPin->DebugStats ( result );
-		COLOUR_AT ( FG_GREEN, BG_BLACK, 4, 45, result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 45, result );
 
-		COLOUR_AT ( FG_WHITE, BG_BLACK, 5, 20, F ( "Light On count      " ) );
-		COLOUR_AT ( FG_GREEN, BG_BLACK, 5, 41, String ( pGarageDoor->GetLightOnCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 20, F ( "Light On count      " ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 5, 41, String ( pGarageDoor->GetLightOnCount () ) );
 
-		COLOUR_AT ( FG_WHITE, BG_BLACK, 6, 20, F ( "Door Opened count   " ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 6, 20, F ( "Door Opened count   " ) );
 		pGarageDoor->m_pDoorOpenStatusPin->DebugStats ( result );
-		COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 41, String ( pGarageDoor->GetDoorOpenedCount () ) );
-		COLOUR_AT ( FG_GREEN, BG_BLACK, 6, 45, result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 41, String ( pGarageDoor->GetDoorOpenedCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 45, result );
 
-		COLOUR_AT ( FG_WHITE, BG_BLACK, 7, 20, F ( "Door Opening count  " ) );
-		COLOUR_AT ( FG_GREEN, BG_BLACK, 7, 41, String ( pGarageDoor->GetDoorOpeningCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 7, 20, F ( "Door Opening count  " ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 7, 41, String ( pGarageDoor->GetDoorOpeningCount () ) );
 
-		COLOUR_AT ( FG_WHITE, BG_BLACK, 8, 20, F ( "Door Closed count   " ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 8, 20, F ( "Door Closed count   " ) );
 		pGarageDoor->m_pDoorClosedStatusPin->DebugStats ( result );
-		COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 41, String ( pGarageDoor->GetDoorClosedCount () ) );
-		COLOUR_AT ( FG_GREEN, BG_BLACK, 8, 45, result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 8, 41, String ( pGarageDoor->GetDoorClosedCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 8, 45, result );
 
-		COLOUR_AT ( FG_WHITE, BG_BLACK, 9, 20, F ( "Door Closing count  " ) );
-		COLOUR_AT ( FG_GREEN, BG_BLACK, 9, 41, String ( pGarageDoor->GetDoorClosingCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 9, 20, F ( "Door Closing count  " ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 9, 41, String ( pGarageDoor->GetDoorClosingCount () ) );
 	}
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 20, F ( "Switch Presssed " ) );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 20, F ( "Switch Presssed " ) );
 	if ( pDoorSwitchPin != nullptr )
 	{
-		COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 41, String ( pDoorSwitchPin->GetMatchedCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 41, String ( pDoorSwitchPin->GetMatchedCount () ) );
 		pDoorSwitchPin->DebugStats ( result );
-		COLOUR_AT ( FG_WHITE, BG_BLACK, 10, 45, result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 45, result );
 	}
 	#endif
 
 	#ifdef TEMP_HUMIDITY_SUPPORT
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 12, 0, F ( "Temperature is " ) );
-	ClearPartofLine ( 12, 16, 6 );
-	COLOUR_AT ( FG_RED, BG_BLACK, 12, 16, String ( sHTResults.fTemperature ) );
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 13, 0, F ( "Humidity is " ) );
-	ClearPartofLine ( 13, 16, 6 );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, 13, 16, String ( sHTResults.fHumidity ) );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 12, 0, F ( "Temperature is " ) );
+	MyLogger.ClearPartofLine ( 12, 16, 6 );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_RED, ansiVT220Logger::BG_BLACK, 12, 16, String ( sHTResults.fTemperature ) );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 13, 0, F ( "Humidity is " ) );
+	MyLogger.ClearPartofLine ( 13, 16, 6 );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 13, 16, String ( sHTResults.fHumidity ) );
 	#endif
 	#ifdef BAROMETRIC_SUPPORT
-	COLOUR_AT ( FG_WHITE, BG_BLACK, 14, 0, F ( "Pressure is " ) );
-	ClearPartofLine ( 14, 16, 7 );
-	COLOUR_AT ( FG_CYAN, BG_BLACK, 14, 16, String ( fLatestPressure ) );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 14, 0, F ( "Pressure is " ) );
+	MyLogger.ClearPartofLine ( 14, 16, 7 );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 14, 16, String ( fLatestPressure ) );
 	#endif
 	if ( IsError )
 	{
@@ -201,7 +211,7 @@ void			DisplayStats ( void )
 		Error ( result );
 		ErrorMsg = "";
 	}
-	pMyUDPService->DisplayStatus ();
+	pMyUDPService->DisplayStatus ( MyLogger );
 #endif
 }
 
@@ -209,8 +219,8 @@ void			DisplayStats ( void )
 void setup ()
 {
 	// Serial.begin ( BAUD_RATE );
-	LogStart ();
-	ClearScreen ();
+	MyLogger.LogStart ();
+	MyLogger.ClearScreen ();
 #ifdef BAROMETRIC_SUPPORT
 	// 	Start barometric sensor
 	lps25hb.begin ( lps25hbDevID );

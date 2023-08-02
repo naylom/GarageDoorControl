@@ -74,7 +74,7 @@ class UDPWiFiService : public WiFiService
 		bool Begin ( UDPWiFiServiceCallback pHandleReqData, const char *WiFissid, const char *WiFipwd, const char *HostName, const uint16_t portUDP = 0xFEED, MNRGBLEDBaseLib *pLED = nullptr );
 		bool Begin ( UDPWiFiServiceCallback pHandleReqData, const char *WiFissid, const char *WiFipwd, const char *HostName, MNRGBLEDBaseLib *pLED = nullptr, const uint16_t portUDP = 0xFEED );
 		void CheckUDP ();
-		void DisplayStatus ();
+		void DisplayStatus (ansiVT220Logger logger);
 		void GetLocalTime ( String & result, time_t timeError = 0 );
 		bool SendAll ( String sMsg );
 		bool SendReply ( String sMsg );

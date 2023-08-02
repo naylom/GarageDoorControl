@@ -53,6 +53,11 @@ void CTelnet::print ( const char *s )
 	Send ( s );
 }
 
+void CTelnet::print ( char &s )
+{
+	print ( (char *)s );
+}
+
 void CTelnet::print ( int32_t s )
 {
 	Send ( String ( s ) );

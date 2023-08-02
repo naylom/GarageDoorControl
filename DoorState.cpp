@@ -25,6 +25,7 @@ History:
 #define CALL_MEMBER_FN( object, ptrToMember ) ( ( object )->*( ptrToMember ) )
 #include "WiFiService.h"
 extern UDPWiFiService *pMyUDPService;
+extern void			  Error ( String s );
 // Error message
 extern String ErrorMsg;
 extern bool IsError;

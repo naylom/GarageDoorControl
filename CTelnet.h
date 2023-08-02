@@ -2,7 +2,7 @@
 #include <WiFiNINA.h>
 /*
 	Telnet
-	This class is used to allow an incoling telnet connection. It only outputs and does not process incoming data
+	This class is used to allow an incoming telnet connection. It only outputs and does not process incoming data
 	It does require an active (connected) network WiFi session
 */
 constexpr uint16_t default_mcast_port = 0xFEEE;

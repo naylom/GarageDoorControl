@@ -6,7 +6,7 @@
 
 #include "SHTTempHumSensors.h"
 #include "logging.h"
-
+extern void Error ( String s );
 SHTTempHumSensorsClass::~SHTTempHumSensorsClass ()
 {
 	m_mySensor.reset ();
