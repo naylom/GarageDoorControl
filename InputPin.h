@@ -18,6 +18,7 @@ class InputPin
 		uint32_t GetDiscardUnchangedCount ();
 		uint32_t GetLastMatchedDuration();
 		void	 DebugStats ( String &result );
+		bool	 GetCurrentMatchedState();
 
 	private:
 		virtual void	   MatchAction ()	= 0;
