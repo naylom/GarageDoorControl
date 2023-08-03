@@ -145,7 +145,7 @@ void DoorState::SwitchPressed ( Event )
 	String Result;
 	if ( pMyUDPService != nullptr && IsError == false )
 	{
-		//timeError = pMyUDPService->GetTime();
+		timeError = pMyUDPService->GetTime();
 		//pMyUDPService->GetLocalTime( Result ) ;
 		ErrorMsg += " Switch Pressed";
 		IsError = true;
@@ -245,11 +245,6 @@ void DoorState::DoEvent ( DoorState::Event eEvent )
 void DoorState::DoRequest ( Request eRequest )
 {
 	String Result;
-	if ( pMyUDPService != nullptr )
-	{
-		pMyUDPService->GetLocalTime( Result ) ;
-	}
-
 	switch ( eRequest )
 	{
 		case Request::LightOn:

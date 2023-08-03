@@ -53,7 +53,7 @@ ansiVT220Logger			MyLogger ( slog );		   // create serial comms object to log to
 #define BAROMETRIC_SUPPORT
 #define TEMP_HUMIDITY_SUPPORT
 #undef DISTANCE_SENSOR_SUPPORT
-// #define 	MKR_RGB_INVERT														// only required if Red and Green colours
+#define 	MKR_RGB_INVERT														// only required if Red and Green colours
 // are inverted as found on some boards
 
 #ifdef TEMP_HUMIDITY_SUPPORT
@@ -123,16 +123,26 @@ UDPWiFiService	 *pMyUDPService	  = nullptr;
 
 unsigned long	  ulLastClientReq = 0UL; // millis of last wifi incoming message
 
-// Error message
+// Error message process used when generating messages during interrupt
 constexpr uint8_t ERROR_LINE	  = 25;
 String			  ErrorMsg;
 bool			  IsError = false;
 time_t			  timeError;
 
+/// @brief Logs to error line the provided error message prepeneded with local date and time
+/// @param s message to be logged
 void			  Error ( String s )
 {
+	String Result;
+	if ( pMyUDPService != nullptr && pMyUDPService->GetState() == WiFiService::Status::CONNECTED )
+	{
+		timeError = pMyUDPService->GetTime ();
+		pMyUDPService->GetLocalTime ( Result );
+		Result += " ";
+	}
+	Result += s;
 	MyLogger.ClearLine ( ERROR_LINE );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_RED, ERROR_LINE, 1, s );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_RED, ERROR_LINE, 1, Result );
 }
 
 // Debug information for ANSI screen with cursor control
@@ -212,10 +222,7 @@ void DisplayStats ( void )
 	if ( IsError )
 	{
 		IsError = false;
-		String result;
-		pMyUDPService->GetLocalTime ( result, timeError );
-		result += ErrorMsg;
-		Error ( result );
+		Error ( ErrorMsg );
 		ErrorMsg = "";
 	}
 	pMyUDPService->DisplayStatus ( MyLogger );
@@ -367,11 +374,7 @@ void loop ()
 		{
 			if ( pDoorSwitchPin->GetCurrentMatchedState () )
 			{
-				String Result;
-				timeError = pMyUDPService->GetTime ();
-				pMyUDPService->GetLocalTime ( Result );
-				Result += "Switch pressed";
-				Error ( Result );
+				Error ( "Switch pressed" );
 			}
 			SwitchPressedCount = LatestSwitchPressedCount;
 		}
