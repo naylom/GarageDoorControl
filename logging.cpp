@@ -221,7 +221,7 @@ CTelnet::operator bool ()
 void CTelnet::begin ( uint32_t port )
 {
 	m_telnetPort = port & 0xffff;
-	m_pmyServer	 = new WiFiServer ( port & 0xffff );
+	m_pmyServer	 = new WiFiServer ( m_telnetPort );
 	m_pmyServer->begin ();
 }
 
@@ -239,8 +239,10 @@ size_t CTelnet::Send ( char c )
 	}
 	else
 	{
-		m_myClient = m_pmyServer->available ();
-		result	   = 0;
+		if ( m_pmyServer != nullptr )
+		{				
+			m_myClient = m_pmyServer->available ();
+		}
 	}
 	return result;
 }
@@ -259,8 +261,10 @@ size_t CTelnet::Send ( const uint8_t *buffer, size_t size )
 	}
 	else
 	{
-		m_myClient = m_pmyServer->available ();
-		result	   = 0;
+		if ( m_pmyServer != nullptr )
+		{		
+			m_myClient = m_pmyServer->available ();
+		}
 	}
 	return result;
 }
@@ -279,7 +283,10 @@ size_t CTelnet::Send ( String Msg )
 	}
 	else
 	{
-		m_myClient = m_pmyServer->available ();
+		if ( m_pmyServer != nullptr )
+		{
+			m_myClient = m_pmyServer->available ();
+		}
 	}
 	return Result;
 }
@@ -389,6 +396,7 @@ void CTelnet::flush ()
 
 void CTelnet::LogStart ()
 {
+	begin();
 }
 
 CTelnet Telnet;

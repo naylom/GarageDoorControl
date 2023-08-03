@@ -38,7 +38,6 @@ class WiFiService
 		unsigned long GetTime ();
 
 	protected:
-		bool		Check ();
 		void		Stop ();
 		bool		WiFiConnect ();
 		void		SetLED ( RGBType theColour, uint8_t flashTime = 0 );
