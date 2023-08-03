@@ -156,8 +156,9 @@ void Info ( String s )
 {
 	String Result;
 	GetLocalTime ( Result );
+	Result += s;
 	MyLogger.ClearLine ( ERROR_LINE );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_CYAN, ERROR_LINE, 1, Result );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLUE, ERROR_LINE, 1, Result );
 }
 
 // Debug information for ANSI screen with cursor control
