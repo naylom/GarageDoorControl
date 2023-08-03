@@ -40,7 +40,9 @@ enum eResponseMessage { TEMPDATA, DOORDATA };
 
 #define CALL_MEMBER_FN_BY_PTR( object, ptrToMember ) ( ( object )->*( ptrToMember ) )
 extern void Error ( String s );
-void TerminateProgram ( const __FlashStringHelper *pErrMsg )
+extern void Info ( String s );
+
+void		TerminateProgram ( const __FlashStringHelper *pErrMsg )
 {
 	Error ( pErrMsg );
 	while ( true )
@@ -49,7 +51,7 @@ void TerminateProgram ( const __FlashStringHelper *pErrMsg )
 
 WiFiService::WiFiService ()
 {
-	setenv("TZ","GMTGMT-1,M3.4.0/01,M10.4.0/02",1);
+	setenv ( "TZ", "GMTGMT-1,M3.4.0/01,M10.4.0/02", 1 );
 }
 
 const char *WiFiService::WiFiStatusToString ( uint8_t iState )
@@ -130,15 +132,15 @@ void WiFiService::Begin ( const char *HostName, const char *WiFissid, const char
 	}
 }
 
-void WiFiService::CalcMyMulticastAddress ( IPAddress& result )
+void WiFiService::CalcMyMulticastAddress ( IPAddress &result )
 {
 	CalcMulticastAddress ( WiFi.localIP (), result );
 }
 
-void WiFiService::CalcMulticastAddress ( IPAddress ip, IPAddress& subnetMask )
+void WiFiService::CalcMulticastAddress ( IPAddress ip, IPAddress &subnetMask )
 {
-	subnetMask = IPAddress ( 0UL ); // WiFi.subnetMask();
-	uint8_t	  firstOctet = ( ip & 0xff );
+	subnetMask		   = IPAddress ( 0UL ); // WiFi.subnetMask();
+	uint8_t firstOctet = ( ip & 0xff );
 	if ( firstOctet > 0 && firstOctet <= 127 )
 	{
 		// class A
@@ -169,7 +171,7 @@ bool WiFiService::WiFiConnect ()
 
 	if ( WiFi.status () != WL_CONNECTED )
 	{
-		Error ( "Starting WiFi, attempt " + String ( iStartCount ) );
+		Info ( "Starting WiFi, attempt " + String ( iStartCount ) );
 		uint8_t	 status;
 		uint32_t ulStart = millis ();
 
@@ -179,7 +181,7 @@ bool WiFiService::WiFiConnect ()
 		{
 			status = WiFi.status ();
 			delay ( 500 );
-			Error ( msg );
+			Info ( msg );
 			msg += ".";
 		}
 		while ( status != WL_CONNECTED && ( millis () - ulStart ) < 10000 );
@@ -196,9 +198,9 @@ bool WiFiService::WiFiConnect ()
 		else
 		{
 			CalcMyMulticastAddress ( m_multicastAddr );
-			Error ( "Connected to " + String ( m_SSID ) );
+			Info ( "Connected to " + String ( m_SSID ) );
 			iStartCount = 0UL;
-			m_beginConnects++;		
+			m_beginConnects++;
 		}
 	}
 
@@ -208,7 +210,7 @@ bool WiFiService::WiFiConnect ()
 void WiFiService::Stop ()
 {
 	WiFi.end ();
-	Error ( "Stopping wifi" );
+	Info ( "Stopping wifi" );
 	SetState ( WiFiService::Status::UNCONNECTED );
 }
 
@@ -334,7 +336,7 @@ void UDPWiFiService::DisplayStatus ( ansiVT220Logger logger )
 }
 
 /// Appends local time to provided String
-void UDPWiFiService::GetLocalTime ( String & result, time_t timeError )
+void UDPWiFiService::GetLocalTime ( String &result, time_t timeError )
 {
 	if ( timeError == 0 )
 	{
@@ -525,7 +527,7 @@ bool UDPWiFiService::GetReq ( void *paramPtr )
 
 void UDPWiFiService::Stop ()
 {
-	Error ( "Stopping WiFI" );
+	Info ( "Stopping WiFI" );
 	m_myUDP.stop ();
 	WiFiService::Stop ();
 }
