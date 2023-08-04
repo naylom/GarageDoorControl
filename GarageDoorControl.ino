@@ -39,7 +39,7 @@ History:
 	Ver 1.0.8		Moved logging to object SerialLogger
 */
 #define VERSION "1.0.8 Beta"
-#undef TELNET
+#define TELNET
 #ifdef MNDEBUG
 	#ifdef TELNET
 ansiVT220Logger MyLogger ( Telnet );
