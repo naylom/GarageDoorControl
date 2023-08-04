@@ -228,13 +228,14 @@ void CTelnet::begin ( uint32_t port )
 size_t CTelnet::Send ( char c )
 {
 	size_t result = 0;
-	if ( m_myClient )
+	if ( m_myClient.connected() )
 	{
 		size_t result = m_myClient.print ( c );
 		if ( result <= 0 )
 		{
 			m_myClient.stop ();
 			m_bClientConnected = false;
+			Serial.println ( "Client disconnected" );
 		}
 	}
 	else
@@ -242,6 +243,11 @@ size_t CTelnet::Send ( char c )
 		if ( m_pmyServer != nullptr )
 		{				
 			m_myClient = m_pmyServer->available ();
+			if ( m_myClient )
+			{
+				Serial.println ( "Client connected" );
+				m_bClientConnected = true;
+			}
 		}
 	}
 	return result;
@@ -250,13 +256,14 @@ size_t CTelnet::Send ( char c )
 size_t CTelnet::Send ( const uint8_t *buffer, size_t size )
 {
 	size_t result = 0;
-	if ( m_myClient )
+	if ( m_myClient.connected()  && size > 0)
 	{
 		size_t result = m_myClient.print ( (const char)*buffer, size );
 		if ( result <= 0 )
 		{
 			m_myClient.stop ();
 			m_bClientConnected = false;
+			Serial.println ( "Client disconnected" );
 		}
 	}
 	else
@@ -264,6 +271,11 @@ size_t CTelnet::Send ( const uint8_t *buffer, size_t size )
 		if ( m_pmyServer != nullptr )
 		{		
 			m_myClient = m_pmyServer->available ();
+			if ( m_myClient )
+			{
+				Serial.println ( "Client connected" );
+				m_bClientConnected = true;
+			}
 		}
 	}
 	return result;
@@ -272,13 +284,14 @@ size_t CTelnet::Send ( const uint8_t *buffer, size_t size )
 size_t CTelnet::Send ( String Msg )
 {
 	size_t Result = 0;
-	if ( m_myClient )
+	if ( m_myClient.connected() && Msg.length() > 0 )
 	{
 		Result = m_myClient.print ( Msg );
 		if ( Result <= 0 )
 		{
 			m_myClient.stop ();
 			m_bClientConnected = false;
+			Serial.println ( "Client disconnected" );
 		}
 	}
 	else
@@ -286,6 +299,11 @@ size_t CTelnet::Send ( String Msg )
 		if ( m_pmyServer != nullptr )
 		{
 			m_myClient = m_pmyServer->available ();
+			if ( m_myClient )
+			{
+				Serial.println ( "Client connected" );
+				m_bClientConnected = true;
+			}
 		}
 	}
 	return Result;

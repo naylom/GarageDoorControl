@@ -248,7 +248,15 @@ void DisplayStats ( void )
 // main setup routine
 void setup ()
 {
-	// Serial.begin ( BAUD_RATE );
+	//Serial.begin ( BAUD_RATE ); while (!Serial);
+	pMyUDPService = new UDPWiFiService ();
+
+	// now we have state table set up and temp sensor configured, allow users to query state
+	if ( !pMyUDPService->Begin ( ProcessUDPMsg, ssid, pass, MyHostName, &TheMKR_RGB_LED ) )
+	{
+		Error ( "Cannot connect WiFI " );
+	}
+
 	MyLogger.LogStart ();
 	MyLogger.ClearScreen ();
 #ifdef BAROMETRIC_SUPPORT
@@ -269,14 +277,6 @@ void setup ()
 	// get initial reading
 	pmyHumidityTempSensor->GetLastReading ( sHTResults );
 #endif
-
-	pMyUDPService = new UDPWiFiService ();
-
-	// now we have state table set up and temp sensor configured, allow users to query state
-	if ( !pMyUDPService->Begin ( ProcessUDPMsg, ssid, pass, MyHostName, &TheMKR_RGB_LED ) )
-	{
-		Error ( "Cannot connect WiFI " );
-	}
 }
 #ifdef UAP_SUPPORT
 // set the colour of the inbuilt MKR Wifi 1010 RGB LED based on the current door state
