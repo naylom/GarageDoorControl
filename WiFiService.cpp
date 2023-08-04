@@ -350,9 +350,7 @@ void UDPWiFiService::GetLocalTime ( String &result, time_t timeError )
 
 bool UDPWiFiService::GetUDPMessage ( String *pRecvMessage )
 {
-	bool bResult = false;
-	bResult		 = CALL_MEMBER_FN_BY_PTR ( this, StateTableFn [ GetState () ][ UDPWiFiService::WiFiEvent::GETREQUEST ] ) ( (void *)pRecvMessage );
-	return bResult;
+	return CALL_MEMBER_FN_BY_PTR ( this, StateTableFn [ GetState () ][ UDPWiFiService::WiFiEvent::GETREQUEST ] ) ( (void *)pRecvMessage );
 }
 
 bool UDPWiFiService::ReadUDPMessage ( String &sRecvMessage )
@@ -391,16 +389,12 @@ bool UDPWiFiService::ReadUDPMessage ( String &sRecvMessage )
 
 bool UDPWiFiService::SendAll ( String sMsg )
 {
-	bool bResult = false;
-	bResult		 = CALL_MEMBER_FN_BY_PTR ( this, StateTableFn [ GetState () ][ UDPWiFiService::WiFiEvent::SENDMCAST ] ) ( (void *)&sMsg );
-	return bResult;
+	return CALL_MEMBER_FN_BY_PTR ( this, StateTableFn [ GetState () ][ UDPWiFiService::WiFiEvent::SENDMCAST ] ) ( (void *)&sMsg );
 }
 
 bool UDPWiFiService::SendReply ( String sMsg )
 {
-	bool bResult = false;
-	bResult		 = CALL_MEMBER_FN_BY_PTR ( this, StateTableFn [ GetState () ][ UDPWiFiService::WiFiEvent::SENDREPLY ] ) ( (void *)&sMsg );
-	return bResult;
+	return CALL_MEMBER_FN_BY_PTR ( this, StateTableFn [ GetState () ][ UDPWiFiService::WiFiEvent::SENDREPLY ] ) ( (void *)&sMsg );
 }
 
 bool UDPWiFiService::Start ()
@@ -431,6 +425,7 @@ bool UDPWiFiService::NowConnected ( void * )
 	if ( Start () )
 	{
 		SetState ( WiFiService::Status::CONNECTED );
+		bResult = true;
 	}
 	return bResult;
 }
@@ -469,6 +464,7 @@ bool UDPWiFiService::SendReply ( void *paramPtr )
 			m_ulReplyCount++;
 			// Error ( "Sent " + String ( pMsg->substring(0, pMsg->length()-1) ) + " to " + ToIPString ( m_myUDP.remoteIP () ) + ":" + m_myUDP.remotePort() );
 			SetState ( WiFiService::Status::CONNECTED );
+			bResult = true;
 		}
 	}
 
