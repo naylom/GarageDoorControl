@@ -131,7 +131,7 @@ time_t			  timeError;
 
 void			  GetLocalTime ( String &Result )
 {
-	if ( pMyUDPService != nullptr && pMyUDPService->IsConnected() )
+	if ( pMyUDPService != nullptr && pMyUDPService->IsConnected () )
 	{
 		timeError = 0;
 		pMyUDPService->GetLocalTime ( Result );
@@ -139,15 +139,20 @@ void			  GetLocalTime ( String &Result )
 	}
 }
 
+String sInfoErrorMsg;
+auto   fgInfoErrorColour = ansiVT220Logger::FG_WHITE;
+auto   bgInfoErrorColour = ansiVT220Logger::BG_GREEN;
+
 /// @brief Logs error to error line the provided error message prepeneded with local date and time
 /// @param s message to be logged
-void Error ( String s )
+void   Error ( String s )
 {
 	String Result;
 	GetLocalTime ( Result );
 	Result += s;
-	MyLogger.ClearLine ( ERROR_LINE );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_RED, ERROR_LINE, 1, Result );
+	sInfoErrorMsg	  = Result;
+	fgInfoErrorColour = ansiVT220Logger::FG_WHITE;
+	bgInfoErrorColour = ansiVT220Logger::BG_BLUE;
 }
 
 /// @brief Logs info to error line the provided error message prepeneded with local date and time
@@ -157,8 +162,15 @@ void Info ( String s )
 	String Result;
 	GetLocalTime ( Result );
 	Result += s;
+	sInfoErrorMsg	  = Result;
+	fgInfoErrorColour = ansiVT220Logger::FG_WHITE;
+	bgInfoErrorColour = ansiVT220Logger::BG_BLUE;
+}
+
+void DisplaylastInfoErrorMsg ()
+{
 	MyLogger.ClearLine ( ERROR_LINE );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLUE, ERROR_LINE, 1, Result );
+	MyLogger.COLOUR_AT ( fgInfoErrorColour, bgInfoErrorColour, ERROR_LINE, 1, sInfoErrorMsg );
 }
 
 // Debug information for ANSI screen with cursor control
@@ -242,13 +254,14 @@ void DisplayStats ( void )
 		ErrorMsg = "";
 	}
 	pMyUDPService->DisplayStatus ( MyLogger );
+	DisplaylastInfoErrorMsg ();
 #endif
 }
 
 // main setup routine
 void setup ()
 {
-	//Serial.begin ( BAUD_RATE ); while (!Serial);
+	// Serial.begin ( BAUD_RATE ); while (!Serial);
 	pMyUDPService = new UDPWiFiService ();
 
 	// now we have state table set up and temp sensor configured, allow users to query state

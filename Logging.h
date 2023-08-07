@@ -24,20 +24,8 @@ History:
 constexpr auto BAUD_RATE = 115200;
 #include <Arduino.h>
 #include <WiFiNINA.h>
-// #include "CTelnet.h"
 #define MNDEBUG
-#undef TELNET
-/*
-#ifdef MNDEBUG
-	#ifdef TELNET
-		#define Log( x )	 Telnet.print ( x )
-		#define Log2( x, y ) Telnet.print ( x, y )
-		#define Logln( x )	 Telnet.Logln ( x )
-		#define LogFlush
-		#define LogStart() Telnet.begin ( 0xFEEE )
-	#endif
-#endif
-*/
+
 void ResetBoard ( const __FlashStringHelper *pErrMsg );
 
 class Logger
