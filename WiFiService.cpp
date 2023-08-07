@@ -14,27 +14,29 @@ History:
 #include "WiFiService.h"
 #include "DoorState.h"
 
-const char		 *WiFiStatus []			= { "WL_IDLE_STATUS",																																											   // = 0,
-											"WL_NO_SSID_AVAIL", "WL_SCAN_COMPLETED", "WL_CONNECTED", "WL_CONNECT_FAILED", "WL_CONNECTION_LOST", "WL_DISCONNECTED", "WL_AP_LISTENING", "WL_AP_CONNECTED", "WL_AP_FAILED", "WL_NO_MODULE" }; // = 255
+const char		  *WiFiStatus []		   = { "WL_IDLE_STATUS",																																											  // = 0,
+											   "WL_NO_SSID_AVAIL", "WL_SCAN_COMPLETED", "WL_CONNECTED", "WL_CONNECT_FAILED", "WL_CONNECTION_LOST", "WL_DISCONNECTED", "WL_AP_LISTENING", "WL_AP_CONNECTED", "WL_AP_FAILED", "WL_NO_MODULE" }; // = 255
 /*
 	UDP config
 */
-constexpr auto	  WIFI_FLASHTIME		= 10; // every 1/2 second
+constexpr auto	   WIFI_FLASHTIME		   = 10; // every 1/2 second
 
 // Valid message parts
-constexpr char	  cMsgVersion1 []		= "V001"; // message version
-constexpr char	  TempHumidityReqMsg [] = "M001"; // Req temp / humidity
-constexpr char	  RestartReqMsg []		= "M002"; // Req restart
-constexpr char	  DoorStatusReqMsg []	= "M003"; // Req Door status
-constexpr char	  DoorOpenReqMsg []		= "M004"; // Req Door Open
-constexpr char	  DoorCloseReqMsg []	= "M005"; // Req Door Close
-constexpr char	  DoorStopReqMsg []		= "M006"; // Req Door Stop
-constexpr char	  DoorLightOnReqMsg []	= "M007"; // Req Light On
-constexpr char	  DoorLightOffReqMsg [] = "M008"; // Req Light off
-constexpr char	  PartSeparator []		= ":";
+constexpr char	   cMsgVersion1 []		   = "V001"; // message version
+constexpr char	   TempHumidityReqMsg []   = "M001"; // Req temp / humidity
+constexpr char	   RestartReqMsg []		   = "M002"; // Req restart
+constexpr char	   DoorStatusReqMsg []	   = "M003"; // Req Door status
+constexpr char	   DoorOpenReqMsg []	   = "M004"; // Req Door Open
+constexpr char	   DoorCloseReqMsg []	   = "M005"; // Req Door Close
+constexpr char	   DoorStopReqMsg []	   = "M006"; // Req Door Stop
+constexpr char	   DoorLightOnReqMsg []	   = "M007"; // Req Light On
+constexpr char	   DoorLightOffReqMsg []   = "M008"; // Req Light off
+constexpr char	   PartSeparator []		   = ":";
 
-constexpr auto	  MAX_INCOMING_UDP_MSG	= 255;
-constexpr uint8_t PrintStartLine		= 15;
+constexpr auto	   MAX_INCOMING_UDP_MSG	   = 255;
+constexpr auto	   WIFI_CONNECT_TIMEOUT_MS = 10000;
+constexpr uint8_t  PrintStartLine		   = 15;
+constexpr uint16_t MulticastSendPort	   = 0xCE5C;
 
 enum eResponseMessage { TEMPDATA, DOORDATA };
 
@@ -169,7 +171,7 @@ bool WiFiService::WiFiConnect ()
 	bool			bResult		= true;
 	static uint32_t iStartCount = 0UL;
 
-	if ( WiFi.status () != WL_CONNECTED )
+	if ( !IsConnected () )
 	{
 		Info ( "Starting WiFi, attempt " + String ( iStartCount ) );
 		uint8_t	 status;
@@ -184,7 +186,7 @@ bool WiFiService::WiFiConnect ()
 			Info ( msg );
 			msg += ".";
 		}
-		while ( status != WL_CONNECTED && ( millis () - ulStart ) < 10000 );
+		while ( status != WL_CONNECTED && ( millis () - ulStart ) < WIFI_CONNECT_TIMEOUT_MS );
 
 		if ( status != WL_CONNECTED )
 		{
@@ -207,16 +209,21 @@ bool WiFiService::WiFiConnect ()
 	return bResult;
 }
 
-void WiFiService::Stop ()
+void WiFiService::WiFiDisconnect ()
 {
-	WiFi.end ();
-	Info ( "Stopping wifi" );
+	WiFi.disconnect ();
+	Info ( "Disconnecting wifi" );
 	SetState ( WiFiService::Status::UNCONNECTED );
 }
 
 String WiFiService::ToIPString ( const IPAddress &address )
 {
 	return String ( address [ 0 ] ) + "." + address [ 1 ] + "." + address [ 2 ] + "." + address [ 3 ];
+}
+
+bool WiFiService::IsConnected ()
+{
+	return WiFi.status () == WL_CONNECTED;
 }
 
 /***************************************************************************************************************************************/
@@ -262,7 +269,7 @@ bool UDPWiFiService::Begin ( UDPWiFiServiceCallback pHandleReqData, const char *
 void UDPWiFiService::CheckUDP ()
 {
 	String Msg = "?";
-	if ( GetUDPMessage ( &Msg ) )
+	if ( GetUDPMessage ( Msg ) )
 	{
 		ProcessUDPMessage ( Msg );
 	}
@@ -348,15 +355,23 @@ void UDPWiFiService::GetLocalTime ( String &result, time_t timeError )
 	result += sTime;
 }
 
-bool UDPWiFiService::GetUDPMessage ( String *pRecvMessage )
+bool UDPWiFiService::GetUDPMessage ( String &RecvMessage )
 {
-	return CALL_MEMBER_FN_BY_PTR ( this, StateTableFn [ GetState () ][ UDPWiFiService::WiFiEvent::GETREQUEST ] ) ( (void *)pRecvMessage );
+	if ( WiFiConnect () )
+	{
+		return ReadUDPMessage ( RecvMessage );
+	}
+	else
+	{
+		SetState ( WiFiService::Status::UNCONNECTED );
+		return false;
+	}
 }
 
 bool UDPWiFiService::ReadUDPMessage ( String &sRecvMessage )
 {
 	bool		 bResult = false;
-	char		 sBuffer [ MAX_UDP_RECV_LEN ];
+	char		 sBuffer [ MAX_INCOMING_UDP_MSG ];
 
 	// if there's data available, read a packet
 	unsigned int packetSize = m_myUDP.parsePacket ();
@@ -387,16 +402,6 @@ bool UDPWiFiService::ReadUDPMessage ( String &sRecvMessage )
 	return bResult;
 }
 
-bool UDPWiFiService::SendAll ( String sMsg )
-{
-	return CALL_MEMBER_FN_BY_PTR ( this, StateTableFn [ GetState () ][ UDPWiFiService::WiFiEvent::SENDMCAST ] ) ( (void *)&sMsg );
-}
-
-bool UDPWiFiService::SendReply ( String sMsg )
-{
-	return CALL_MEMBER_FN_BY_PTR ( this, StateTableFn [ GetState () ][ UDPWiFiService::WiFiEvent::SENDREPLY ] ) ( (void *)&sMsg );
-}
-
 bool UDPWiFiService::Start ()
 {
 	bool bResult = false;
@@ -413,12 +418,13 @@ bool UDPWiFiService::Start ()
 	}
 	else
 	{
-		Error ( "Unable to allocate UDP Port" );
-		Stop ();
+		Error ( "Unable to allocate UDP Port, restarting" );
+		delay ( 1000 * 20 );
+		ResetBoard ( F ("") );
 	}
 	return bResult;
 }
-
+/*
 bool UDPWiFiService::NowConnected ( void * )
 {
 	bool bResult = false;
@@ -445,74 +451,94 @@ bool UDPWiFiService::Connect ( void *paramPtr )
 	}
 	return bResult;
 }
-
-bool UDPWiFiService::SendReply ( void *paramPtr )
+*/
+bool UDPWiFiService::SendReply ( String sMsg )
 {
-	bool	bResult = false;
-	String *pMsg	= (String *)( paramPtr );
-
-	if ( m_myUDP.beginPacket ( m_myUDP.remoteIP (), m_myUDP.remotePort () ) == 1 )
+	bool bResult = false;
+	if ( WiFiConnect () )
 	{
-		m_myUDP.write ( pMsg->c_str () );
-		if ( m_myUDP.endPacket () == 0 )
+		if ( sMsg.length () > 0 )
 		{
-			Error ( "Message Response failed" );
-			Stop ();
-		}
-		else
-		{
-			m_ulReplyCount++;
-			// Error ( "Sent " + String ( pMsg->substring(0, pMsg->length()-1) ) + " to " + ToIPString ( m_myUDP.remoteIP () ) + ":" + m_myUDP.remotePort() );
-			SetState ( WiFiService::Status::CONNECTED );
-			bResult = true;
-		}
-	}
-
-	return bResult;
-}
-
-bool UDPWiFiService::SendMCast ( void *paramPtr )
-{
-	bool	bResult = false;
-	String *pMsg	= (String *)paramPtr;
-	if ( pMsg->length () > 0 )
-	{
-		uint8_t	  iterator = m_pMulticastDestList->GetIterator ();
-		IPAddress nextIP;
-		while ( (long unsigned int)( nextIP = m_pMulticastDestList->GetNext ( iterator ) ) != 0UL )
-		{
-			delay ( 200 );
-			if ( m_myUDP.beginPacket ( nextIP, 0xCE5C ) == 1 )
+			if ( m_myUDP.beginPacket ( m_myUDP.remoteIP (), m_myUDP.remotePort () ) == 1 )
 			{
-				m_myUDP.write ( pMsg->c_str () );
+				m_myUDP.write ( sMsg.c_str () );
 				if ( m_myUDP.endPacket () == 0 )
 				{
-					Error ( "Multicast Message failed" );
-					Stop ();
+					Error ( "Message Response failed" );
+					WiFiDisconnect ();
 				}
 				else
 				{
-					SetLED ( PROCESSING_MSG_COLOUR );
-					delay ( 500 );
+					m_ulReplyCount++;
+					// Error ( "Sent " + String ( pMsg->substring(0, pMsg->length()-1) ) + " to " + ToIPString ( m_myUDP.remoteIP () ) + ":" + m_myUDP.remotePort() );
 					SetState ( WiFiService::Status::CONNECTED );
 					bResult = true;
-					m_ulMCastSentCount++;
 				}
 			}
+			else
+			{
+				Error ( "Unable to send UDP message, beginpacket() failed sending to : " + ToIPString ( m_myUDP.remoteIP () ) + " : " + m_myUDP.remotePort () );
+			}
 		}
-	}
-	else
-	{
-		Error ( "Error: Empty message to be sent" );
+		else
+		{
+			Error ( "Empty reply to be sent" );
+		}
 	}
 	return bResult;
 }
 
-bool UDPWiFiService::GetReq ( void *paramPtr )
+/// @brief Checks WiFi connected and attempts to connect if not. If connected then will look for a message and store in parameter
+/// @param paramPtr pointer to String to receive any available message
+/// @return
+bool UDPWiFiService::SendAll ( String sMsg )
 {
-	if ( WiFi.status () == WL_CONNECTED )
+	bool bResult = false;
+	if ( WiFiConnect () )
 	{
-		return ReadUDPMessage ( *( (String *)paramPtr ) );
+		if ( sMsg.length () > 0 )
+		{
+			uint8_t	  iterator = m_pMulticastDestList->GetIterator ();
+			IPAddress nextIP;
+			while ( (long unsigned int)( nextIP = m_pMulticastDestList->GetNext ( iterator ) ) != 0UL )
+			{
+				delay ( 200 );
+				if ( m_myUDP.beginPacket ( nextIP, MulticastSendPort ) == 1 )
+				{
+					m_myUDP.write ( sMsg.c_str () );
+					if ( m_myUDP.endPacket () == 0 )
+					{
+						Error ( "Multicast Message failed" );
+						WiFiDisconnect ();
+					}
+					else
+					{
+						SetLED ( PROCESSING_MSG_COLOUR );
+						delay ( 500 );
+						SetState ( WiFiService::Status::CONNECTED );
+						bResult = true;
+						m_ulMCastSentCount++;
+					}
+				}
+			}
+		}
+		else
+		{
+			Error ( "Error: Empty message to be sent" );
+		}
+	}
+	return bResult;
+}
+
+/// @brief Checks WiFi connected and attempts to connect if not. If connected then will look for a message and store in parameter
+/// @param paramPtr pointer to String to receive any available message
+/// @return
+/*
+bool UDPWiFiService::GetReq ( String Message )
+{
+	if ( WiFiConnect () )
+	{
+		return ReadUDPMessage ( Message );
 	}
 	else
 	{
@@ -520,14 +546,17 @@ bool UDPWiFiService::GetReq ( void *paramPtr )
 		return false;
 	}
 }
-
+*/
+/// @brief Releases UDP port and disconnects from WiFi
 void UDPWiFiService::Stop ()
 {
 	Info ( "Stopping WiFI" );
 	m_myUDP.stop ();
-	WiFiService::Stop ();
+	WiFiDisconnect ();
 }
 
+/// @brief Processes the UDP message that has been received
+/// @param sRecvMessage String containing the messade received
 void UDPWiFiService::ProcessUDPMessage ( const String &sRecvMessage )
 {
 	if ( sRecvMessage.startsWith ( cMsgVersion1 ) )

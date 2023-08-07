@@ -36,9 +36,10 @@ class WiFiService
 		Status		  GetState ();
 		static String ToIPString ( const IPAddress &address );
 		unsigned long GetTime ();
+		bool		  IsConnected ();
 
 	protected:
-		void		Stop ();
+		void		WiFiDisconnect ();
 		bool		WiFiConnect ();
 		void		SetLED ( RGBType theColour, uint8_t flashTime = 0 );
 		void		SetState ( WiFiService::Status state );
@@ -58,9 +59,6 @@ class WiFiService
 		MNRGBLEDBaseLib *m_pLED			 = nullptr;
 };
 
-constexpr auto MAX_UDP_RECV_LEN	   = 255;
-constexpr auto MAX_CONNECT_RETRIES = 20;
-
 class UDPWiFiService : public WiFiService
 {
 	public:
@@ -73,24 +71,23 @@ class UDPWiFiService : public WiFiService
 		bool Begin ( UDPWiFiServiceCallback pHandleReqData, const char *WiFissid, const char *WiFipwd, const char *HostName, const uint16_t portUDP = 0xFEED, MNRGBLEDBaseLib *pLED = nullptr );
 		bool Begin ( UDPWiFiServiceCallback pHandleReqData, const char *WiFissid, const char *WiFipwd, const char *HostName, MNRGBLEDBaseLib *pLED = nullptr, const uint16_t portUDP = 0xFEED );
 		void CheckUDP ();
-		void DisplayStatus (ansiVT220Logger logger);
-		void GetLocalTime ( String & result, time_t timeError = 0 );
+		void DisplayStatus ( ansiVT220Logger logger );
+		void GetLocalTime ( String &result, time_t timeError = 0 );
 		bool SendAll ( String sMsg );
 		bool SendReply ( String sMsg );
 		bool Start ();
 		void Stop ();
 
-
 	private:
 		enum WiFiState { DISCONNECTED, ISCONNECTED };
-
+/*
 		enum WiFiEvent { MADE_CONNECTION, LOST_CONNECTION, SENDREPLY, GETREQUEST, SENDMCAST };
 
 		typedef bool ( UDPWiFiService::*WiFiStateFunction ) ( void *paramPtr ); // prototype of function to handle event
 
 		bool			  Connect ( void *paramPtr );
 		bool			  DoNowt ( void *paramPtr );
-		bool			  GetReq ( void *paramPtr );
+		bool			  GetReq ( String Message );
 		bool			  NowConnected ( void *paramPtr );
 		bool			  SendMCast ( void *paramPtr );
 		bool			  SendReply ( void *paramPtr );
@@ -99,6 +96,7 @@ class UDPWiFiService : public WiFiService
 			{&UDPWiFiService::NowConnected, &UDPWiFiService::DoNowt,  &UDPWiFiService::Connect,	&UDPWiFiService::Connect, &UDPWiFiService::Connect  }, // Actions when current state is UNCONNECTED
 			{ &UDPWiFiService::DoNowt,	   &UDPWiFiService::Connect, &UDPWiFiService::SendReply, &UDPWiFiService::GetReq,  &UDPWiFiService::SendMCast}  // Actions when current state is CONNECTED
 		};
+*/		
 		uint16_t			   m_Port = 0;
 		WiFiUDP				   m_myUDP;
 		String				   m_sUDPReceivedMsg;
@@ -111,7 +109,7 @@ class UDPWiFiService : public WiFiService
 		uint32_t			   m_ulReplyCount		= 0UL;
 		WiFiState			   m_WiFiState			= WiFiState::DISCONNECTED;
 
-		bool				   GetUDPMessage ( String *pRecvMessage );
+		bool				   GetUDPMessage ( String &RecvMessage );
 		void				   ProcessUDPMessage ( const String &sRecvMessage );
 		bool				   ReadUDPMessage ( String &sRecvMessage );
 };
