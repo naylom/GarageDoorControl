@@ -131,9 +131,9 @@ time_t			  timeError;
 
 void			  GetLocalTime ( String &Result )
 {
-	if ( pMyUDPService != nullptr && pMyUDPService->GetState () == WiFiService::Status::CONNECTED )
+	if ( pMyUDPService != nullptr && pMyUDPService->IsConnected() )
 	{
-		timeError = pMyUDPService->GetTime ();
+		timeError = 0;
 		pMyUDPService->GetLocalTime ( Result );
 		Result += " ";
 	}

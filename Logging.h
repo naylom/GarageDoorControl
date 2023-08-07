@@ -151,7 +151,7 @@ class ansiVT220Logger
 		// colours
 		enum colours : uint8_t { FG_BLACK = 30, FG_RED, FG_GREEN, FG_YELLOW, FG_BLUE, FG_MAGENTA, FG_CYAN, FG_WHITE, BG_BLACK = 40, BG_RED, BG_GREEN, BG_YELLOW, BG_BLUE, BG_MAGENTA, BG_CYAN, BG_WHITE };
 
-		const static uint8_t MAX_COLS = 80;
+		const static uint8_t MAX_COLS = 132;
 		const static uint8_t MAX_ROWS = 25;
 		ansiVT220Logger ( Logger &logger ) : m_logger ( logger ) {};
 		void ClearScreen ();
@@ -171,4 +171,5 @@ class ansiVT220Logger
 		const String CLEAR_LINE		= F ( "\x1b[2K" );
 		const String RESET_COLOURS	= F ( "\x1b[0m" );
 		const String CLEAR_SCREEN	= F ( "\x1b[2J" );
+		const String SCREEN_SIZE132 = F ( "\x1b?3h");
 };

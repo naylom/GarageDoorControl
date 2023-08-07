@@ -98,6 +98,7 @@ void ansiVT220Logger::ClearPartofLine ( uint8_t row, uint8_t start_col, uint8_t 
 void ansiVT220Logger::LogStart ()
 {
 	m_logger.LogStart ();
+	m_logger.Log (SCREEN_SIZE132 ); 
 }
 
 size_t SerialLogger::Log ( const __FlashStringHelper *ifsh )

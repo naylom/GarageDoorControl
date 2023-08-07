@@ -199,8 +199,9 @@ bool WiFiService::WiFiConnect ()
 		}
 		else
 		{
-			CalcMyMulticastAddress ( m_multicastAddr );
+			CalcMyMulticastAddress ( m_multicastAddr );	
 			Info ( "Connected to " + String ( m_SSID ) );
+			SetState ( WiFiService::Status::CONNECTED );
 			iStartCount = 0UL;
 			m_beginConnects++;
 		}
@@ -256,6 +257,7 @@ bool UDPWiFiService::Begin ( UDPWiFiServiceCallback pHandleReqData, const char *
 
 	if ( m_sUDPReceivedMsg.reserve ( MAX_INCOMING_UDP_MSG ) )
 	{
+		Start();
 		bResult = true;
 	}
 	return bResult;
@@ -349,16 +351,20 @@ void UDPWiFiService::GetLocalTime ( String &result, time_t timeError )
 	{
 		timeError = (time_t)GetTime ();
 	}
-	tm	*localtm = localtime ( &timeError );
-	char sTime [ 20 ];
-	sprintf ( sTime, "%02d/%02d/%02d %02d:%02d:%02d", localtm->tm_mday, localtm->tm_mon + 1, ( localtm->tm_year - 100 ), localtm->tm_hour, localtm->tm_min, localtm->tm_sec );
-	result += sTime;
+	if ( timeError != 0 )
+	{
+		tm	*localtm = localtime ( &timeError );
+		char sTime [ 20 ];
+		sprintf ( sTime, "%02d/%02d/%02d %02d:%02d:%02d", localtm->tm_mday, localtm->tm_mon + 1, ( localtm->tm_year - 100 ), localtm->tm_hour, localtm->tm_min, localtm->tm_sec );
+		result += sTime;
+	}
 }
 
 bool UDPWiFiService::GetUDPMessage ( String &RecvMessage )
 {
 	if ( WiFiConnect () )
 	{
+		m_pMulticastDestList->Add ( GetMulticastAddress() );
 		return ReadUDPMessage ( RecvMessage );
 	}
 	else
@@ -380,7 +386,7 @@ bool UDPWiFiService::ReadUDPMessage ( String &sRecvMessage )
 		SetLED ( PROCESSING_MSG_COLOUR );
 		delay ( 500 );
 		String s = "Received packet of size " + String ( packetSize ) + " From " + ToIPString ( m_myUDP.remoteIP () ) + ", port " + String ( m_myUDP.remotePort () );
-		// Error ( s ) ;
+		//Info ( s ) ;
 		if ( packetSize < sizeof ( sBuffer ) - 1 )
 		{
 			// read the packet into packetBufffer
@@ -424,6 +430,7 @@ bool UDPWiFiService::Start ()
 	}
 	return bResult;
 }
+
 /*
 bool UDPWiFiService::NowConnected ( void * )
 {
