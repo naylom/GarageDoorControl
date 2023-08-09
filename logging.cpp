@@ -104,6 +104,8 @@ void ansiVT220Logger::OnClientConnect ( void *plog )
 {
 	Logger *pLog = (Logger *)plog;
 	pLog->Log ( SCREEN_SIZE132 );
+	pLog->Log ( ansiVT220Logger::OSC + "2;GarageControl Debug\x1b\\" + STRING_TERMINATOR);
+	pLog->Log ( "\x1b[63;2\"p");
 }
 
 void ansiVT220Logger::LogStart ()
@@ -114,9 +116,10 @@ void ansiVT220Logger::LogStart ()
 		m_logger.SetConnectCallback ( &ansiVT220Logger::OnClientConnect );
 	}
 }
-
+String ansiVT220Logger::STRING_TERMINATOR = F ( "\x1b\\" );
+String ansiVT220Logger::OSC =  F ( "\x1b]");
 String ansiVT220Logger::SCREEN_SIZE132 =  F ( "\x1b[?3h" );
-
+String ansiVT220Logger::WINDOW_TITLE = F ( "Debug" );
 size_t SerialLogger::Log ( const __FlashStringHelper *ifsh )
 {
 	return Serial.print ( ifsh );
