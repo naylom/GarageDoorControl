@@ -149,7 +149,40 @@ class ansiVT220Logger
 
 		// defines for ansi terminal sequences
 		// colours
-		enum colours : uint8_t { FG_BLACK = 30, FG_RED, FG_GREEN, FG_YELLOW, FG_BLUE, FG_MAGENTA, FG_CYAN, FG_WHITE, BG_BLACK = 40, BG_RED, BG_GREEN, BG_YELLOW, BG_BLUE, BG_MAGENTA, BG_CYAN, BG_WHITE };
+		enum colours : uint8_t {
+			FG_BLACK = 30,
+			FG_RED,
+			FG_GREEN,
+			FG_YELLOW,
+			FG_BLUE,
+			FG_MAGENTA,
+			FG_CYAN,
+			FG_WHITE,
+			BG_BLACK = 40,
+			BG_RED,
+			BG_GREEN,
+			BG_YELLOW,
+			BG_BLUE,
+			BG_MAGENTA,
+			BG_CYAN,
+			BG_WHITE,
+			FG_BRIGHTBLACK = 90,
+			FG_BRIGHTRED,
+			FG_BRIGHTGREEN,
+			FG_BRIGHTYELLOW,
+			FG_BRIGHTBLUE,
+			FG_BRIGHTMAGENTA,
+			FG_BRIGHTCYAN,
+			FG_BRIGHTWHITE,
+			BG_BRIGHTBLACK = 100,
+			BG_BRIGHTRED,
+			BG_BRIGHTGREEN,
+			BG_BRIGHTYELLOW,
+			BG_BRIGHTBLUE,
+			BG_BRIGHTMAGENTA,
+			BG_BRIGHTCYAN,
+			BG_BRIGHTWHITE
+		};
 
 		const static uint8_t MAX_COLS = 132;
 		const static uint8_t MAX_ROWS = 25;
@@ -165,12 +198,12 @@ class ansiVT220Logger
 		void		LogStart ();
 
 	private:
-		Logger			   &m_logger;
-		const String		CSI			   = F ( "\x1b[" );
-		const String		SAVE_CURSOR	   = F ( "\x1b[s" );
-		const String		RESTORE_CURSOR = F ( "\x1b[u" );
-		const String		CLEAR_LINE	   = F ( "\x1b[2K" );
-		const String		RESET_COLOURS  = F ( "\x1b[0m" );
-		const String		CLEAR_SCREEN   = F ( "\x1b[2J" );
-		static String 		SCREEN_SIZE132;
+		Logger		 &m_logger;
+		const String  CSI			 = F ( "\x1b[" );
+		const String  SAVE_CURSOR	 = F ( "\x1b[s" );
+		const String  RESTORE_CURSOR = F ( "\x1b[u" );
+		const String  CLEAR_LINE	 = F ( "\x1b[2K" );
+		const String  RESET_COLOURS	 = F ( "\x1b[0m" );
+		const String  CLEAR_SCREEN	 = F ( "\x1b[2J" );
+		static String SCREEN_SIZE132;
 };

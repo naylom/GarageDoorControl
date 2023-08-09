@@ -115,7 +115,7 @@ void ansiVT220Logger::LogStart ()
 	}
 }
 
-String ansiVT220Logger::SCREEN_SIZE132 =  F ( "\x1b?3h" );
+String ansiVT220Logger::SCREEN_SIZE132 =  F ( "\x1b[?3h" );
 
 size_t SerialLogger::Log ( const __FlashStringHelper *ifsh )
 {

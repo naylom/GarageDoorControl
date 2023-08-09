@@ -151,7 +151,7 @@ void   Error ( String s )
 	GetLocalTime ( Result );
 	Result			  += s;
 	sInfoErrorMsg	   = Result;
-	fgInfoErrorColour  = ansiVT220Logger::FG_WHITE;
+	fgInfoErrorColour  = ansiVT220Logger::FG_BRIGHTWHITE;
 	bgInfoErrorColour  = ansiVT220Logger::BG_BLUE;
 }
 
