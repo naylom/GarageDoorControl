@@ -35,7 +35,7 @@ constexpr char	   PartSeparator []		   = ":";
 
 constexpr auto	   MAX_INCOMING_UDP_MSG	   = 255;
 constexpr auto	   WIFI_CONNECT_TIMEOUT_MS = 10000;
-constexpr uint8_t  PrintStartLine		   = 15;
+
 constexpr uint16_t MulticastSendPort	   = 0xCE5C;
 
 enum eResponseMessage { TEMPDATA, DOORDATA };
@@ -73,6 +73,11 @@ const char *WiFiService::WiFiStatusToString ( uint8_t iState )
 			return WiFiStatus [ iState ];
 		}
 	}
+}
+
+uint32_t WiFiService::GetBeginTimeOutCount ()
+{
+	return m_beginTimeouts;
 }
 
 const char *WiFiService::GetHostName ()
@@ -161,7 +166,7 @@ void WiFiService::CalcMulticastAddress ( IPAddress ip, IPAddress &subnetMask )
 	subnetMask = ( ip & subnetMask ) | ( ~subnetMask );
 }
 
-inline IPAddress WiFiService::GetMulticastAddress ()
+IPAddress WiFiService::GetMulticastAddress ()
 {
 	return m_multicastAddr;
 }
@@ -199,7 +204,7 @@ bool WiFiService::WiFiConnect ()
 		}
 		else
 		{
-			CalcMyMulticastAddress ( m_multicastAddr );	
+			CalcMyMulticastAddress ( m_multicastAddr );
 			Info ( "Connected to " + String ( m_SSID ) );
 			SetState ( WiFiService::Status::CONNECTED );
 			iStartCount = 0UL;
@@ -225,6 +230,11 @@ String WiFiService::ToIPString ( const IPAddress &address )
 bool WiFiService::IsConnected ()
 {
 	return WiFi.status () == WL_CONNECTED;
+}
+
+uint32_t WiFiService::GetBeginCount ()
+{
+	return m_beginConnects;
 }
 
 /***************************************************************************************************************************************/
@@ -257,7 +267,7 @@ bool UDPWiFiService::Begin ( UDPWiFiServiceCallback pHandleReqData, const char *
 
 	if ( m_sUDPReceivedMsg.reserve ( MAX_INCOMING_UDP_MSG ) )
 	{
-		Start();
+		Start ();
 		bResult = true;
 	}
 	return bResult;
@@ -276,7 +286,7 @@ void UDPWiFiService::CheckUDP ()
 		ProcessUDPMessage ( Msg );
 	}
 }
-
+/*
 void UDPWiFiService::DisplayStatus ( ansiVT220Logger logger )
 {
 #ifdef MNDEBUG
@@ -343,7 +353,7 @@ void UDPWiFiService::DisplayStatus ( ansiVT220Logger logger )
 	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 8, 61, String ( GetState () ) );
 #endif
 }
-
+*/
 /// Appends local time to provided String
 void UDPWiFiService::GetLocalTime ( String &result, time_t timeError )
 {
@@ -364,7 +374,7 @@ bool UDPWiFiService::GetUDPMessage ( String &RecvMessage )
 {
 	if ( WiFiConnect () )
 	{
-		m_pMulticastDestList->Add ( GetMulticastAddress() );
+		m_pMulticastDestList->Add ( GetMulticastAddress () );
 		return ReadUDPMessage ( RecvMessage );
 	}
 	else
@@ -386,7 +396,7 @@ bool UDPWiFiService::ReadUDPMessage ( String &sRecvMessage )
 		SetLED ( PROCESSING_MSG_COLOUR );
 		delay ( 500 );
 		String s = "Received packet of size " + String ( packetSize ) + " From " + ToIPString ( m_myUDP.remoteIP () ) + ", port " + String ( m_myUDP.remotePort () );
-		//Info ( s ) ;
+		// Info ( s ) ;
 		if ( packetSize < sizeof ( sBuffer ) - 1 )
 		{
 			// read the packet into packetBufffer
@@ -426,9 +436,19 @@ bool UDPWiFiService::Start ()
 	{
 		Error ( "Unable to allocate UDP Port, restarting" );
 		delay ( 1000 * 20 );
-		ResetBoard ( F ("") );
+		MN::Utils::ResetBoard ( F ( "" ) );
 	}
 	return bResult;
+}
+
+uint32_t UDPWiFiService::GetMCastSentCount ()
+{
+	return m_ulMCastSentCount;
+}
+
+uint32_t UDPWiFiService::GetRequestsReceivedCount ()
+{
+	return m_ulReqCount;
 }
 
 /*
@@ -537,6 +557,16 @@ bool UDPWiFiService::SendAll ( String sMsg )
 	return bResult;
 }
 
+uint32_t UDPWiFiService::GetReplySentCount ()
+{
+	return m_ulReplyCount;
+}
+
+FixedIPList *UDPWiFiService::GetMulticastList ()
+{
+	return m_pMulticastDestList;
+}
+
 /// @brief Checks WiFi connected and attempts to connect if not. If connected then will look for a message and store in parameter
 /// @param paramPtr pointer to String to receive any available message
 /// @return
@@ -578,7 +608,7 @@ void UDPWiFiService::ProcessUDPMessage ( const String &sRecvMessage )
 		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof ( PartSeparator ) - 2 ).startsWith ( RestartReqMsg ) )
 		{
 			// Got a reset request
-			ResetBoard ( F ( "Reset request" ) );
+			MN::Utils::ResetBoard ( F ( "Reset request" ) );
 		}
 		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof ( PartSeparator ) - 2 ).startsWith ( DoorStatusReqMsg ) )
 		{

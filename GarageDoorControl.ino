@@ -115,18 +115,18 @@ MNRGBLEDBaseLib		*pMyLED					   = new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
 /*
 	WiFi config
 */
-constexpr char	  ssid []		  = "Naylorfamily"; // your network SSID (name)
-constexpr char	  pass []		  = "welcome1";		// your network password
-constexpr char	  MyHostName []	  = "GarageControl";
+constexpr char	  ssid []		   = "Naylorfamily"; // your network SSID (name)
+constexpr char	  pass []		   = "welcome1";	 // your network password
+constexpr char	  MyHostName []	   = "GarageControl";
 
-UDPWiFiService	 *pMyUDPService	  = nullptr;
-
-unsigned long	  ulLastClientReq = 0UL; // millis of last wifi incoming message
+UDPWiFiService	 *pMyUDPService	   = nullptr;
+constexpr uint8_t NWPrintStartLine = 15;  // Start line for network stats
+unsigned long	  ulLastClientReq  = 0UL; // millis of last wifi incoming message
 
 // Error message process used when generating messages during interrupt
-constexpr uint8_t ERROR_LINE	  = 25;
-String			  ErrorMsg;
-bool			  IsError = false;
+constexpr uint8_t ERROR_LINE	   = 25;
+//String			  ErrorMsg;
+//bool			  IsError = false;
 time_t			  timeError;
 
 void			  GetLocalTime ( String &Result )
@@ -149,10 +149,10 @@ void   Error ( String s )
 {
 	String Result;
 	GetLocalTime ( Result );
-	Result += s;
-	sInfoErrorMsg	  = Result;
-	fgInfoErrorColour = ansiVT220Logger::FG_WHITE;
-	bgInfoErrorColour = ansiVT220Logger::BG_BLUE;
+	Result			  += s;
+	sInfoErrorMsg	   = Result;
+	fgInfoErrorColour  = ansiVT220Logger::FG_WHITE;
+	bgInfoErrorColour  = ansiVT220Logger::BG_BLUE;
 }
 
 /// @brief Logs info to error line the provided error message prepeneded with local date and time
@@ -161,10 +161,10 @@ void Info ( String s )
 {
 	String Result;
 	GetLocalTime ( Result );
-	Result += s;
-	sInfoErrorMsg	  = Result;
-	fgInfoErrorColour = ansiVT220Logger::FG_WHITE;
-	bgInfoErrorColour = ansiVT220Logger::BG_BLUE;
+	Result			  += s;
+	sInfoErrorMsg	   = Result;
+	fgInfoErrorColour  = ansiVT220Logger::FG_WHITE;
+	bgInfoErrorColour  = ansiVT220Logger::BG_BLUE;
 }
 
 void DisplaylastInfoErrorMsg ()
@@ -184,11 +184,11 @@ void DisplayStats ( void )
 	String Heading = F ( "Temp Sensor - ver " );
 	#endif
 	Heading += String ( VERSION );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 0, 20, Heading );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 1, 20, Heading );
 
 	String sTime;
 	pMyUDPService->GetLocalTime ( sTime );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 0, 60, sTime );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 1, 60, sTime );
 
 	#ifdef UAP_SUPPORT
 	String result;
@@ -247,15 +247,85 @@ void DisplayStats ( void )
 	MyLogger.ClearPartofLine ( 14, 16, 7 );
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 14, 16, String ( fLatestPressure ) );
 	#endif
+/*	
 	if ( IsError )
 	{
 		IsError = false;
 		Error ( ErrorMsg );
 		ErrorMsg = "";
-	}
-	pMyUDPService->DisplayStatus ( MyLogger );
+*/	
+	DisplayNWStatus ( MyLogger );
 	DisplaylastInfoErrorMsg ();
 #endif
+}
+
+void DisplayNWStatus ( ansiVT220Logger logger )
+{
+	// print the SSID of the network you're attached to:
+	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 0, F ( "SSID: " ) );
+	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 23, WiFi.SSID () );
+	if ( pMyUDPService != nullptr )
+	{
+		FixedIPList *m_pMulticastDestList = pMyUDPService->GetMulticastList ();
+		if ( m_pMulticastDestList != nullptr )
+		{
+			uint8_t	  iterator = m_pMulticastDestList->GetIterator ();
+			IPAddress mcastDest;
+			while ( (long unsigned int)( mcastDest = m_pMulticastDestList->GetNext ( iterator ) ) != 0UL )
+			{
+				logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + iterator - 1, 41, "Mcast #" + String ( iterator ) + ": " );
+				logger.ClearPartofLine ( NWPrintStartLine + iterator - 1, 61, 15 );
+				logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + iterator - 1, 61, pMyUDPService->ToIPString ( mcastDest ) );
+			}
+		}
+
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 1, 0, F ( "My Hostname: " ) );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 1, 23, pMyUDPService->GetHostName () );
+
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 2, 0, F ( "IP Address: " ) );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 2, 23, pMyUDPService->ToIPString ( WiFi.localIP () ) );
+
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 3, 0, "Subnet Mask: " );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 3, 23, pMyUDPService->ToIPString ( WiFi.subnetMask () ) );
+
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 0, "Local Multicast Addr: " );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 23, pMyUDPService->ToIPString ( pMyUDPService->GetMulticastAddress () ) );
+
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 41, "WiFi connect/fail: " );
+		logger.ClearPartofLine ( NWPrintStartLine + 4, 61, 10 );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 61, String ( pMyUDPService->GetBeginCount () ) + "/" + String ( pMyUDPService->GetBeginTimeOutCount () ) );
+
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 41, "Multicasts sent: " );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 61, String ( pMyUDPService->GetMCastSentCount () ) );
+
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 6, 41, "Requests recvd: " );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 6, 61, String ( pMyUDPService->GetRequestsReceivedCount () ) );
+
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 41, "Replies sent: " );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 61, String ( pMyUDPService->GetReplySentCount () ) );
+
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 0, F ( "Mac address: " ) );
+		byte bMac [ 6 ];
+		WiFi.macAddress ( bMac );
+		char s [ 18 ];
+		sprintf ( s, "%02X:%02X:%02X:%02X:%02X:%02X", bMac [ 5 ], bMac [ 4 ], bMac [ 3 ], bMac [ 2 ], bMac [ 1 ], bMac [ 0 ] );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 23, s );
+
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 6, 0, F ( "Gateway Address: " ) );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 6, 23, pMyUDPService->ToIPString ( WiFi.gatewayIP () ) );
+		// print the received signal strength:
+
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 0, F ( "Signal strength (RSSI):" ) );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 23, String ( WiFi.RSSI () ) );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 30, F ( " dBm" ) );
+
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 8, 0, F ( "WiFi Status: " ) );
+		logger.ClearPartofLine ( NWPrintStartLine + 8, 23, 15 );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 8, 23, pMyUDPService->WiFiStatusToString ( WiFi.status () ) );
+
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 8, 41, F ( "WiFi Service State: " ) );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 8, 61, String ( pMyUDPService->GetState () ) );
+	}
 }
 
 // main setup routine

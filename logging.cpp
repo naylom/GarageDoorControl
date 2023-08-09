@@ -17,26 +17,31 @@ History:
 	Ver 1.0			Initial version
 */
 #include "logging.h"
-#ifdef ARDUINO_AVR_UNO
-extern "C"
-{
-	void ( *SWResetBoard ) ( void ) = 0; // declare reset function at address 0
-}
 
-void ResetBoard ( const __FlashStringHelper *pErrMsg )
+namespace MN ::Utils
 {
-	// Error ( pErrMsg );
-	// LogFlush;
-	SWResetBoard ();
-}
+#ifdef ARDUINO_AVR_UNO
+	extern "C"
+	{
+		void ( *SWResetBoard ) ( void ) = 0; // declare reset function at address 0
+	}
+
+	void ResetBoard ( const __FlashStringHelper *pErrMsg )
+	{
+		// Error ( pErrMsg );
+		// LogFlush;
+		SWResetBoard ();
+	}
 #else
-void ResetBoard ( const __FlashStringHelper *pErrMsg )
-{
-	// Error ( pErrMsg );
-	// LogFlush();
-	NVIC_SystemReset (); // processor software reset for ARM SAMD processor
-}
+	void ResetBoard ( const __FlashStringHelper *pErrMsg )
+	{
+		// Error ( pErrMsg );
+		// LogFlush();
+		NVIC_SystemReset (); // processor software reset for ARM SAMD processor
+	}
 #endif
+} // namespace MN::Utils
+
 void ansiVT220Logger::ClearScreen ()
 {
 	m_logger.Log ( CLEAR_SCREEN );
@@ -95,11 +100,22 @@ void ansiVT220Logger::ClearPartofLine ( uint8_t row, uint8_t start_col, uint8_t 
 	RestoreCursor ();
 }
 
+void ansiVT220Logger::OnClientConnect ( void *plog )
+{
+	Logger *pLog = (Logger *)plog;
+	pLog->Log ( SCREEN_SIZE132 );
+}
+
 void ansiVT220Logger::LogStart ()
 {
 	m_logger.LogStart ();
-	m_logger.Log (SCREEN_SIZE132 ); 
+	if ( m_logger.CanDetectClientConnect () )
+	{
+		m_logger.SetConnectCallback ( &ansiVT220Logger::OnClientConnect );
+	}
 }
+
+String ansiVT220Logger::SCREEN_SIZE132 =  F ( "\x1b?3h" );
 
 size_t SerialLogger::Log ( const __FlashStringHelper *ifsh )
 {
@@ -208,6 +224,11 @@ void SerialLogger::LogStart ()
 		;
 }
 
+bool SerialLogger::CanDetectClientConnect ()
+{
+	return false;
+}
+
 /* ----------------------------------------------------------------------------------------------------------------------- */
 bool CTelnet::isConnected ()
 {
@@ -229,24 +250,24 @@ void CTelnet::begin ( uint32_t port )
 size_t CTelnet::Send ( char c )
 {
 	size_t result = 0;
-	if ( m_myClient.connected() )
+	if ( m_myClient.connected () )
 	{
 		size_t result = m_myClient.print ( c );
 		if ( result <= 0 )
 		{
 			m_myClient.stop ();
 			m_bClientConnected = false;
-			//Serial.println ( "Client disconnected" );
+			// Serial.println ( "Client disconnected" );
 		}
 	}
 	else
 	{
 		if ( m_pmyServer != nullptr )
-		{				
+		{
 			m_myClient = m_pmyServer->available ();
 			if ( m_myClient )
 			{
-				//Serial.println ( "Client connected" );
+				// Serial.println ( "Client connected" );
 				m_bClientConnected = true;
 			}
 		}
@@ -254,28 +275,42 @@ size_t CTelnet::Send ( char c )
 	return result;
 }
 
+void CTelnet::SetConnectCallback ( voidFuncPtrParam pConnectCallback )
+{
+	m_ConnectCallback = pConnectCallback;
+}
+
+void CTelnet::DoConnect ()
+{
+	if ( m_ConnectCallback != nullptr )
+	{
+		m_ConnectCallback ( this );
+	}
+}
+
 size_t CTelnet::Send ( const uint8_t *buffer, size_t size )
 {
 	size_t result = 0;
-	if ( m_myClient.connected()  && size > 0)
+	if ( m_myClient.connected () && size > 0 )
 	{
 		size_t result = m_myClient.print ( (const char)*buffer, size );
 		if ( result <= 0 )
 		{
 			m_myClient.stop ();
 			m_bClientConnected = false;
-			//Serial.println ( "Client disconnected" );
+			// Serial.println ( "Client disconnected" );
 		}
 	}
 	else
 	{
 		if ( m_pmyServer != nullptr )
-		{		
+		{
 			m_myClient = m_pmyServer->available ();
 			if ( m_myClient )
 			{
-				//Serial.println ( "Client connected" );
+				// Serial.println ( "Client connected" );
 				m_bClientConnected = true;
+				DoConnect ();
 			}
 		}
 	}
@@ -285,14 +320,14 @@ size_t CTelnet::Send ( const uint8_t *buffer, size_t size )
 size_t CTelnet::Send ( String Msg )
 {
 	size_t Result = 0;
-	if ( m_myClient.connected() && Msg.length() > 0 )
+	if ( m_myClient.connected () && Msg.length () > 0 )
 	{
 		Result = m_myClient.print ( Msg );
 		if ( Result <= 0 )
 		{
 			m_myClient.stop ();
 			m_bClientConnected = false;
-			//Serial.println ( "Client disconnected" );
+			// Serial.println ( "Client disconnected" );
 		}
 	}
 	else
@@ -302,8 +337,9 @@ size_t CTelnet::Send ( String Msg )
 			m_myClient = m_pmyServer->available ();
 			if ( m_myClient )
 			{
-				//Serial.println ( "Client connected" );
+				// Serial.println ( "Client connected" );
 				m_bClientConnected = true;
+				DoConnect ();
 			}
 		}
 	}
@@ -415,7 +451,12 @@ void CTelnet::flush ()
 
 void CTelnet::LogStart ()
 {
-	begin();
+	begin ();
+}
+
+bool CTelnet::CanDetectClientConnect ()
+{
+	return true;
 }
 
 CTelnet Telnet;

@@ -36,19 +36,21 @@ class WiFiService
 		Status		  GetState ();
 		static String ToIPString ( const IPAddress &address );
 		unsigned long GetTime ();
+		uint32_t	  GetBeginCount ();
+		uint32_t	  GetBeginTimeOutCount ();
 		bool		  IsConnected ();
+		const char	 *WiFiStatusToString ( uint8_t iState );
 
 	protected:
-		void		WiFiDisconnect ();
-		bool		WiFiConnect ();
-		void		SetLED ( RGBType theColour, uint8_t flashTime = 0 );
-		void		SetState ( WiFiService::Status state );
-		void		CalcMyMulticastAddress ( IPAddress &result );
-		void		CalcMulticastAddress ( IPAddress ip, IPAddress &result );
-		const char *WiFiStatusToString ( uint8_t iState );
+		void	 WiFiDisconnect ();
+		bool	 WiFiConnect ();
+		void	 SetLED ( RGBType theColour, uint8_t flashTime = 0 );
+		void	 SetState ( WiFiService::Status state );
+		void	 CalcMyMulticastAddress ( IPAddress &result );
+		void	 CalcMulticastAddress ( IPAddress ip, IPAddress &result );
 
-		uint32_t	m_beginTimeouts = 0UL; // count of times WiFi.begin fails to connect within 10 secs
-		uint32_t	m_beginConnects = 0UL; // count of times WiFi.begin has connected successfully
+		uint32_t m_beginTimeouts = 0UL; // count of times WiFi.begin fails to connect within 10 secs
+		uint32_t m_beginConnects = 0UL; // count of times WiFi.begin has connected successfully
 	private:
 
 		const char		*m_SSID			 = nullptr;
@@ -68,35 +70,23 @@ class UDPWiFiService : public WiFiService
 		typedef void ( *UDPWiFiServiceCallback ) ( UDPWiFiService::ReqMsgType uiParam );
 
 		UDPWiFiService ();
-		bool Begin ( UDPWiFiServiceCallback pHandleReqData, const char *WiFissid, const char *WiFipwd, const char *HostName, const uint16_t portUDP = 0xFEED, MNRGBLEDBaseLib *pLED = nullptr );
-		bool Begin ( UDPWiFiServiceCallback pHandleReqData, const char *WiFissid, const char *WiFipwd, const char *HostName, MNRGBLEDBaseLib *pLED = nullptr, const uint16_t portUDP = 0xFEED );
-		void CheckUDP ();
-		void DisplayStatus ( ansiVT220Logger logger );
-		void GetLocalTime ( String &result, time_t timeError = 0 );
-		bool SendAll ( String sMsg );
-		bool SendReply ( String sMsg );
-		bool Start ();
-		void Stop ();
+		bool		 Begin ( UDPWiFiServiceCallback pHandleReqData, const char *WiFissid, const char *WiFipwd, const char *HostName, const uint16_t portUDP = 0xFEED, MNRGBLEDBaseLib *pLED = nullptr );
+		bool		 Begin ( UDPWiFiServiceCallback pHandleReqData, const char *WiFissid, const char *WiFipwd, const char *HostName, MNRGBLEDBaseLib *pLED = nullptr, const uint16_t portUDP = 0xFEED );
+		void		 CheckUDP ();
+		// void		 DisplayStatus ( ansiVT220Logger logger );
+		void		 GetLocalTime ( String &result, time_t timeError = 0 );
+		FixedIPList *GetMulticastList ();
+		uint32_t	 GetMCastSentCount ();
+		uint32_t	 GetRequestsReceivedCount ();
+		uint32_t	 GetReplySentCount ();
+		bool		 SendAll ( String sMsg );
+		bool		 SendReply ( String sMsg );
+		bool		 Start ();
+		void		 Stop ();
 
 	private:
 		enum WiFiState { DISCONNECTED, ISCONNECTED };
-/*
-		enum WiFiEvent { MADE_CONNECTION, LOST_CONNECTION, SENDREPLY, GETREQUEST, SENDMCAST };
 
-		typedef bool ( UDPWiFiService::*WiFiStateFunction ) ( void *paramPtr ); // prototype of function to handle event
-
-		bool			  Connect ( void *paramPtr );
-		bool			  DoNowt ( void *paramPtr );
-		bool			  GetReq ( String Message );
-		bool			  NowConnected ( void *paramPtr );
-		bool			  SendMCast ( void *paramPtr );
-		bool			  SendReply ( void *paramPtr );
-
-		WiFiStateFunction StateTableFn [ 2 ][ 5 ] = {
-			{&UDPWiFiService::NowConnected, &UDPWiFiService::DoNowt,  &UDPWiFiService::Connect,	&UDPWiFiService::Connect, &UDPWiFiService::Connect  }, // Actions when current state is UNCONNECTED
-			{ &UDPWiFiService::DoNowt,	   &UDPWiFiService::Connect, &UDPWiFiService::SendReply, &UDPWiFiService::GetReq,  &UDPWiFiService::SendMCast}  // Actions when current state is CONNECTED
-		};
-*/		
 		uint16_t			   m_Port = 0;
 		WiFiUDP				   m_myUDP;
 		String				   m_sUDPReceivedMsg;

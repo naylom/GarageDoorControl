@@ -26,7 +26,10 @@ constexpr auto BAUD_RATE = 115200;
 #include <WiFiNINA.h>
 #define MNDEBUG
 
-void ResetBoard ( const __FlashStringHelper *pErrMsg );
+namespace MN ::Utils
+{
+	void ResetBoard ( const __FlashStringHelper *pErrMsg );
+}
 
 class Logger
 {
@@ -52,6 +55,8 @@ class Logger
 		virtual size_t Logln ( double num, int digits )		   = 0;
 		virtual void   flush ()								   = 0;
 		virtual void   LogStart ()							   = 0;
+		virtual bool   CanDetectClientConnect ()			   = 0;
+		virtual void   SetConnectCallback ( voidFuncPtrParam pConnectCallback ) {};
 
 	private:
 };
@@ -81,6 +86,7 @@ class SerialLogger : public Logger
 		size_t		   Logln ( double num, int digits );
 		void		   flush ();
 		void		   LogStart ();
+		bool		   CanDetectClientConnect ();
 };
 
 /*
@@ -116,21 +122,27 @@ class CTelnet : public Logger
 		size_t Logln ( double num, int digits );
 		void   flush ();
 		void   LogStart ();
+		bool   CanDetectClientConnect ();
+		void   SetConnectCallback ( voidFuncPtrParam pConnectCallback ) override;
 
 	private:
-		char		buff [ 32 ];
-		bool		isConnected ();
-		size_t		Send ( String Msg );
-		size_t		Send ( char c );
-		size_t		Send ( const uint8_t *buffer, size_t size );
-		WiFiServer *m_pmyServer = nullptr;
-		WiFiClient	m_myClient;
-		uint16_t	m_telnetPort;
-		bool		m_bClientConnected = false;
+		// char			   buff [ 32 ];
+		bool			 isConnected ();
+		size_t			 Send ( String Msg );
+		size_t			 Send ( char c );
+		size_t			 Send ( const uint8_t *buffer, size_t size );
+		void			 DoConnect ();
+
+		WiFiServer		*m_pmyServer = nullptr;
+		WiFiClient		 m_myClient;
+		uint16_t		 m_telnetPort;
+		bool			 m_bClientConnected = false;
+		voidFuncPtrParam m_ConnectCallback	= nullptr;
 };
 
 extern CTelnet Telnet;
 
+/// @brief This class sends VT220 sequences to the supplied logger
 class ansiVT220Logger
 {
 	public:
@@ -142,22 +154,23 @@ class ansiVT220Logger
 		const static uint8_t MAX_COLS = 132;
 		const static uint8_t MAX_ROWS = 25;
 		ansiVT220Logger ( Logger &logger ) : m_logger ( logger ) {};
-		void ClearScreen ();
-		void AT ( uint8_t row, uint8_t col, String s );
-		void COLOUR_AT ( colours FGColour, colours BGColour, uint8_t row, uint8_t col, String s );
-		void RestoreCursor ( void );
-		void SaveCursor ( void );
-		void ClearLine ( uint8_t row );
-		void ClearPartofLine ( uint8_t row, uint8_t start_col, uint8_t toclear );
-		void LogStart ();
+		void		ClearScreen ();
+		void		AT ( uint8_t row, uint8_t col, String s );
+		void		COLOUR_AT ( colours FGColour, colours BGColour, uint8_t row, uint8_t col, String s );
+		void		RestoreCursor ( void );
+		void		SaveCursor ( void );
+		void		ClearLine ( uint8_t row );
+		void		ClearPartofLine ( uint8_t row, uint8_t start_col, uint8_t toclear );
+		static void OnClientConnect ( void *ptr );
+		void		LogStart ();
 
 	private:
-		Logger		&m_logger;
-		const String CSI			= F ( "\x1b[" );
-		const String SAVE_CURSOR	= F ( "\x1b[s" );
-		const String RESTORE_CURSOR = F ( "\x1b[u" );
-		const String CLEAR_LINE		= F ( "\x1b[2K" );
-		const String RESET_COLOURS	= F ( "\x1b[0m" );
-		const String CLEAR_SCREEN	= F ( "\x1b[2J" );
-		const String SCREEN_SIZE132 = F ( "\x1b?3h");
+		Logger			   &m_logger;
+		const String		CSI			   = F ( "\x1b[" );
+		const String		SAVE_CURSOR	   = F ( "\x1b[s" );
+		const String		RESTORE_CURSOR = F ( "\x1b[u" );
+		const String		CLEAR_LINE	   = F ( "\x1b[2K" );
+		const String		RESET_COLOURS  = F ( "\x1b[0m" );
+		const String		CLEAR_SCREEN   = F ( "\x1b[2J" );
+		static String 		SCREEN_SIZE132;
 };
