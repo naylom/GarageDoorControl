@@ -205,5 +205,8 @@ class ansiVT220Logger
 		const String  CLEAR_LINE	 = F ( "\x1b[2K" );
 		const String  RESET_COLOURS	 = F ( "\x1b[0m" );
 		const String  CLEAR_SCREEN	 = F ( "\x1b[2J" );
+		static String OSC;
+		static String WINDOW_TITLE;
 		static String SCREEN_SIZE132;
+		static String STRING_TERMINATOR;
 };

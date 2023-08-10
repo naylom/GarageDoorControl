@@ -154,7 +154,7 @@ void   Error ( String s )
 	Result			  += s;
 	sInfoErrorMsg	   = Result;
 	fgInfoErrorColour  = ansiVT220Logger::FG_BRIGHTWHITE;
-	bgInfoErrorColour  = ansiVT220Logger::BG_BLUE;
+	bgInfoErrorColour  = ansiVT220Logger::BG_BRIGHTBLUE;
 }
 
 /// @brief Logs info to error line the provided error message prepeneded with local date and time
