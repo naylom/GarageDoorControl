@@ -38,7 +38,7 @@ History:
 	Ver 1.0.7		Moved all input and out pins into DoorState, added InputPin class
 	Ver 1.0.8		Moved logging to object SerialLogger
 */
-#define VERSION "1.0.8 Beta"
+#define VERSION "1.0.9 Beta"
 #define TELNET
 #ifdef MNDEBUG
 	#ifdef TELNET
@@ -48,6 +48,8 @@ SerialLogger			slog;
 ansiVT220Logger			MyLogger ( slog );		   // create serial comms object to log to
 	#endif
 #endif
+
+uint32_t ulStartTime = 0UL;			// will hold the time the system starts
 
 #define UAP_SUPPORT
 #define BAROMETRIC_SUPPORT
@@ -247,20 +249,37 @@ void DisplayStats ( void )
 	MyLogger.ClearPartofLine ( 14, 16, 7 );
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 14, 16, String ( fLatestPressure ) );
 	#endif
-/*	
-	if ( IsError )
-	{
-		IsError = false;
-		Error ( ErrorMsg );
-		ErrorMsg = "";
-*/	
 	DisplayNWStatus ( MyLogger );
 	DisplaylastInfoErrorMsg ();
 #endif
 }
 
+void DisplayUptime ( ansiVT220Logger logger, uint32_t ulStartTime )
+{
+	int32_t ulNumSeconds =  millis() - ulStartTime;
+	if ( ulNumSeconds < 0 )
+	{
+		// wrapped around
+	}
+	else
+	{
+		uint32_t ulTotalNumSeconds = ulNumSeconds / 1000;
+
+		uint32_t ulDays =  ulTotalNumSeconds / ( 60 *  60 *  24 ) ;
+		uint32_t ulHours = ( ulTotalNumSeconds / (60 * 60) ) % 60;
+		uint32_t ulMinutes = ( ulTotalNumSeconds / 60 ) % 60 ;
+		uint32_t ulSecs = ulTotalNumSeconds % 60;
+
+		char sUpTime [ 20 ];
+		sprintf ( sUpTime, "%02d:%02d:%02d:%02d", ulDays, ulHours, ulMinutes, ulSecs );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 1, 1, sUpTime );	
+	}
+}
+
 void DisplayNWStatus ( ansiVT220Logger logger )
 {
+	// display uptime
+	DisplayUptime( logger, ulStartTime );
 	// print the SSID of the network you're attached to:
 	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 0, F ( "SSID: " ) );
 	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 23, WiFi.SSID () );
@@ -333,7 +352,7 @@ void setup ()
 {
 	// Serial.begin ( BAUD_RATE ); while (!Serial);
 	pMyUDPService = new UDPWiFiService ();
-
+	ulStartTime = millis();
 	// now we have state table set up and temp sensor configured, allow users to query state
 	if ( !pMyUDPService->Begin ( ProcessUDPMsg, ssid, pass, MyHostName, &TheMKR_RGB_LED ) )
 	{
