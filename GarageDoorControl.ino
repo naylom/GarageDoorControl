@@ -49,8 +49,6 @@ ansiVT220Logger			MyLogger ( slog );		   // create serial comms object to log to
 	#endif
 #endif
 
-uint32_t ulStartTime = 0UL;			// will hold the time the system starts
-
 #define UAP_SUPPORT
 #define BAROMETRIC_SUPPORT
 #define TEMP_HUMIDITY_SUPPORT
@@ -178,7 +176,9 @@ void DisplaylastInfoErrorMsg ()
 // Debug information for ANSI screen with cursor control
 void DisplayStats ( void )
 {
-#ifdef MNDEBUG
+#ifdef MNDEBUG#
+	// display uptime
+	DisplayUptime( MyLogger, 1, 1, ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK );
 	static time_t LastTime = 0;
 	#ifdef UAP_SUPPORT
 	String Heading = F ( "Garage Door Control -  ver " );
@@ -254,8 +254,16 @@ void DisplayStats ( void )
 #endif
 }
 
-void DisplayUptime ( ansiVT220Logger logger, uint32_t ulStartTime )
+void DisplayUptime ( ansiVT220Logger logger, uint8_t line, uint8_t row, ansiVT220Logger::colours Foreground, ansiVT220Logger::colours Background )
 {
+	static uint32_t ulStartTime = 0UL;
+
+	// set initial start time
+	if ( ulStartTime == 0 )
+	{
+		ulStartTime = millis();
+	}
+
 	int32_t ulNumSeconds =  millis() - ulStartTime;
 	if ( ulNumSeconds < 0 )
 	{
@@ -272,14 +280,12 @@ void DisplayUptime ( ansiVT220Logger logger, uint32_t ulStartTime )
 
 		char sUpTime [ 20 ];
 		sprintf ( sUpTime, "%02d:%02d:%02d:%02d", ulDays, ulHours, ulMinutes, ulSecs );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 1, 1, sUpTime );	
+		logger.COLOUR_AT ( Foreground, Background, line, row, sUpTime );	
 	}
 }
 
 void DisplayNWStatus ( ansiVT220Logger logger )
 {
-	// display uptime
-	DisplayUptime( logger, ulStartTime );
 	// print the SSID of the network you're attached to:
 	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 0, F ( "SSID: " ) );
 	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 23, WiFi.SSID () );
@@ -352,7 +358,7 @@ void setup ()
 {
 	// Serial.begin ( BAUD_RATE ); while (!Serial);
 	pMyUDPService = new UDPWiFiService ();
-	ulStartTime = millis();
+
 	// now we have state table set up and temp sensor configured, allow users to query state
 	if ( !pMyUDPService->Begin ( ProcessUDPMsg, ssid, pass, MyHostName, &TheMKR_RGB_LED ) )
 	{
