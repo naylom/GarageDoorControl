@@ -16,7 +16,6 @@ InputPin::InputPin ( pin_size_t pin, uint32_t debouncems, PinStatus matchStatus,
 	m_LastPinRead		  = digitalRead ( m_Pin );
 	m_CurrentMatchedState = m_LastPinRead == m_MatchStatus ? true : false;
 	m_LastChangedTime	  = millis ();
-
 	attachInterruptParam ( digitalPinToInterrupt ( m_Pin ), InputPinISR, status, this );
 }
 
@@ -174,10 +173,16 @@ bool	 InputPin::GetCurrentMatchedState()
 
 void InputPin::DebugStats ( String &result )
 {
-	result	= String ( m_ISRCalledCount ) + " : ";
+	result = F ( "Called ");
+	result += String ( m_ISRCalledCount ) + " : ";
+	result += F ( "Unchgd ");
 	result += String ( m_DiscardedUnchangedCount ) + " : ";
+	result += F ( "Mtchd ");
 	result += String ( m_MatchedCount ) + " : ";
-	result += String ( m_SpuriousCount ) + " : ";	
+	result += F ( "UnMatchd ");
 	result += String ( m_UnmatchedCount ) + " : ";
+	result += F ( "Spurious ");
+	result += String ( m_SpuriousCount ) + " : ";		
+	result += F ( "Dur  ");
 	result += String ( m_MatchedDuration );
 }

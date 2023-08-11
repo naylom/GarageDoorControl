@@ -35,7 +35,7 @@ extern time_t		   timeError;
 
 constexpr auto		   DOOR_FLASHTIME = 10;				// every 2 seconds
 const int16_t		   SIGNAL_PULSE	  = 2000 * 5;		// 2000 per sec, so every 1/5 sec, 200 ms
-constexpr uint32_t	   DEBOUNCE_MS	  = 75;				// min ms between consecutive pin interrupts before signal accepted
+constexpr uint32_t	   DEBOUNCE_MS	  = 0;				// min ms between consecutive pin interrupts before signal accepted
 constexpr PinStatus	   UAP_TRUE		  = PinStatus::LOW; // UAP signals LOW when sensor is TRUE
 
 const char			  *StateNames []  =					// In order of State enums!
