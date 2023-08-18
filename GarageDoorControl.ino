@@ -1,3 +1,10 @@
+#include <BME280.h>
+#include <BME280I2C_BRZO.h>
+#include <BME280I2C.h>
+#include <BME280Spi.h>
+#include <BME280SpiSw.h>
+#include <EnvironmentCalculations.h>
+#include <Wire.h>
 #include <MNPCIHandler.h>
 #include <MNRGBLEDBaseLib.h>
 #include <MNTimerLib.h>
@@ -37,8 +44,9 @@ History:
 	Ver 1.0.6       Changed input pins to be simply INPUT and use external pulldown resistors
 	Ver 1.0.7		Moved all input and out pins into DoorState, added InputPin class
 	Ver 1.0.8		Moved logging to object SerialLogger
+	Ver 1.0.10      Added BME280 suppot and changed logging to inherit Stream class
 */
-#define VERSION "1.0.9 Beta"
+#define VERSION "1.0.10 Beta"
 #define TELNET
 #ifdef MNDEBUG
 	#ifdef TELNET
@@ -50,11 +58,26 @@ ansiVT220Logger			MyLogger ( slog );		   // create serial comms object to log to
 #endif
 
 #define UAP_SUPPORT
-#define BAROMETRIC_SUPPORT
+#undef BME280_SUPPORT
+#undef BAROMETRIC_SUPPORT
 #define TEMP_HUMIDITY_SUPPORT
 #undef DISTANCE_SENSOR_SUPPORT
 #define MKR_RGB_INVERT // only required if Red and Green colours
+
 // are inverted as found on some boards
+
+struct
+{
+		float	 temperature;
+		float	 pressure;
+		float	 humidity;
+		uint32_t ulTimeOfReadingms;
+} EnvironmentResults = { NAN, NAN, NAN, 0UL };
+
+#ifdef BME280_SUPPORT // Temp, humidity and pressure sensor
+BME280I2C::Settings settings ( BME280::OSR_X1, BME280::OSR_X1, BME280::OSR_X1, BME280::Mode_Forced, BME280::StandbyTime_1000ms, BME280::Filter_16, BME280::SpiEnable_False, BME280I2C::I2CAddr_0x76 );
+BME280I2C			MyBME280 ( settings );
+#endif
 
 #ifdef TEMP_HUMIDITY_SUPPORT
 	#include <ClosedCube_SHT31D.h>
@@ -94,14 +117,16 @@ float			   fLatestPressure		 = NAN;
 	#include "DoorState.h"
 // PIN allocations, input & output from arduino perspective
 
-constexpr pin_size_t DOOR_IS_OPEN_STATUS_PIN   = 0;
-constexpr uint8_t	 DOOR_IS_CLOSED_STATUS_PIN = 1;
-constexpr uint8_t	 LIGHT_IS_ON_STATUS_PIN	   = 4;
-constexpr uint8_t	 DOOR_SWITCH_INPUT_PIN	   = 5;
-constexpr uint8_t	 TURN_LIGHT_ON_OUTPUT_PIN  = 9;
-constexpr uint8_t	 CLOSE_DOOR_OUTPUT_PIN	   = 8;
-constexpr uint8_t	 OPEN_DOOR_OUTPUT_PIN	   = 7;
-constexpr uint8_t	 STOP_DOOR_OUTPUT_PIN	   = 6;
+// Need to be interrupt pins
+constexpr pin_size_t DOOR_IS_OPEN_STATUS_PIN   = 8;
+constexpr uint8_t	 DOOR_IS_CLOSED_STATUS_PIN = 7;
+constexpr uint8_t	 LIGHT_IS_ON_STATUS_PIN	   = 6;
+constexpr uint8_t	 DOOR_SWITCH_INPUT_PIN	   = 0;
+// Don't need to be interrupt pins
+constexpr uint8_t	 TURN_LIGHT_ON_OUTPUT_PIN  = 2;
+constexpr uint8_t	 CLOSE_DOOR_OUTPUT_PIN	   = 3;
+constexpr uint8_t	 OPEN_DOOR_OUTPUT_PIN	   = 4;
+constexpr uint8_t	 STOP_DOOR_OUTPUT_PIN	   = 5;
 
 constexpr uint8_t	 RED_PIN				   = A4;
 constexpr uint8_t	 GREEN_PIN				   = A5;
@@ -125,8 +150,8 @@ unsigned long	  ulLastClientReq  = 0UL; // millis of last wifi incoming message
 
 // Error message process used when generating messages during interrupt
 constexpr uint8_t ERROR_LINE	   = 25;
-//String			  ErrorMsg;
-//bool			  IsError = false;
+// String			  ErrorMsg;
+// bool			  IsError = false;
 time_t			  timeError;
 
 void			  GetLocalTime ( String &Result )
@@ -169,16 +194,18 @@ void Info ( String s )
 
 void DisplaylastInfoErrorMsg ()
 {
+#ifdef MNDEBUG
 	MyLogger.ClearLine ( ERROR_LINE );
 	MyLogger.COLOUR_AT ( fgInfoErrorColour, bgInfoErrorColour, ERROR_LINE, 1, sInfoErrorMsg );
+#endif
 }
 
 // Debug information for ANSI screen with cursor control
 void DisplayStats ( void )
 {
-#ifdef MNDEBUG#
+#ifdef MNDEBUG
 	// display uptime
-	DisplayUptime( MyLogger, 1, 1, ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK );
+	DisplayUptime ( MyLogger, 1, 1, ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK );
 	static time_t LastTime = 0;
 	#ifdef UAP_SUPPORT
 	String Heading = F ( "Garage Door Control -  ver " );
@@ -203,10 +230,11 @@ void DisplayStats ( void )
 		MyLogger.ClearPartofLine ( 5, 10, 8 );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 5, 10, pGarageDoor->GetDoorDisplayState () );
 
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 3, 41, "Count     Called Unchngd Matched UnMtchdSpurious Duration" );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 4, 20, F ( "Light Off count     " ) );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 41, String ( pGarageDoor->GetLightOffCount () ) );
 		pGarageDoor->m_pDoorLightStatusPin->DebugStats ( result );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 45, result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 49, result );
 
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 20, F ( "Light On count      " ) );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 5, 41, String ( pGarageDoor->GetLightOnCount () ) );
@@ -214,7 +242,7 @@ void DisplayStats ( void )
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 6, 20, F ( "Door Opened count   " ) );
 		pGarageDoor->m_pDoorOpenStatusPin->DebugStats ( result );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 41, String ( pGarageDoor->GetDoorOpenedCount () ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 45, result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 49, result );
 
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 7, 20, F ( "Door Opening count  " ) );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 7, 41, String ( pGarageDoor->GetDoorOpeningCount () ) );
@@ -222,7 +250,7 @@ void DisplayStats ( void )
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 8, 20, F ( "Door Closed count   " ) );
 		pGarageDoor->m_pDoorClosedStatusPin->DebugStats ( result );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 8, 41, String ( pGarageDoor->GetDoorClosedCount () ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 8, 45, result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 8, 49, result );
 
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 9, 20, F ( "Door Closing count  " ) );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 9, 41, String ( pGarageDoor->GetDoorClosingCount () ) );
@@ -230,9 +258,9 @@ void DisplayStats ( void )
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 20, F ( "Switch Presssed " ) );
 	if ( pDoorSwitchPin != nullptr )
 	{
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 41, String ( pDoorSwitchPin->GetMatchedCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 10, 41, String ( pDoorSwitchPin->GetMatchedCount () ) );
 		pDoorSwitchPin->DebugStats ( result );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 45, result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 10, 49, result );
 	}
 	#endif
 
@@ -249,6 +277,17 @@ void DisplayStats ( void )
 	MyLogger.ClearPartofLine ( 14, 16, 7 );
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 14, 16, String ( fLatestPressure ) );
 	#endif
+	#ifdef BME280_SUPPORT
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 12, 0, F ( "Temperature is " ) );
+	MyLogger.ClearPartofLine ( 12, 16, 6 );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_RED, ansiVT220Logger::BG_BLACK, 12, 16, String ( EnvironmentResults.temperature ) );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 13, 0, F ( "Humidity is " ) );
+	MyLogger.ClearPartofLine ( 13, 16, 6 );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 13, 16, String ( EnvironmentResults.humidity ) );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 14, 0, F ( "Pressure is " ) );
+	MyLogger.ClearPartofLine ( 14, 16, 7 );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_YELLOW, ansiVT220Logger::BG_BLACK, 14, 16, String ( EnvironmentResults.pressure ) );
+	#endif
 	DisplayNWStatus ( MyLogger );
 	DisplaylastInfoErrorMsg ();
 #endif
@@ -261,26 +300,26 @@ void DisplayUptime ( ansiVT220Logger logger, uint8_t line, uint8_t row, ansiVT22
 	// set initial start time
 	if ( ulStartTime == 0 )
 	{
-		ulStartTime = millis();
+		ulStartTime = millis ();
 	}
 
-	int32_t ulNumSeconds =  millis() - ulStartTime;
+	int32_t ulNumSeconds = millis () - ulStartTime;
 	if ( ulNumSeconds < 0 )
 	{
 		// wrapped around
 	}
-	else
+	else 
 	{
 		uint32_t ulTotalNumSeconds = ulNumSeconds / 1000;
 
-		uint32_t ulDays =  ulTotalNumSeconds / ( 60 *  60 *  24 ) ;
-		uint32_t ulHours = ( ulTotalNumSeconds / (60 * 60) ) % 60;
-		uint32_t ulMinutes = ( ulTotalNumSeconds / 60 ) % 60 ;
-		uint32_t ulSecs = ulTotalNumSeconds % 60;
+		uint32_t ulDays			   = ulTotalNumSeconds / ( 60 * 60 * 24 );
+		uint32_t ulHours		   = ( ulTotalNumSeconds / ( 60 * 60 ) ) % 24;
+		uint32_t ulMinutes		   = ( ulTotalNumSeconds / 60 ) % 60;
+		uint32_t ulSecs			   = ulTotalNumSeconds % 60;
 
-		char sUpTime [ 20 ];
+		char	 sUpTime [ 20 ];
 		sprintf ( sUpTime, "%02d:%02d:%02d:%02d", ulDays, ulHours, ulMinutes, ulSecs );
-		logger.COLOUR_AT ( Foreground, Background, line, row, sUpTime );	
+		logger.COLOUR_AT ( Foreground, Background, line, row, sUpTime );
 	}
 }
 
@@ -356,7 +395,9 @@ void DisplayNWStatus ( ansiVT220Logger logger )
 // main setup routine
 void setup ()
 {
-	// Serial.begin ( BAUD_RATE ); while (!Serial);
+	MyLogger.LogStart ();
+	MyLogger.ClearScreen ();
+
 	pMyUDPService = new UDPWiFiService ();
 
 	// now we have state table set up and temp sensor configured, allow users to query state
@@ -365,15 +406,37 @@ void setup ()
 		Error ( "Cannot connect WiFI " );
 	}
 
-	MyLogger.LogStart ();
-	MyLogger.ClearScreen ();
+#ifdef BME280_SUPPORT
+	Wire.begin ();
+	if ( !MyBME280.begin () )
+	{
+		Error ( "Could not find BME280 sensor!" );
+		delay ( 1000 );
+	}
+	else
+	{
+		switch ( MyBME280.chipModel () )
+		{
+			case BME280::ChipModel_BME280:
+				Info ( "Found BME280 sensor! Success." );
+				break;
+			case BME280::ChipModel_BMP280:
+				Info ( "Found BMP280 sensor! No Humidity available." );
+				break;
+			default:
+				Error ( "Found UNKNOWN sensor! Error!" );
+		}
+	}
+	DisplaylastInfoErrorMsg ();
+#endif
+
 #ifdef BAROMETRIC_SUPPORT
 	// 	Start barometric sensor
 	lps25hb.begin ( lps25hbDevID );
 #endif
 #ifdef UAP_SUPPORT
 	// Setup so we are called if the state of door changes
-	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, DOOR_IS_OPEN_STATUS_PIN, DOOR_IS_CLOSED_STATUS_PIN, LIGHT_IS_ON_STATUS_PIN  );
+	pGarageDoor	   = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, DOOR_IS_OPEN_STATUS_PIN, DOOR_IS_CLOSED_STATUS_PIN, LIGHT_IS_ON_STATUS_PIN );
 	// pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::LOW, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	SetLED ();
@@ -437,7 +500,10 @@ void SetLED ()
 // main loop function
 void loop ()
 {
-#if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT
+#ifdef BME280_SUPPORT
+	float				 pres ( NAN ), temp ( NAN ), hum ( NAN );
+#endif
+#if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT || defined BME280_SUPPORT
 	static unsigned long ulLastSensorTime = 0UL;
 #endif
 	static unsigned long ulLastDisplayTime = 0UL;
@@ -456,7 +522,16 @@ void loop ()
 
 	// See if we have any udp requests to action
 	pMyUDPService->CheckUDP ();
-
+#ifdef BME280_SUPPORT
+	if ( millis () - ulLastSensorTime > 30 * 1000 )
+	{
+		MyBME280.read ( EnvironmentResults.pressure, EnvironmentResults.temperature, EnvironmentResults.humidity, BME280::TempUnit::TempUnit_Celsius, BME280::PresUnit::PresUnit_hPa );
+		EnvironmentResults.ulTimeOfReadingms = pMyUDPService->GetTime ();
+		MulticastMsg ( UDPWiFiService::ReqMsgType::TEMPDATA );
+		// reset time counter
+		ulLastSensorTime = millis ();
+	}
+#endif
 #if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT
 	if ( millis () - ulLastSensorTime > 30 * 1000 )
 	{
@@ -466,6 +541,8 @@ void loop ()
 	#endif
 	#ifdef TEMP_HUMIDITY_SUPPORT
 		pmyHumidityTempSensor->GetLastReading ( sHTResults );
+	#endif
+	#ifdef TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT
 		sHTResults.ulTimeOfReadingms = pMyUDPService->GetTime ();
 	#endif
 		MulticastMsg ( UDPWiFiService::ReqMsgType::TEMPDATA );
@@ -512,6 +589,21 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 {
 	switch ( eReqType )
 	{
+#ifdef BME280_SUPPORT
+		case UDPWiFiService::ReqMsgType::TEMPDATA:
+			sResponse  = F ( "T=" );
+			sResponse += EnvironmentResults.temperature;
+			sResponse += F ( ",H=" );
+			sResponse += EnvironmentResults.humidity;
+			sResponse += F ( ",D=" );
+			sResponse += EnvironmentCalculations::DewPoint ( EnvironmentResults.temperature, EnvironmentResults.humidity, EnvironmentCalculations::TempUnit_Celsius );
+			sResponse += F ( ",P=" );
+			sResponse += EnvironmentResults.pressure;
+			sResponse += F ( ",A=" );
+			sResponse += EnvironmentResults.ulTimeOfReadingms;
+			sResponse += F ( "\r" );
+			break;
+#endif
 #if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT
 		case UDPWiFiService::ReqMsgType::TEMPDATA:
 			// check we have good data to share
@@ -532,8 +624,10 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 				sResponse += fLatestPressure;
 				sResponse += F ( "," );
 	#endif
+	#ifdef TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT
 				sResponse += F ( "A=" );
 				sResponse += sHTResults.ulTimeOfReadingms;
+	#endif				
 				sResponse += F ( "\r" );
 			}
 			else
@@ -547,17 +641,17 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 			if ( pGarageDoor != nullptr )
 			{
 				sResponse  = F ( "S=" );
-				sResponse += pGarageDoor->GetDoorDisplayState ();			   // Door State
+				sResponse += pGarageDoor->GetDoorDisplayState (); // Door State
 				sResponse += F ( ",L=" );
-				sResponse += pGarageDoor->IsLit () ? "On" : "Off";			   // Light on or not
+				sResponse += pGarageDoor->IsLit () ? "On" : "Off"; // Light on or not
 				sResponse += F ( ",C=" );
 				sResponse += pGarageDoor->IsClosed () ? F ( "Y" ) : F ( "N" ); // Closed or not
 				sResponse += F ( ",O=" );
-				sResponse += pGarageDoor->IsOpen () ? F ( "Y" ) : F ( "N" );   // Open or not
+				sResponse += pGarageDoor->IsOpen () ? F ( "Y" ) : F ( "N" ); // Open or not
 				sResponse += F ( ",M=" );
 				sResponse += pGarageDoor->IsMoving () ? F ( "Y" ) : F ( "N" ); // Moving or not
 				sResponse += F ( ",A=" );
-				sResponse += pMyUDPService->GetTime ();						   // current epoch time
+				sResponse += pMyUDPService->GetTime (); // current epoch time
 				sResponse += F ( "\r" );
 			}
 			else
