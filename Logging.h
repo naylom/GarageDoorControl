@@ -31,32 +31,12 @@ namespace MN ::Utils
 	void ResetBoard ( const __FlashStringHelper *pErrMsg );
 }
 
-class Logger
+class Logger : public Stream
 {
 	public:
-		virtual size_t Log ( const __FlashStringHelper *ifsh ) = 0;
-		virtual size_t Log ( const String &s )				   = 0;
-		virtual size_t Log ( char c )						   = 0;
-		virtual size_t Log ( const char str [] )			   = 0;
-		virtual size_t Log ( unsigned char b, int base )	   = 0;
-		virtual size_t Log ( int n, int base )				   = 0;
-		virtual size_t Log ( unsigned int n, int base )		   = 0;
-		virtual size_t Log ( long n, int base )				   = 0;
-		virtual size_t Log ( unsigned long num, int base )	   = 0;
-		virtual size_t Logln ( char x )						   = 0;
-		virtual size_t Logln ( const char c [] )			   = 0;
-		virtual size_t Logln ( const String &s )			   = 0;
-		virtual size_t Logln ( void )						   = 0;
-		virtual size_t Logln ( unsigned char b, int base )	   = 0;
-		virtual size_t Logln ( int num, int base )			   = 0;
-		virtual size_t Logln ( unsigned int num, int base )	   = 0;
-		virtual size_t Logln ( long num, int base )			   = 0;
-		virtual size_t Logln ( unsigned long num, int base )   = 0;
-		virtual size_t Logln ( double num, int digits )		   = 0;
-		virtual void   flush ()								   = 0;
-		virtual void   LogStart ()							   = 0;
-		virtual bool   CanDetectClientConnect ()			   = 0;
-		virtual void   SetConnectCallback ( voidFuncPtrParam pConnectCallback ) {};
+		virtual void LogStart ()			   = 0;
+		virtual bool CanDetectClientConnect () = 0;
+		virtual void SetConnectCallback ( voidFuncPtrParam ) {};
 
 	private:
 };
@@ -65,28 +45,14 @@ class SerialLogger : public Logger
 {
 	public:
 		const uint32_t BAUD_RATE = 115200;
-		size_t		   Log ( const __FlashStringHelper *ifsh );
-		size_t		   Log ( const String &s );
-		size_t		   Log ( char c );
-		size_t		   Log ( const char str [] );
-		size_t		   Log ( unsigned char b, int base );
-		size_t		   Log ( int n, int base );
-		size_t		   Log ( unsigned int n, int base );
-		size_t		   Log ( long n, int base );
-		size_t		   Log ( unsigned long num, int base );
-		size_t		   Logln ( char x );
-		size_t		   Logln ( const char c [] );
-		size_t		   Logln ( const String &s );
-		size_t		   Logln ( void );
-		size_t		   Logln ( unsigned char b, int base );
-		size_t		   Logln ( int num, int base );
-		size_t		   Logln ( unsigned int num, int base );
-		size_t		   Logln ( long num, int base );
-		size_t		   Logln ( unsigned long num, int base );
-		size_t		   Logln ( double num, int digits );
-		void		   flush ();
 		void		   LogStart ();
 		bool		   CanDetectClientConnect ();
+		int			   available ();
+		int			   read ();
+		int			   peek ();
+		size_t		   write ( String Msg );
+		size_t		   write ( uint8_t c );
+		size_t		   write ( const uint8_t *buffer, size_t size );
 };
 
 /*
@@ -100,38 +66,21 @@ class CTelnet : public Logger
 {
 	public:
 		operator bool ();
-		void   begin ( uint32_t s = default_mcast_port );
-		size_t Log ( const __FlashStringHelper *ifsh );
-		size_t Log ( const String &s );
-		size_t Log ( char c );
-		size_t Log ( const char str [] );
-		size_t Log ( unsigned char b, int base );
-		size_t Log ( int n, int base );
-		size_t Log ( unsigned int n, int base );
-		size_t Log ( long n, int base );
-		size_t Log ( unsigned long num, int base );
-		size_t Logln ( char x );
-		size_t Logln ( const char c [] );
-		size_t Logln ( const String &s );
-		size_t Logln ( void );
-		size_t Logln ( unsigned char b, int base );
-		size_t Logln ( int num, int base );
-		size_t Logln ( unsigned int num, int base );
-		size_t Logln ( long num, int base );
-		size_t Logln ( unsigned long num, int base );
-		size_t Logln ( double num, int digits );
-		void   flush ();
-		void   LogStart ();
-		bool   CanDetectClientConnect ();
-		void   SetConnectCallback ( voidFuncPtrParam pConnectCallback ) override;
+		void begin ( uint32_t s = default_mcast_port );
+		void LogStart ();
+		bool CanDetectClientConnect ();
+		void SetConnectCallback ( voidFuncPtrParam pConnectCallback ) override;
+		int	 available ();
 
 	private:
 		// char			   buff [ 32 ];
 		bool			 isConnected ();
-		size_t			 Send ( String Msg );
-		size_t			 Send ( char c );
-		size_t			 Send ( const uint8_t *buffer, size_t size );
+		size_t			 write ( String Msg );
+		size_t			 write ( uint8_t c );
+		size_t			 write ( const uint8_t *buffer, size_t size );
 		void			 DoConnect ();
+		int				 read ();
+		int				 peek ();
 
 		WiFiServer		*m_pmyServer = nullptr;
 		WiFiClient		 m_myClient;

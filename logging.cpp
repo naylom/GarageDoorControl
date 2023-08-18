@@ -44,7 +44,7 @@ namespace MN ::Utils
 
 void ansiVT220Logger::ClearScreen ()
 {
-	m_logger.Log ( CLEAR_SCREEN );
+	m_logger.print ( CLEAR_SCREEN );
 }
 
 void ansiVT220Logger::AT ( uint8_t row, uint8_t col, String s )
@@ -52,26 +52,27 @@ void ansiVT220Logger::AT ( uint8_t row, uint8_t col, String s )
 	row		 = row == 0 ? 1 : row;
 	col		 = col == 0 ? 1 : col;
 	String m = String ( CSI ) + row + String ( ";" ) + col + String ( "H" ) + s;
-	m_logger.Log ( m );
+	m_logger.print ( m );
 }
 
 void ansiVT220Logger::COLOUR_AT ( colours FGColour, colours BGColour, uint8_t row, uint8_t col, String s )
 {
 	// set colours
-	m_logger.Log ( String ( CSI ) + FGColour + ";" + BGColour + "m" );
+
+	m_logger.print ( String ( CSI ) + FGColour + ";" + BGColour + "m" );
 	AT ( row, col, s );
 	// reset colours
-	m_logger.Log ( RESET_COLOURS );
+	m_logger.print ( RESET_COLOURS );
 }
 
 void ansiVT220Logger::RestoreCursor ( void )
 {
-	m_logger.Log ( RESTORE_CURSOR );
+	m_logger.print ( RESTORE_CURSOR );
 }
 
 void ansiVT220Logger::SaveCursor ( void )
 {
-	m_logger.Log ( SAVE_CURSOR );
+	m_logger.print ( SAVE_CURSOR );
 }
 
 void ansiVT220Logger::ClearLine ( uint8_t row )
@@ -103,9 +104,9 @@ void ansiVT220Logger::ClearPartofLine ( uint8_t row, uint8_t start_col, uint8_t 
 void ansiVT220Logger::OnClientConnect ( void *plog )
 {
 	Logger *pLog = (Logger *)plog;
-	pLog->Log ( SCREEN_SIZE132 );
-	pLog->Log ( ansiVT220Logger::OSC + "2;GarageControl Debug\x1b\\" + STRING_TERMINATOR);
-	pLog->Log ( "\x1b[63;2\"p");
+	pLog->print ( SCREEN_SIZE132 );
+	pLog->print ( ansiVT220Logger::OSC + "2;GarageControl Debug\x1b\\" + STRING_TERMINATOR );
+	pLog->print ( "\x1b[63;2\"p" );
 }
 
 void ansiVT220Logger::LogStart ()
@@ -116,108 +117,40 @@ void ansiVT220Logger::LogStart ()
 		m_logger.SetConnectCallback ( &ansiVT220Logger::OnClientConnect );
 	}
 }
+
 String ansiVT220Logger::STRING_TERMINATOR = F ( "\x1b\\" );
-String ansiVT220Logger::OSC =  F ( "\x1b]");
-String ansiVT220Logger::SCREEN_SIZE132 =  F ( "\x1b[?3h" );
-String ansiVT220Logger::WINDOW_TITLE = F ( "Debug" );
-size_t SerialLogger::Log ( const __FlashStringHelper *ifsh )
+String ansiVT220Logger::OSC				  = F ( "\x1b]" );
+String ansiVT220Logger::SCREEN_SIZE132	  = F ( "\x1b[?3h" );
+String ansiVT220Logger::WINDOW_TITLE	  = F ( "Debug" );
+
+int	   SerialLogger::available ()
 {
-	return Serial.print ( ifsh );
+	return Serial.available ();
 }
 
-size_t SerialLogger::Log ( const String &s )
+int SerialLogger::read ()
 {
-	return Serial.print ( s );
+	return Serial.read ();
 }
 
-size_t SerialLogger::Log ( char c )
+int SerialLogger::peek ()
+{
+	return Serial.peek ();
+}
+
+size_t SerialLogger::write ( String Msg )
+{
+	return Serial.print ( Msg );
+}
+
+size_t SerialLogger::write ( uint8_t c )
 {
 	return Serial.print ( c );
 }
 
-size_t SerialLogger::Log ( const char str [] )
+size_t SerialLogger::write ( const uint8_t *buffer, size_t size )
 {
-	return Serial.print ( str );
-}
-
-size_t SerialLogger::Log ( unsigned char b, int base )
-{
-	return Serial.print ( b, base );
-}
-
-size_t SerialLogger::Log ( int n, int base )
-{
-	return Serial.print ( n, base );
-}
-
-size_t SerialLogger::Log ( unsigned int n, int base )
-{
-	return Serial.print ( n, base );
-}
-
-size_t SerialLogger::Log ( long n, int base )
-{
-	return Serial.print ( n, base );
-}
-
-size_t SerialLogger::Log ( unsigned long num, int base )
-{
-	return Serial.print ( num, base );
-}
-
-void SerialLogger::flush ()
-{
-	return Serial.flush ();
-}
-
-size_t SerialLogger::Logln ( const char c [] )
-{
-	return Serial.println ( c );
-}
-
-size_t SerialLogger::Logln ( const String &s )
-{
-	return Serial.println ( s );
-}
-
-size_t SerialLogger::Logln ( void )
-{
-	return Serial.println ();
-}
-
-size_t SerialLogger::Logln ( unsigned char b, int base )
-{
-	return Serial.println ( b, base );
-}
-
-size_t SerialLogger::Logln ( int num, int base )
-{
-	return Serial.println ( num, base );
-}
-
-size_t SerialLogger::Logln ( unsigned int num, int base )
-{
-	return Serial.println ( num, base );
-}
-
-size_t SerialLogger::Logln ( long num, int base )
-{
-	return Serial.println ( num, base );
-}
-
-size_t SerialLogger::Logln ( unsigned long num, int base )
-{
-	return Serial.println ( num, base );
-}
-
-size_t SerialLogger::Logln ( double num, int digits )
-{
-	return Serial.println ( num, digits );
-}
-
-size_t SerialLogger::Logln ( char x )
-{
-	return Serial.println ( x );
+	return Serial.write ( (char *)buffer, size );
 }
 
 void SerialLogger::LogStart ()
@@ -250,12 +183,12 @@ void CTelnet::begin ( uint32_t port )
 	m_pmyServer->begin ();
 }
 
-size_t CTelnet::Send ( char c )
+size_t CTelnet::write ( uint8_t c )
 {
 	size_t result = 0;
 	if ( m_myClient.connected () )
 	{
-		size_t result = m_myClient.print ( c );
+		size_t result = m_myClient.write ( c );
 		if ( result <= 0 )
 		{
 			m_myClient.stop ();
@@ -291,12 +224,12 @@ void CTelnet::DoConnect ()
 	}
 }
 
-size_t CTelnet::Send ( const uint8_t *buffer, size_t size )
+size_t CTelnet::write ( const uint8_t *buffer, size_t size )
 {
 	size_t result = 0;
 	if ( m_myClient.connected () && size > 0 )
 	{
-		size_t result = m_myClient.print ( (const char)*buffer, size );
+		size_t result = m_myClient.write ( (char* )buffer, size );
 		if ( result <= 0 )
 		{
 			m_myClient.stop ();
@@ -320,7 +253,7 @@ size_t CTelnet::Send ( const uint8_t *buffer, size_t size )
 	return result;
 }
 
-size_t CTelnet::Send ( String Msg )
+size_t CTelnet::write ( String Msg )
 {
 	size_t Result = 0;
 	if ( m_myClient.connected () && Msg.length () > 0 )
@@ -349,107 +282,19 @@ size_t CTelnet::Send ( String Msg )
 	return Result;
 }
 
-size_t CTelnet::Log ( char c )
+int CTelnet::available ()
 {
-	char buf [ 2 ];
-	buf [ 0 ] = c;
-	buf [ 1 ] = 0;
-	return Send ( buf );
+	return m_myClient.available ();
 }
 
-size_t CTelnet::Log ( const char str [] )
+int CTelnet::read ()
 {
-	return Send ( str );
+	return m_myClient.read ();
 }
 
-size_t CTelnet::Log ( unsigned char b, int base )
+int CTelnet::peek ()
 {
-	return Send ( String ( b, base ) );
-}
-
-size_t CTelnet::Log ( int n, int base )
-{
-	return Send ( String ( n, base ) );
-}
-
-size_t CTelnet::Log ( unsigned int n, int base )
-{
-	return Send ( String ( n, base ) );
-}
-
-size_t CTelnet::Log ( const __FlashStringHelper *s )
-{
-	return Send ( String ( s ) );
-}
-
-size_t CTelnet::Log ( const String &s )
-{
-	return Send ( String ( s ) );
-}
-
-size_t CTelnet::Log ( unsigned long num, int base )
-{
-	return Send ( String ( num, base ) );
-}
-
-size_t CTelnet::Log ( long n, int base )
-{
-	return Send ( String ( n, base ) );
-}
-
-size_t CTelnet::Logln ( char x )
-{
-	return Send ( String ( x ) + "\n" );
-}
-
-size_t CTelnet::Logln ( const char c [] )
-{
-	return Send ( String ( c ) + "\n" );
-}
-
-size_t CTelnet::Logln ( const String &s )
-{
-	return Send ( String ( s ) + "\n" );
-}
-
-size_t CTelnet::Logln ( void )
-{
-	return Send ( "\n" );
-}
-
-size_t CTelnet::Logln ( unsigned char b, int base )
-{
-	return Send ( String ( b, base ) + "\n" );
-}
-
-size_t CTelnet::Logln ( int num, int base )
-{
-	return Send ( String ( num, base ) + "\n" );
-}
-
-size_t CTelnet::Logln ( unsigned int num, int base )
-{
-	return Send ( String ( num, base ) + "\n" );
-}
-
-size_t CTelnet::Logln ( long num, int base )
-{
-	return Send ( String ( num, base ) + "\n" );
-}
-
-size_t CTelnet::Logln ( unsigned long num, int base )
-{
-	return Send ( String ( num, base ) + "\n" );
-}
-
-size_t CTelnet::Logln ( double num, int digits )
-{
-	return Send ( String ( num, digits ) + "\n" );
-}
-
-void CTelnet::flush ()
-{
-	m_myClient.flush ();
+	return m_myClient.peek ();
 }
 
 void CTelnet::LogStart ()
