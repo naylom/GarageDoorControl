@@ -1,6 +1,6 @@
 {
     "board": "arduino:samd:mkrwifi1010",
     "sketch": "GarageDoorControl.ino",
-    "port": "COM3",
+    "port": "COM9",
     "output": "C:/Temp/ArduinoTemp/GarageControl"
 }

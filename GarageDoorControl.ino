@@ -1,8 +1,5 @@
 #include <BME280.h>
-#include <BME280I2C_BRZO.h>
 #include <BME280I2C.h>
-#include <BME280Spi.h>
-#include <BME280SpiSw.h>
 #include <EnvironmentCalculations.h>
 #include <Wire.h>
 #include <MNPCIHandler.h>
@@ -52,65 +49,30 @@ History:
 	#ifdef TELNET
 ansiVT220Logger MyLogger ( Telnet );
 	#else
-SerialLogger			slog;
-ansiVT220Logger			MyLogger ( slog );		   // create serial comms object to log to
+SerialLogger	slog;
+ansiVT220Logger MyLogger ( slog ); // create serial comms object to log to
 	#endif
 #endif
 
-#define UAP_SUPPORT
-#undef BME280_SUPPORT
-#undef BAROMETRIC_SUPPORT
-#define TEMP_HUMIDITY_SUPPORT
-#undef DISTANCE_SENSOR_SUPPORT
-#define MKR_RGB_INVERT // only required if Red and Green colours
+#undef UAP_SUPPORT
+#define BME280_SUPPORT
 
+#define MKR_RGB_INVERT // only required if Red and Green colours
 // are inverted as found on some boards
 
+#ifdef BME280_SUPPORT // Temp, humidity and pressure sensor
 struct
 {
 		float	 temperature;
-		float	 pressure;
+		float	 pressure; // at sea level
 		float	 humidity;
+		float	 dewpoint;
 		uint32_t ulTimeOfReadingms;
-} EnvironmentResults = { NAN, NAN, NAN, 0UL };
+} EnvironmentResults					  = { NAN, NAN, NAN, 0UL };
 
-#ifdef BME280_SUPPORT // Temp, humidity and pressure sensor
-BME280I2C::Settings settings ( BME280::OSR_X1, BME280::OSR_X1, BME280::OSR_X1, BME280::Mode_Forced, BME280::StandbyTime_1000ms, BME280::Filter_16, BME280::SpiEnable_False, BME280I2C::I2CAddr_0x76 );
+constexpr float		ALTITUDE_COMPENSATION = 135.0; // sensor is 135 metres aboves sea level, we need this to adjust pressure reading to sea level equivalent.
+BME280I2C::Settings settings ( BME280::OSR_X2, BME280::OSR_X2, BME280::OSR_X2, BME280::Mode_Normal, BME280::StandbyTime_250ms, BME280::Filter_Off, BME280::SpiEnable_False, BME280I2C::I2CAddr_0x76 );
 BME280I2C			MyBME280 ( settings );
-#endif
-
-#ifdef TEMP_HUMIDITY_SUPPORT
-	#include <ClosedCube_SHT31D.h>
-	/*
-		HumiditySensor config
-	*/
-	#define SHT35D // Configure to use SHT35D sensor for humidity and temperature
-	#ifdef SHT35D
-		#include "SHTTempHumSensors.h"
-constexpr auto			SensorDeviceID		  = 0x44; // I2C device id for SHT35-D sensor
-SHTTempHumSensorsClass *pmyHumidityTempSensor = nullptr;
-	#else
-		#include "DHTTempHumSensors.h"
-constexpr auto			SensorDeviceID		  = 6; // Data Pin Num for DHT sensor
-DHTTempHumSensorsClass *pmyHumidityTempSensor = nullptr;
-	#endif
-
-THSENSOR_RESULT sHTResults; // Holds last temperature and humidity results
-
-#endif
-
-#ifdef BAROMETRIC_SUPPORT
-	#include <ClosedCube_LPS25HB.h>
-/*
-	Baramoter sensor, closedcube LPS25HB based on MEMS sensor
-*/
-ClosedCube_LPS25HB lps25hb;
-// TN210TD height adjustment factor for pressure, see
-// //https://www.engineeringtoolbox.com/barometers-elevation-compensation-d_1812.html
-constexpr float	   ALTITUDE_COMPENSATION = 15.0; // TN210TD is 127m above sea level according to Google Maps, which the
-												 // above link converts to 15 mbars (hPa) compensation
-constexpr auto	   lps25hbDevID			 = 0x5C; // I2C device id
-float			   fLatestPressure		 = NAN;
 #endif
 
 #ifdef UAP_SUPPORT
@@ -264,19 +226,6 @@ void DisplayStats ( void )
 	}
 	#endif
 
-	#ifdef TEMP_HUMIDITY_SUPPORT
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 12, 0, F ( "Temperature is " ) );
-	MyLogger.ClearPartofLine ( 12, 16, 6 );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_RED, ansiVT220Logger::BG_BLACK, 12, 16, String ( sHTResults.fTemperature ) );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 13, 0, F ( "Humidity is " ) );
-	MyLogger.ClearPartofLine ( 13, 16, 6 );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 13, 16, String ( sHTResults.fHumidity ) );
-	#endif
-	#ifdef BAROMETRIC_SUPPORT
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 14, 0, F ( "Pressure is " ) );
-	MyLogger.ClearPartofLine ( 14, 16, 7 );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 14, 16, String ( fLatestPressure ) );
-	#endif
 	#ifdef BME280_SUPPORT
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 12, 0, F ( "Temperature is " ) );
 	MyLogger.ClearPartofLine ( 12, 16, 6 );
@@ -308,7 +257,7 @@ void DisplayUptime ( ansiVT220Logger logger, uint8_t line, uint8_t row, ansiVT22
 	{
 		// wrapped around
 	}
-	else 
+	else
 	{
 		uint32_t ulTotalNumSeconds = ulNumSeconds / 1000;
 
@@ -430,23 +379,11 @@ void setup ()
 	DisplaylastInfoErrorMsg ();
 #endif
 
-#ifdef BAROMETRIC_SUPPORT
-	// 	Start barometric sensor
-	lps25hb.begin ( lps25hbDevID );
-#endif
 #ifdef UAP_SUPPORT
 	// Setup so we are called if the state of door changes
 	pGarageDoor	   = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, DOOR_IS_OPEN_STATUS_PIN, DOOR_IS_CLOSED_STATUS_PIN, LIGHT_IS_ON_STATUS_PIN );
-	// pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::LOW, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	SetLED ();
-#endif
-
-#ifdef TEMP_HUMIDITY_SUPPORT
-	// cannot instantiate object as global - causes board to freeze, need to allocate when running
-	pmyHumidityTempSensor = new SHTTempHumSensorsClass ( SensorDeviceID );
-	// get initial reading
-	pmyHumidityTempSensor->GetLastReading ( sHTResults );
 #endif
 }
 #ifdef UAP_SUPPORT
@@ -502,11 +439,11 @@ void loop ()
 {
 #ifdef BME280_SUPPORT
 	float				 pres ( NAN ), temp ( NAN ), hum ( NAN );
+	static unsigned long ulLastSensorTime = millis () - ( 30UL * 1000UL );
 #endif
-#if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT || defined BME280_SUPPORT
-	static unsigned long ulLastSensorTime = 0UL;
-#endif
+
 	static unsigned long ulLastDisplayTime = 0UL;
+
 #ifdef UAP_SUPPORT
 	static DoorState::State LastDoorState  = DoorState::Unknown;
 	static bool				LastLightState = false;
@@ -526,36 +463,22 @@ void loop ()
 	if ( millis () - ulLastSensorTime > 30 * 1000 )
 	{
 		MyBME280.read ( EnvironmentResults.pressure, EnvironmentResults.temperature, EnvironmentResults.humidity, BME280::TempUnit::TempUnit_Celsius, BME280::PresUnit::PresUnit_hPa );
+		EnvironmentResults.pressure			 = EnvironmentCalculations::EquivalentSeaLevelPressure ( ALTITUDE_COMPENSATION, EnvironmentResults.temperature, EnvironmentResults.pressure );
+		EnvironmentResults.dewpoint			 = EnvironmentCalculations::DewPoint ( EnvironmentResults.temperature, EnvironmentResults.humidity );
 		EnvironmentResults.ulTimeOfReadingms = pMyUDPService->GetTime ();
 		MulticastMsg ( UDPWiFiService::ReqMsgType::TEMPDATA );
 		// reset time counter
 		ulLastSensorTime = millis ();
 	}
 #endif
-#if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT
-	if ( millis () - ulLastSensorTime > 30 * 1000 )
-	{
-		//  30 secs have passed to get latest sensor readings
-	#ifdef BAROMETRIC_SUPPORT
-		fLatestPressure = ( lps25hb.readPressure () + ALTITUDE_COMPENSATION );
-	#endif
-	#ifdef TEMP_HUMIDITY_SUPPORT
-		pmyHumidityTempSensor->GetLastReading ( sHTResults );
-	#endif
-	#ifdef TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT
-		sHTResults.ulTimeOfReadingms = pMyUDPService->GetTime ();
-	#endif
-		MulticastMsg ( UDPWiFiService::ReqMsgType::TEMPDATA );
-		// reset time counter
-		ulLastSensorTime = millis ();
-	}
-#endif
+
 	// update debug stats every 1/2 second
 	if ( millis () - ulLastDisplayTime > 500 )
 	{
 		ulLastDisplayTime = millis ();
 		DisplayStats ();
 	}
+
 #ifdef UAP_SUPPORT
 	// if door state has changed, multicast news
 	if ( pGarageDoor != nullptr )
@@ -589,53 +512,22 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 {
 	switch ( eReqType )
 	{
-#ifdef BME280_SUPPORT
 		case UDPWiFiService::ReqMsgType::TEMPDATA:
+#ifdef BME280_SUPPORT
 			sResponse  = F ( "T=" );
 			sResponse += EnvironmentResults.temperature;
 			sResponse += F ( ",H=" );
 			sResponse += EnvironmentResults.humidity;
 			sResponse += F ( ",D=" );
-			sResponse += EnvironmentCalculations::DewPoint ( EnvironmentResults.temperature, EnvironmentResults.humidity, EnvironmentCalculations::TempUnit_Celsius );
+			sResponse += EnvironmentResults.dewpoint;
 			sResponse += F ( ",P=" );
 			sResponse += EnvironmentResults.pressure;
 			sResponse += F ( ",A=" );
 			sResponse += EnvironmentResults.ulTimeOfReadingms;
 			sResponse += F ( "\r" );
-			break;
 #endif
-#if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT
-		case UDPWiFiService::ReqMsgType::TEMPDATA:
-			// check we have good data to share
-			if ( sHTResults.fTemperature != NAN && sHTResults.fHumidity != NAN )
-			{
-	#ifdef TEMP_HUMIDITY_SUPPORT
-				// send a reply, to the IP address and port that sent us the packet we received
-				sResponse  = F ( "T=" );
-				sResponse += sHTResults.fTemperature;
-				sResponse += F ( ",H=" );
-				sResponse += sHTResults.fHumidity;
-				sResponse += F ( ",D=" );
-				sResponse += sHTResults.fDewPoint;
-				sResponse += F ( "," );
-	#endif
-	#ifdef BAROMETRIC_SUPPORT
-				sResponse += F ( "P=" );
-				sResponse += fLatestPressure;
-				sResponse += F ( "," );
-	#endif
-	#ifdef TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT
-				sResponse += F ( "A=" );
-				sResponse += sHTResults.ulTimeOfReadingms;
-	#endif				
-				sResponse += F ( "\r" );
-			}
-			else
-			{
-				Error ( "Not responding to UDP request for data as no valid results" );
-			}
 			break;
-#endif
+
 #ifdef UAP_SUPPORT
 		case UDPWiFiService::ReqMsgType::DOORDATA:
 			if ( pGarageDoor != nullptr )
