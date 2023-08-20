@@ -20,7 +20,7 @@ Also collects the temperature, humidity and barometric pressure
 Door state and humidity can be queried by remote client sending and receiving UDP messages - see WiFiService files
 
 This is designed to use two RGB LEDS to display status
-The built in MKR WiFi 1010 RGB LED displays the door state
+An external RGB LED displays the door state when we are connected to a UAP
 WHITE, no flash  - state unknown
 GREEN, no flash	 - Door Closed
 GREEN, flashing  - Door Closing
@@ -28,9 +28,11 @@ RED, no flash	 - Door Open
 RED, flashing    - Door Opening
 PURPLE, no flash - Door Stopped
 BLUE, flashing	 - Door unknown state, not open and not closed ie in transit but we cannot determine which
-YELLOW, flashing - Door in a BAD STate, UAP says open and closed at same time.
-an external RGB LED displays the WiFI status
+YELLOW, flashing - Door in a BAD State, UAP says open and closed at same time.
+When not connected to a UAP the colours indicate how close to teh desired humidity threshold it is
+Green - at desired level, the more red the drier and the more blue the more humid it is. Will flash when above min or max threshold
 
+The built in MKR WiFi 1010 RGB LED displays the WiFI status 
 
 Author: (c) M. Naylor 2022
 
@@ -42,8 +44,9 @@ History:
 	Ver 1.0.7		Moved all input and out pins into DoorState, added InputPin class
 	Ver 1.0.8		Moved logging to object SerialLogger
 	Ver 1.0.10      Added BME280 support and changed logging to inherit from Stream class
+	Ver 1.0.11      Added external LED usage in Non UAP mode to show how far from desired humidity we are
 */
-#define VERSION "1.0.10 Beta"
+#define VERSION "1.0.11 Beta"
 #define TELNET
 #ifdef MNDEBUG
 	#ifdef TELNET
@@ -54,7 +57,7 @@ ansiVT220Logger MyLogger ( slog ); // create serial comms object to log to
 	#endif
 #endif
 
-#define UAP_SUPPORT
+#undef UAP_SUPPORT
 #define BME280_SUPPORT
 
 #define MKR_RGB_INVERT // only required if Red and Green colours
@@ -90,15 +93,17 @@ constexpr uint8_t	 CLOSE_DOOR_OUTPUT_PIN	   = 3;
 constexpr uint8_t	 OPEN_DOOR_OUTPUT_PIN	   = 4;
 constexpr uint8_t	 STOP_DOOR_OUTPUT_PIN	   = 5;
 
-constexpr uint8_t	 RED_PIN				   = A4;
-constexpr uint8_t	 GREEN_PIN				   = A5;
-constexpr uint8_t	 BLUE_PIN				   = A6;
-
 constexpr uint32_t	 SWITCH_DEBOUNCE_MS		   = 50; // min ms between consecutive pin interrupts before signal accepted from manual switch
 DoorState			*pGarageDoor			   = nullptr;
 DoorStatusPin		*pDoorSwitchPin			   = nullptr;
-MNRGBLEDBaseLib		*pMyLED					   = new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
+
 #endif
+
+constexpr uint8_t	 RED_PIN				   = A4;
+constexpr uint8_t	 GREEN_PIN				   = A5;
+constexpr uint8_t	 BLUE_PIN				   = A6;
+MNRGBLEDBaseLib		*pMyLED					   = new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
+
 /*
 	WiFi config
 */
@@ -431,6 +436,45 @@ void SetLED ()
 		}
 	}
 }
+#else
+// When not showing the door (UAP) status then show the humidity status
+void SetLED ()
+{
+	uint8_t		   red, green, blue;
+	bool		   bOutsideRange		   = false;
+	uint8_t		   Flashtime			   = 0U;
+	// calculate color component
+	constexpr auto HUMIDITY_MAX			   = 60;
+	constexpr auto HUMIDITY_MIN			   = 40;
+	constexpr auto HUMIDITY_MID			   = 50;
+	constexpr auto OUTSIDE_RANGE_FLASHTIME = 10U;
+
+	if ( EnvironmentResults.humidity > HUMIDITY_MAX || EnvironmentResults.humidity < HUMIDITY_MIN )
+	{
+		Flashtime = OUTSIDE_RANGE_FLASHTIME;
+	}
+	// red level indicates how dry
+	if ( EnvironmentResults.humidity < HUMIDITY_MID )
+	{
+		red = ( HUMIDITY_MID - EnvironmentResults.humidity ) * 255 / ( HUMIDITY_MID - HUMIDITY_MIN );
+	}
+	else
+	{
+		red = 0;
+	}
+	// blue level indicates how wet
+	if ( EnvironmentResults.humidity > HUMIDITY_MID )
+	{
+		blue = ( EnvironmentResults.humidity - HUMIDITY_MID ) * 255 / ( HUMIDITY_MAX - HUMIDITY_MID );
+	}
+	else
+	{
+		blue = 0;
+	}
+	// green level indicates how close to wanted level
+	green = max ( min ( EnvironmentResults.humidity, HUMIDITY_MAX ), HUMIDITY_MIN ) * 255 / ( HUMIDITY_MAX - HUMIDITY_MIN );
+	pMyLED->SetLEDColour ( RGB ( red, green, blue ), Flashtime );
+}
 #endif
 // main loop function
 void loop ()
@@ -451,9 +495,9 @@ void loop ()
 	{
 		LastLightState = !pGarageDoor->IsLit ();
 	}
+#endif	
 	// set LED to match Door State
 	SetLED ();
-#endif
 
 	// See if we have any udp requests to action
 	pMyUDPService->CheckUDP ();
