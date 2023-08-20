@@ -41,7 +41,7 @@ History:
 	Ver 1.0.6       Changed input pins to be simply INPUT and use external pulldown resistors
 	Ver 1.0.7		Moved all input and out pins into DoorState, added InputPin class
 	Ver 1.0.8		Moved logging to object SerialLogger
-	Ver 1.0.10      Added BME280 suppot and changed logging to inherit Stream class
+	Ver 1.0.10      Added BME280 support and changed logging to inherit from Stream class
 */
 #define VERSION "1.0.10 Beta"
 #define TELNET
@@ -54,7 +54,7 @@ ansiVT220Logger MyLogger ( slog ); // create serial comms object to log to
 	#endif
 #endif
 
-#undef UAP_SUPPORT
+#define UAP_SUPPORT
 #define BME280_SUPPORT
 
 #define MKR_RGB_INVERT // only required if Red and Green colours
@@ -112,8 +112,6 @@ unsigned long	  ulLastClientReq  = 0UL; // millis of last wifi incoming message
 
 // Error message process used when generating messages during interrupt
 constexpr uint8_t ERROR_LINE	   = 25;
-// String			  ErrorMsg;
-// bool			  IsError = false;
 time_t			  timeError;
 
 void			  GetLocalTime ( String &Result )
