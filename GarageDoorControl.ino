@@ -32,7 +32,7 @@ YELLOW, flashing - Door in a BAD State, UAP says open and closed at same time.
 When not connected to a UAP the colours indicate how close to teh desired humidity threshold it is
 Green - at desired level, the more red the drier and the more blue the more humid it is. Will flash when above min or max threshold
 
-The built in MKR WiFi 1010 RGB LED displays the WiFI status 
+The built in MKR WiFi 1010 RGB LED displays the WiFI status
 
 Author: (c) M. Naylor 2022
 
@@ -57,7 +57,7 @@ ansiVT220Logger MyLogger ( slog ); // create serial comms object to log to
 	#endif
 #endif
 
-#undef UAP_SUPPORT
+#define UAP_SUPPORT
 #define BME280_SUPPORT
 
 #define MKR_RGB_INVERT // only required if Red and Green colours
@@ -99,10 +99,10 @@ DoorStatusPin		*pDoorSwitchPin			   = nullptr;
 
 #endif
 
-constexpr uint8_t	 RED_PIN				   = A4;
-constexpr uint8_t	 GREEN_PIN				   = A5;
-constexpr uint8_t	 BLUE_PIN				   = A6;
-MNRGBLEDBaseLib		*pMyLED					   = new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN );
+constexpr uint8_t RED_PIN		   = A4;
+constexpr uint8_t GREEN_PIN		   = 10;
+constexpr uint8_t BLUE_PIN		   = A3;
+MNRGBLEDBaseLib	 *pMyLED		   = new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 90, 60 );
 
 /*
 	WiFi config
@@ -440,23 +440,36 @@ void SetLED ()
 // When not showing the door (UAP) status then show the humidity status
 void SetLED ()
 {
-	uint8_t		   red, green, blue;
-	bool		   bOutsideRange		   = false;
-	uint8_t		   Flashtime			   = 0U;
-	// calculate color component
-	constexpr auto HUMIDITY_MAX			   = 60;
-	constexpr auto HUMIDITY_MIN			   = 40;
-	constexpr auto HUMIDITY_MID			   = 50;
-	constexpr auto OUTSIDE_RANGE_FLASHTIME = 10U;
+	uint8_t			   red, green, blue;
+	bool			   bOutsideRange = false;
+	uint8_t			   Flashtime	 = 0U;
+	float			   constrainedHumidity;
+	static float OldHumidity = NAN;
 
+	// calculate color component
+	constexpr float	   HUMIDITY_MAX			   = 60.0;
+	constexpr float	   HUMIDITY_MIN			   = 40.0;
+	constexpr float	   HUMIDITY_MID			   = 50.0;
+	constexpr uint32_t OUTSIDE_RANGE_FLASHTIME = 10U;
+	if ( EnvironmentResults.humidity == OldHumidity )
+	{
+		return;
+	}
+	else
+	{
+		OldHumidity =  EnvironmentResults.humidity;
+	}
+	constrainedHumidity						   = max ( EnvironmentResults.humidity, HUMIDITY_MIN );
+	constrainedHumidity						   = min ( constrainedHumidity, HUMIDITY_MAX );
 	if ( EnvironmentResults.humidity > HUMIDITY_MAX || EnvironmentResults.humidity < HUMIDITY_MIN )
 	{
 		Flashtime = OUTSIDE_RANGE_FLASHTIME;
 	}
+
 	// red level indicates how dry
-	if ( EnvironmentResults.humidity < HUMIDITY_MID )
+	if ( constrainedHumidity < HUMIDITY_MID )
 	{
-		red = ( HUMIDITY_MID - EnvironmentResults.humidity ) * 255 / ( HUMIDITY_MID - HUMIDITY_MIN );
+		red = ( HUMIDITY_MID - constrainedHumidity ) * 255.0 / ( HUMIDITY_MID - HUMIDITY_MIN );
 	}
 	else
 	{
@@ -465,15 +478,26 @@ void SetLED ()
 	// blue level indicates how wet
 	if ( EnvironmentResults.humidity > HUMIDITY_MID )
 	{
-		blue = ( EnvironmentResults.humidity - HUMIDITY_MID ) * 255 / ( HUMIDITY_MAX - HUMIDITY_MID );
+		blue = ( constrainedHumidity - HUMIDITY_MID ) * 255.0 / ( HUMIDITY_MAX - HUMIDITY_MID );
 	}
 	else
 	{
 		blue = 0;
 	}
 	// green level indicates how close to wanted level
-	green = max ( min ( EnvironmentResults.humidity, HUMIDITY_MAX ), HUMIDITY_MIN ) * 255 / ( HUMIDITY_MAX - HUMIDITY_MIN );
+	green = 255.0 - ( ( abs ( constrainedHumidity - HUMIDITY_MID ) * 255.0 ) / ( ( HUMIDITY_MAX - HUMIDITY_MIN ) / 2.0 ) );
 	pMyLED->SetLEDColour ( RGB ( red, green, blue ), Flashtime );
+
+	MyLogger.AT ( 3, 1, "Red   :" );
+	MyLogger.AT ( 4, 1, "Green :" );
+	MyLogger.AT ( 5, 1, "Blue  :" );
+	MyLogger.ClearPartofLine ( 3, 8, 3 );
+	MyLogger.ClearPartofLine ( 4, 8, 3 );
+	MyLogger.ClearPartofLine ( 5, 8, 3 );
+	MyLogger.AT ( 3, 8, String ( red ) );
+	MyLogger.AT ( 4, 8, String ( green ) );
+	MyLogger.AT ( 5, 8, String ( blue ) );
+
 }
 #endif
 // main loop function
@@ -495,8 +519,8 @@ void loop ()
 	{
 		LastLightState = !pGarageDoor->IsLit ();
 	}
-#endif	
-	// set LED to match Door State
+#endif
+	// set LED
 	SetLED ();
 
 	// See if we have any udp requests to action
