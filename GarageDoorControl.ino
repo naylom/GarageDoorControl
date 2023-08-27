@@ -99,18 +99,21 @@ DoorStatusPin		*pDoorSwitchPin			   = nullptr;
 
 #endif
 
-constexpr uint8_t RED_PIN		   = A4;
-constexpr uint8_t GREEN_PIN		   = 10;
-constexpr uint8_t BLUE_PIN		   = A3;
-MNRGBLEDBaseLib	 *pMyLED		   = new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 90, 60 );
+constexpr uint8_t RED_PIN	= A4;
+constexpr uint8_t GREEN_PIN = 10;
+constexpr uint8_t BLUE_PIN	= A3;
+MNRGBLEDBaseLib	 *pMyLED	= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 90, 60 );
 
 /*
 	WiFi config
 */
-constexpr char	  ssid []		   = "Naylorfamily"; // your network SSID (name)
-constexpr char	  pass []		   = "welcome1";	 // your network password
-constexpr char	  MyHostName []	   = "GarageControl";
-
+constexpr char	  ssid []	= "Naylorfamily"; // your network SSID (name)
+constexpr char	  pass []	= "welcome1";	  // your network password
+#ifdef UAP_SUPPORT
+constexpr char MyHostName [] = "GarageControl";
+#else
+constexpr char MyHostName [] = "OfficeTHSensor";
+#endif
 UDPWiFiService	 *pMyUDPService	   = nullptr;
 constexpr uint8_t NWPrintStartLine = 15;  // Start line for network stats
 unsigned long	  ulLastClientReq  = 0UL; // millis of last wifi incoming message
@@ -438,13 +441,13 @@ void SetLED ()
 }
 #else
 // When not showing the door (UAP) status then show the humidity status
-void SetLED ()
+void		   SetLED ()
 {
 	uint8_t			   red, green, blue;
 	bool			   bOutsideRange = false;
 	uint8_t			   Flashtime	 = 0U;
 	float			   constrainedHumidity;
-	static float OldHumidity = NAN;
+	static float	   OldHumidity			   = NAN;
 
 	// calculate color component
 	constexpr float	   HUMIDITY_MAX			   = 60.0;
@@ -457,10 +460,10 @@ void SetLED ()
 	}
 	else
 	{
-		OldHumidity =  EnvironmentResults.humidity;
+		OldHumidity = EnvironmentResults.humidity;
 	}
-	constrainedHumidity						   = max ( EnvironmentResults.humidity, HUMIDITY_MIN );
-	constrainedHumidity						   = min ( constrainedHumidity, HUMIDITY_MAX );
+	constrainedHumidity = max ( EnvironmentResults.humidity, HUMIDITY_MIN );
+	constrainedHumidity = min ( constrainedHumidity, HUMIDITY_MAX );
 	if ( EnvironmentResults.humidity > HUMIDITY_MAX || EnvironmentResults.humidity < HUMIDITY_MIN )
 	{
 		Flashtime = OUTSIDE_RANGE_FLASHTIME;
@@ -497,7 +500,6 @@ void SetLED ()
 	MyLogger.AT ( 3, 8, String ( red ) );
 	MyLogger.AT ( 4, 8, String ( green ) );
 	MyLogger.AT ( 5, 8, String ( blue ) );
-
 }
 #endif
 // main loop function

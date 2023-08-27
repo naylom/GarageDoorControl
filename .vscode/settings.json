@@ -7,8 +7,9 @@
 		".clang-format": "plaintext",
 		"*.h": "cpp",
 		"*.tcc": "cpp",
-		"calliper2,cpp": "cpp",
+		"calliper2.cpp": "cpp",
 		"limits": "cpp",
 		"type_traits": "cpp"
-	}
+	},
+	"arduino.logLevel": "verbose"
 }
