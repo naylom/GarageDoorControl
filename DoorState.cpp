@@ -36,20 +36,20 @@ extern time_t		   timeError;
 constexpr auto		   DOOR_FLASHTIME = 10;				// every 2 seconds
 const int16_t		   SIGNAL_PULSE	  = 2000 * 5;		// 2000 per sec, so every 1/5 sec, 200 ms
 constexpr uint32_t	   DEBOUNCE_MS	  = 0;				// min ms between consecutive pin interrupts before signal accepted
-constexpr PinStatus	   UAP_TRUE		  = PinStatus::LOW; // UAP signals LOW when sensor is TRUE
+constexpr PinStatus	   UAP_TRUE		  = PinStatus::HIGH; // UAP signals HIGH when sensor is TRUE
 
 const char			  *StateNames []  =					// In order of State enums!
-	{ "Opened", "Opening", "Closed", "Closing", "Stopped", "Bad", "Unknown" };
+	{ "Opened", "Opening", "Closed", "Closing", "Stopped", "Unknown", "Bad" };
 
 DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopPin, pin_size_t LightPin, pin_size_t DoorOpenStatusPin, pin_size_t DoorClosedStatusPin, pin_size_t DoorLightStatusPin )
 	: m_DoorOpenCtrlPin ( OpenPin ), m_DoorCloseCtrlPin ( ClosePin ), m_DoorStopCtrlPin ( StopPin ), m_DoorLightCtrlPin ( LightPin ), m_DoorOpenStatusPin ( DoorOpenStatusPin ), m_DoorClosedStatusPin ( DoorClosedStatusPin ), m_DoorLightStatusPin ( DoorLightStatusPin )
 {
 	//m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::DoorOpenTrue, DoorState::Event::DoorOpenFalse, m_DoorOpenStatusPin, DEBOUNCE_MS, UAP_TRUE, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::DoorOpenTrue, DoorState::Event::DoorOpenFalse, m_DoorOpenStatusPin, DEBOUNCE_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );	
+	m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::DoorOpenTrue, DoorState::Event::DoorOpenFalse, m_DoorOpenStatusPin, DEBOUNCE_MS, UAP_TRUE, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );	
 	//m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::DoorClosedTrue, DoorState::Event::DoorClosedFalse, m_DoorClosedStatusPin, DEBOUNCE_MS, UAP_TRUE, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::DoorClosedTrue, DoorState::Event::DoorClosedFalse, m_DoorClosedStatusPin, DEBOUNCE_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
+	m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::DoorClosedTrue, DoorState::Event::DoorClosedFalse, m_DoorClosedStatusPin, DEBOUNCE_MS, UAP_TRUE, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	//m_pDoorLightStatusPin  = new DoorStatusPin ( nullptr, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorLightStatusPin, DEBOUNCE_MS, UAP_TRUE, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	m_pDoorLightStatusPin  = new DoorStatusPin ( nullptr, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorLightStatusPin, DEBOUNCE_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
+	m_pDoorLightStatusPin  = new DoorStatusPin ( nullptr, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorLightStatusPin, DEBOUNCE_MS, UAP_TRUE, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	m_pDoorOpenCtrlPin	   = new OutputPin ( m_DoorOpenCtrlPin, RELAY_ON );
 	m_pDoorCloseCtrlPin	   = new OutputPin ( m_DoorCloseCtrlPin, RELAY_ON );
 	m_pDoorStopCtrlPin	   = new OutputPin ( m_DoorStopCtrlPin, RELAY_ON );
@@ -383,6 +383,16 @@ uint32_t DoorState::GetDoorClosedCount ()
 uint32_t DoorState::GetDoorClosingCount ()
 {
 	return m_pDoorOpenStatusPin->GetUnmatchedCount ();
+}
+
+void DoorState::GetPinStates ( String &states )
+{
+	states = String ( "Light: " );
+	states += m_pDoorLightStatusPin->IsMatched() ? "On" : "Off";
+	states += String ( " Open: " );
+	states += m_pDoorOpenStatusPin->IsMatched() ? "On" : "Off";
+	states += String ( " Closed: ");
+	states += m_pDoorClosedStatusPin->IsMatched() ? "On" : "Off";
 }
 
 /// <summary>

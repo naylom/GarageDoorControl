@@ -3,6 +3,7 @@
 OutputPin::OutputPin ( pin_size_t Pin, PinStatus OnStatus ) : m_Pin ( Pin ), m_OnStatus ( OnStatus )
 {
 	pinMode ( m_Pin, OUTPUT );
+	delay ( 10 );
 	Off();
 }
 

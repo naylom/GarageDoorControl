@@ -125,8 +125,8 @@ unsigned long	  ulLastClientReq  = 0UL; // millis of last wifi incoming message
 
 // Error message process used when generating messages during interrupt
 constexpr uint8_t ERROR_LINE	   = 25;
-//String			  ErrorMsg;
-//bool			  IsError = false;
+// String			  ErrorMsg;
+// bool			  IsError = false;
 time_t			  timeError;
 
 void			  GetLocalTime ( String &Result )
@@ -176,9 +176,9 @@ void DisplaylastInfoErrorMsg ()
 // Debug information for ANSI screen with cursor control
 void DisplayStats ( void )
 {
-#ifdef MNDEBUG#
+#ifdef MNDEBUG #
 	// display uptime
-	DisplayUptime( MyLogger, 1, 1, ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK );
+	DisplayUptime ( MyLogger, 1, 1, ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK );
 	static time_t LastTime = 0;
 	#ifdef UAP_SUPPORT
 	String Heading = F ( "Garage Door Control -  ver " );
@@ -203,36 +203,32 @@ void DisplayStats ( void )
 		MyLogger.ClearPartofLine ( 5, 10, 8 );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 5, 10, pGarageDoor->GetDoorDisplayState () );
 
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 3, 41, "Count     Called Unchngd Matched UnMtchdSpurious Duration" );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 4, 20, F ( "Light Off count     " ) );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 41, String ( pGarageDoor->GetLightOffCount () ) );
 		pGarageDoor->m_pDoorLightStatusPin->DebugStats ( result );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 45, result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 49, result );
 
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 20, F ( "Light On count      " ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 5, 41, String ( pGarageDoor->GetLightOnCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 20, F ( "Pin States          " ) );
+		pGarageDoor->GetPinStates ( result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 5, 41, result );
 
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 6, 20, F ( "Door Opened count   " ) );
 		pGarageDoor->m_pDoorOpenStatusPin->DebugStats ( result );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 41, String ( pGarageDoor->GetDoorOpenedCount () ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 45, result );
-
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 7, 20, F ( "Door Opening count  " ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 7, 41, String ( pGarageDoor->GetDoorOpeningCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 49, result );
 
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 8, 20, F ( "Door Closed count   " ) );
 		pGarageDoor->m_pDoorClosedStatusPin->DebugStats ( result );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 8, 41, String ( pGarageDoor->GetDoorClosedCount () ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 8, 45, result );
-
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 9, 20, F ( "Door Closing count  " ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 9, 41, String ( pGarageDoor->GetDoorClosingCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 8, 49, result );
 	}
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 20, F ( "Switch Presssed " ) );
 	if ( pDoorSwitchPin != nullptr )
 	{
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 41, String ( pDoorSwitchPin->GetMatchedCount () ) );
 		pDoorSwitchPin->DebugStats ( result );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 45, result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 49, result );
 	}
 	#endif
 
@@ -261,10 +257,10 @@ void DisplayUptime ( ansiVT220Logger logger, uint8_t line, uint8_t row, ansiVT22
 	// set initial start time
 	if ( ulStartTime == 0 )
 	{
-		ulStartTime = millis();
+		ulStartTime = millis ();
 	}
 
-	int32_t ulNumSeconds =  millis() - ulStartTime;
+	int32_t ulNumSeconds = millis () - ulStartTime;
 	if ( ulNumSeconds < 0 )
 	{
 		// wrapped around
@@ -273,14 +269,14 @@ void DisplayUptime ( ansiVT220Logger logger, uint8_t line, uint8_t row, ansiVT22
 	{
 		uint32_t ulTotalNumSeconds = ulNumSeconds / 1000;
 
-		uint32_t ulDays =  ulTotalNumSeconds / ( 60 *  60 *  24 ) ;
-		uint32_t ulHours = ( ulTotalNumSeconds / (60 * 60) ) % 60;
-		uint32_t ulMinutes = ( ulTotalNumSeconds / 60 ) % 60 ;
-		uint32_t ulSecs = ulTotalNumSeconds % 60;
+		uint32_t ulDays			   = ulTotalNumSeconds / ( 60 * 60 * 24 );
+		uint32_t ulHours		   = ( ulTotalNumSeconds / ( 60 * 60 ) ) % 24;
+		uint32_t ulMinutes		   = ( ulTotalNumSeconds / 60 ) % 60;
+		uint32_t ulSecs			   = ulTotalNumSeconds % 60;
 
-		char sUpTime [ 20 ];
+		char	 sUpTime [ 20 ];
 		sprintf ( sUpTime, "%02d:%02d:%02d:%02d", ulDays, ulHours, ulMinutes, ulSecs );
-		logger.COLOUR_AT ( Foreground, Background, line, row, sUpTime );	
+		logger.COLOUR_AT ( Foreground, Background, line, row, sUpTime );
 	}
 }
 
@@ -373,7 +369,7 @@ void setup ()
 #endif
 #ifdef UAP_SUPPORT
 	// Setup so we are called if the state of door changes
-	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, DOOR_IS_OPEN_STATUS_PIN, DOOR_IS_CLOSED_STATUS_PIN, LIGHT_IS_ON_STATUS_PIN  );
+	pGarageDoor	   = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, DOOR_IS_OPEN_STATUS_PIN, DOOR_IS_CLOSED_STATUS_PIN, LIGHT_IS_ON_STATUS_PIN );
 	// pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::LOW, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	SetLED ();
@@ -512,7 +508,7 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 {
 	switch ( eReqType )
 	{
-#if defined TEMP_HUMIDITY_SUPPORT || defined BAROMETRIC_SUPPORT
+#if defined TEMP_HUMIDITY_SUPPORT && defined BAROMETRIC_SUPPORT
 		case UDPWiFiService::ReqMsgType::TEMPDATA:
 			// check we have good data to share
 			if ( sHTResults.fTemperature != NAN && sHTResults.fHumidity != NAN )
@@ -547,17 +543,17 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 			if ( pGarageDoor != nullptr )
 			{
 				sResponse  = F ( "S=" );
-				sResponse += pGarageDoor->GetDoorDisplayState ();			   // Door State
+				sResponse += pGarageDoor->GetDoorDisplayState (); // Door State
 				sResponse += F ( ",L=" );
-				sResponse += pGarageDoor->IsLit () ? "On" : "Off";			   // Light on or not
+				sResponse += pGarageDoor->IsLit () ? "On" : "Off"; // Light on or not
 				sResponse += F ( ",C=" );
 				sResponse += pGarageDoor->IsClosed () ? F ( "Y" ) : F ( "N" ); // Closed or not
 				sResponse += F ( ",O=" );
-				sResponse += pGarageDoor->IsOpen () ? F ( "Y" ) : F ( "N" );   // Open or not
+				sResponse += pGarageDoor->IsOpen () ? F ( "Y" ) : F ( "N" ); // Open or not
 				sResponse += F ( ",M=" );
 				sResponse += pGarageDoor->IsMoving () ? F ( "Y" ) : F ( "N" ); // Moving or not
 				sResponse += F ( ",A=" );
-				sResponse += pMyUDPService->GetTime ();						   // current epoch time
+				sResponse += pMyUDPService->GetTime (); // current epoch time
 				sResponse += F ( "\r" );
 			}
 			else
