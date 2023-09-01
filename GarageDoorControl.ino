@@ -102,7 +102,7 @@ DoorStatusPin		*pDoorSwitchPin			   = nullptr;
 constexpr uint8_t RED_PIN	= A4;
 constexpr uint8_t GREEN_PIN = 10;
 constexpr uint8_t BLUE_PIN	= A3;
-MNRGBLEDBaseLib	 *pMyLED	= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 90, 60 );
+MNRGBLEDBaseLib	 *pMyLED	= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 180, 120 );//new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 90, 60 );
 
 /*
 	WiFi config
