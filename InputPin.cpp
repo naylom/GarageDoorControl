@@ -60,78 +60,7 @@ void InputPin::ProcessISR ( void )
 		m_DiscardedUnchangedCount++;
 	}
 }
-/*
-void InputPin::ProcessISR ( void )
-{
-	unsigned long ulNow = millis ();
 
-	m_ISRCalledCount++;
-	PinStatus newReading = digitalRead ( m_Pin );
-	if ( newReading != m_LastPinRead )
-	{
-		// pin has changed state 
-		m_LastChangedTime = ulNow;
-		m_LastPinRead	  = newReading;
-		// Check if this change lasted long enough
-		if ( ulNow - m_LastChangedTime > m_Debouncems )
-		{
-			m_AfterDebounceCount++;
-			if ( newReading == m_MatchStatus )
-			{
-				m_MatchedCount++;
-				m_CurrentMatchedState = true;
-				MatchAction ();
-			}
-			else
-			{
-				m_UnmatchedCount++;
-				m_CurrentMatchedState = false;
-				UnmatchAction ();
-			}
-		}
-		else
-		{
-			// discard as spurious change
-			m_ToQuick++;
-		}
-	}
-	else
-	{
-		// Reading unchanged
-		m_DiscardedUnchangedCount++;
-	}
-/*
-	if ( ( ulNow - m_LastChangedTime ) > m_Debouncems )
-	{
-		// ISR fired and debouce threshold has passed
-		m_AfterDebounceCount++;
-		PinStatus newReading = digitalRead ( m_Pin );
-		if ( newReading != m_LastPinRead )
-		{
-			m_LastChangedTime = ulNow;
-			m_LastPinRead	  = newReading;
-			if ( newReading == m_MatchStatus )
-			{
-				m_MatchedCount++;
-				m_CurrentMatchedState = true;
-				MatchAction ();
-			}
-			else
-			{
-				m_UnmatchedCount++;
-				m_CurrentMatchedState = false;
-				UnmatchAction ();
-			}
-		}
-		else
-		{
-			// ISR fired after debounce threshold but reading unchanged
-			m_DiscardedUnchangedCount++;
-		}
-	}
-
-}
-*/
 bool InputPin::IsMatched ()
 {
 	return m_CurrentMatchedState;
@@ -177,18 +106,4 @@ void InputPin::DebugStats ( String &result )
 	char cMsg [ 50 ];
 	result = sprintf ( cMsg, "%8ld%8ld%8ld%8ld%8ld %8ld", m_ISRCalledCount, m_DiscardedUnchangedCount, m_MatchedCount, m_UnmatchedCount, m_SpuriousCount, m_MatchedDuration );
 	result = cMsg;
-/*
-	result = F ( "Called ");
-	result += String ( m_ISRCalledCount ) + " : ";
-	result += F ( "Unchgd ");
-	result += String ( m_DiscardedUnchangedCount ) + " : ";
-	result += F ( "Mtchd ");
-	result += String ( m_MatchedCount ) + " : ";
-	result += F ( "UnMatchd ");
-	result += String ( m_UnmatchedCount ) + " : ";
-	result += F ( "Spurious ");
-	result += String ( m_SpuriousCount ) + " : ";		
-	result += F ( "Dur  ");
-	result += String ( m_MatchedDuration );
-*/	
 }
