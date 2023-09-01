@@ -73,7 +73,7 @@ struct
 		uint32_t ulTimeOfReadingms;
 } EnvironmentResults					  = { NAN, NAN, NAN, 0UL };
 
-constexpr float		ALTITUDE_COMPENSATION = 135.0; // sensor is 135 metres aboves sea level, we need this to adjust pressure reading to sea level equivalent.
+constexpr float		ALTITUDE_COMPENSATION = 131.0; // sensor is 135 metres aboves sea level, we need this to adjust pressure reading to sea level equivalent.
 BME280I2C::Settings settings ( BME280::OSR_X2, BME280::OSR_X2, BME280::OSR_X2, BME280::Mode_Normal, BME280::StandbyTime_250ms, BME280::Filter_Off, BME280::SpiEnable_False, BME280I2C::I2CAddr_0x76 );
 BME280I2C			MyBME280 ( settings );
 #endif
@@ -212,9 +212,6 @@ void DisplayStats ( void )
 		pGarageDoor->m_pDoorOpenStatusPin->DebugStats ( result );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 41, String ( pGarageDoor->GetDoorOpenedCount () ) );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 49, result );
-
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 7, 20, F ( "Door Opening count  " ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 7, 41, String ( pGarageDoor->GetDoorOpeningCount () ) );
 
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 8, 20, F ( "Door Closed count   " ) );
 		pGarageDoor->m_pDoorClosedStatusPin->DebugStats ( result );
