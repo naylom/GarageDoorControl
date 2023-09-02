@@ -60,9 +60,6 @@ ansiVT220Logger MyLogger ( slog ); // create serial comms object to log to
 #define UAP_SUPPORT
 #define BME280_SUPPORT
 
-#undef MKR_RGB_INVERT // only required if Red and Green colours
-// are inverted as found on some boards
-
 #ifdef BME280_SUPPORT // Temp, humidity and pressure sensor
 struct
 {
@@ -361,6 +358,8 @@ void setup ()
 	pMyUDPService = new UDPWiFiService ();
 
 	// now we have state table set up and temp sensor configured, allow users to query state
+
+	TheMKR_RGB_LED.Invert();		// Only if required!
 	if ( !pMyUDPService->Begin ( ProcessUDPMsg, ssid, pass, MyHostName, &TheMKR_RGB_LED ) )
 	{
 		Error ( "Cannot connect WiFI " );
