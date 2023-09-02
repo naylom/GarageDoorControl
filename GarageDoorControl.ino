@@ -60,7 +60,7 @@ ansiVT220Logger MyLogger ( slog ); // create serial comms object to log to
 #define UAP_SUPPORT
 #define BME280_SUPPORT
 
-#define MKR_RGB_INVERT // only required if Red and Green colours
+#undef MKR_RGB_INVERT // only required if Red and Green colours
 // are inverted as found on some boards
 
 #ifdef BME280_SUPPORT // Temp, humidity and pressure sensor
@@ -136,7 +136,7 @@ String sInfoErrorMsg;
 auto   fgInfoErrorColour = ansiVT220Logger::FG_WHITE;
 auto   bgInfoErrorColour = ansiVT220Logger::BG_GREEN;
 
-/// @brief Logs error to error line the provided error message prepeneded with local date and time
+/// @brief Logs error to error line the provided error message prepended with local date and time
 /// @param s message to be logged
 void   Error ( String s )
 {
@@ -148,7 +148,7 @@ void   Error ( String s )
 	bgInfoErrorColour  = ansiVT220Logger::BG_BRIGHTBLUE;
 }
 
-/// @brief Logs info to error line the provided error message prepeneded with local date and time
+/// @brief Logs info to error line the provided error message prepended with local date and time
 /// @param s message to be logged
 void Info ( String s )
 {

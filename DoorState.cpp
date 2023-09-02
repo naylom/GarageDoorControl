@@ -145,16 +145,6 @@ void DoorState::NowOpening ( Event )
 /// <returns>None
 void DoorState::SwitchPressed ( Event )
 {
-	String Result;
-	if ( pMyUDPService != nullptr /*&& IsError == false*/ )
-	{
-		timeError  = pMyUDPService->GetTime ();
-		Info ( " Switch Pressed" );
-		// pMyUDPService->GetLocalTime( Result ) ;
-		//ErrorMsg  += " Switch Pressed";
-		//IsError	   = true;
-	}
-	// Error ( Result );
 #ifndef MNDEBUG
 	switch ( m_theDoorState )
 	{
