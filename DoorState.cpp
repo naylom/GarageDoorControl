@@ -25,13 +25,8 @@ History:
 #define CALL_MEMBER_FN( object, ptrToMember ) ( ( object )->*( ptrToMember ) )
 #include "WiFiService.h"
 extern UDPWiFiService *pMyUDPService;
-extern void			   Error ( String s );
-extern void			   Info ( String s );
-
-// Error message
-//extern String		   ErrorMsg;
-//extern bool			   IsError;
-extern time_t		   timeError;
+extern void			   Error ( String s, bool bInISR = false );
+extern void			   Info ( String s, bool bInISR = false );
 
 constexpr auto		   DOOR_FLASHTIME = 10;				// every 2 seconds
 const int16_t		   SIGNAL_PULSE	  = 2000 * 5;		// 2000 per sec, so every 1/5 sec, 200 ms
@@ -152,7 +147,7 @@ void DoorState::SwitchPressed ( Event )
 			// Open door
 			ResetTimer ();
 			// rely on UAP outpins to signal this is happening
-			Error ( "Door closed - open pin on                  " );
+			Info ( "Door closed - open pin on                  ", true );
 			m_pDoorOpenCtrlPin->On ();
 			// SetRelayPin ( m_DoorOpenCtrlPin );
 			break;
@@ -161,7 +156,7 @@ void DoorState::SwitchPressed ( Event )
 			// Close Door
 			ResetTimer ();
 			// rely on UAP outpins to signal this is happening
-			Error ( "Door open - close pin on                  " );
+			Info ( "Door open - close pin on                  ", true );
 			m_pDoorCloseCtrlPin->On ();
 			// SetRelayPin ( m_DoorCloseCtrlPin );
 			break;
@@ -183,14 +178,14 @@ void DoorState::SwitchPressed ( Event )
 				case Direction::Down:
 					// Were closing so now open
 					ResetTimer ();
-					Error ( "Door stopped, was going down - open pin on" );
+					Info ( "Door stopped, was going down - open pin on", true );
 					m_pDoorOpenCtrlPin->On ();
 					// SetRelayPin ( m_DoorOpenCtrlPin );
 					break;
 
 				case Direction::Up:
 					ResetTimer ();
-					Error ( "Door stopped, was going up - close pin on" );
+					Info ( "Door stopped, was going up - close pin on", true );
 					m_pDoorCloseCtrlPin->On ();
 					// SetRelayPin ( m_DoorCloseCtrlPin );
 					break;
@@ -217,7 +212,7 @@ void DoorState::ResetTimer ()
 	TurnOffControlPins ();
 	if ( !TheTimer.AddCallBack ( (MNTimerClass *)this, (aMemberFunction)&DoorState::TurnOffControlPins, SIGNAL_PULSE ) )
 	{
-		Error ( "Timer callback add failed" );
+		Error ( "Timer callback add failed", true );
 	}
 }
 
@@ -275,7 +270,7 @@ void DoorState::DoRequest ( Request eRequest )
 			// SetRelayPin ( m_DoorStopCtrlPin );
 			break;
 	}
-	Info ( Result );
+	Info ( Result, true );
 }
 
 /// <summary>

@@ -41,8 +41,8 @@ constexpr uint16_t MulticastSendPort	   = 0xCE5C;
 enum eResponseMessage { TEMPDATA, DOORDATA };
 
 #define CALL_MEMBER_FN_BY_PTR( object, ptrToMember ) ( ( object )->*( ptrToMember ) )
-extern void Error ( String s );
-extern void Info ( String s );
+extern void Error ( String s, bool bInISR = false );
+extern void Info ( String s, bool bInISR = false );
 
 void		TerminateProgram ( const __FlashStringHelper *pErrMsg )
 {
@@ -286,74 +286,7 @@ void UDPWiFiService::CheckUDP ()
 		ProcessUDPMessage ( Msg );
 	}
 }
-/*
-void UDPWiFiService::DisplayStatus ( ansiVT220Logger logger )
-{
-#ifdef MNDEBUG
-	// print the SSID of the network you're attached to:
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine, 0, F ( "SSID: " ) );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine, 23, WiFi.SSID () );
-	if ( m_pMulticastDestList != nullptr )
-	{
-		uint8_t	  iterator = m_pMulticastDestList->GetIterator ();
-		IPAddress mcastDest;
-		while ( (long unsigned int)( mcastDest = m_pMulticastDestList->GetNext ( iterator ) ) != 0UL )
-		{
-			logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + iterator - 1, 41, "Mcast #" + String ( iterator ) + ": " );
-			logger.ClearPartofLine ( PrintStartLine + iterator - 1, 61, 15 );
-			logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + iterator - 1, 61, ToIPString ( mcastDest ) );
-		}
-	}
 
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 1, 0, F ( "My Hostname: " ) );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 1, 23, GetHostName () );
-
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 2, 0, F ( "IP Address: " ) );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 2, 23, ToIPString ( WiFi.localIP () ) );
-
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 3, 0, "Subnet Mask: " );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 3, 23, ToIPString ( WiFi.subnetMask () ) );
-
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 4, 0, "Local Multicast Addr: " );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 4, 23, ToIPString ( GetMulticastAddress () ) );
-
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 4, 41, "WiFi connect/fail: " );
-	logger.ClearPartofLine ( PrintStartLine + 4, 61, 10 );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 4, 61, String ( m_beginConnects ) + "/" + String ( m_beginTimeouts ) );
-
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 5, 41, "Multicasts sent: " );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 5, 61, String ( m_ulMCastSentCount ) );
-
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 6, 41, "Requests recvd: " );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 6, 61, String ( m_ulReqCount ) );
-
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 7, 41, "Replies sent: " );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 7, 61, String ( m_ulReplyCount ) );
-
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 5, 0, F ( "Mac address: " ) );
-	byte bMac [ 6 ];
-	WiFi.macAddress ( bMac );
-	char s [ 18 ];
-	sprintf ( s, "%02X:%02X:%02X:%02X:%02X:%02X", bMac [ 5 ], bMac [ 4 ], bMac [ 3 ], bMac [ 2 ], bMac [ 1 ], bMac [ 0 ] );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 5, 23, s );
-
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 6, 0, F ( "Gateway Address: " ) );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 6, 23, ToIPString ( WiFi.gatewayIP () ) );
-	// print the received signal strength:
-
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 7, 0, F ( "Signal strength (RSSI):" ) );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 7, 23, String ( WiFi.RSSI () ) );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 7, 30, F ( " dBm" ) );
-
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 8, 0, F ( "WiFi Status: " ) );
-	logger.ClearPartofLine ( PrintStartLine + 8, 23, 15 );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 8, 23, WiFiStatusToString ( WiFi.status () ) );
-
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, PrintStartLine + 8, 41, F ( "WiFi Service State: " ) );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, PrintStartLine + 8, 61, String ( GetState () ) );
-#endif
-}
-*/
 /// Appends local time to provided String
 void UDPWiFiService::GetLocalTime ( String &result, time_t timeError )
 {
@@ -451,34 +384,6 @@ uint32_t UDPWiFiService::GetRequestsReceivedCount ()
 	return m_ulReqCount;
 }
 
-/*
-bool UDPWiFiService::NowConnected ( void * )
-{
-	bool bResult = false;
-	if ( Start () )
-	{
-		SetState ( WiFiService::Status::CONNECTED );
-		bResult = true;
-	}
-	return bResult;
-}
-
-bool UDPWiFiService::DoNowt ( void * )
-{
-	return true;
-}
-
-bool UDPWiFiService::Connect ( void *paramPtr )
-{
-	bool bResult = false;
-	if ( WiFiConnect () )
-	{
-		// setup udp
-		bResult = CALL_MEMBER_FN_BY_PTR ( this, StateTableFn [ GetState () ][ UDPWiFiService::WiFiEvent::MADE_CONNECTION ] ) ( paramPtr );
-	}
-	return bResult;
-}
-*/
 bool UDPWiFiService::SendReply ( String sMsg )
 {
 	bool bResult = false;
@@ -567,23 +472,6 @@ FixedIPList *UDPWiFiService::GetMulticastList ()
 	return m_pMulticastDestList;
 }
 
-/// @brief Checks WiFi connected and attempts to connect if not. If connected then will look for a message and store in parameter
-/// @param paramPtr pointer to String to receive any available message
-/// @return
-/*
-bool UDPWiFiService::GetReq ( String Message )
-{
-	if ( WiFiConnect () )
-	{
-		return ReadUDPMessage ( Message );
-	}
-	else
-	{
-		SetState ( WiFiService::Status::UNCONNECTED );
-		return false;
-	}
-}
-*/
 /// @brief Releases UDP port and disconnects from WiFi
 void UDPWiFiService::Stop ()
 {

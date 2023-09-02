@@ -102,7 +102,7 @@ DoorStatusPin		*pDoorSwitchPin			   = nullptr;
 constexpr uint8_t RED_PIN	= A4;
 constexpr uint8_t GREEN_PIN = 10;
 constexpr uint8_t BLUE_PIN	= A3;
-MNRGBLEDBaseLib	 *pMyLED	= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 180, 120 );//new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 90, 60 );
+MNRGBLEDBaseLib	 *pMyLED	= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 180, 120 ); // new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 90, 60 );
 
 /*
 	WiFi config
@@ -138,10 +138,15 @@ auto   bgInfoErrorColour = ansiVT220Logger::BG_GREEN;
 
 /// @brief Logs error to error line the provided error message prepended with local date and time
 /// @param s message to be logged
-void   Error ( String s )
+/// @param bInISR indicates if code being called from interrupt level code, defaults to false
+void   Error ( String s, bool bInISR = false )
 {
 	String Result;
-	GetLocalTime ( Result );
+	// do not call when in ISR level code path
+	if ( !bInISR )
+	{
+		GetLocalTime ( Result );
+	}
 	Result			  += s;
 	sInfoErrorMsg	   = Result;
 	fgInfoErrorColour  = ansiVT220Logger::FG_BRIGHTWHITE;
@@ -150,10 +155,15 @@ void   Error ( String s )
 
 /// @brief Logs info to error line the provided error message prepended with local date and time
 /// @param s message to be logged
-void Info ( String s )
+/// @param bInISR indicates if code being called from interrupt level code, defaults to false
+void Info ( String s, bool bInISR = false )
 {
 	String Result;
-	GetLocalTime ( Result );
+	// do not call when in ISR level code path
+	if ( !bInISR )
+	{
+		GetLocalTime ( Result );
+	}
 	Result			  += s;
 	sInfoErrorMsg	   = Result;
 	fgInfoErrorColour  = ansiVT220Logger::FG_WHITE;
