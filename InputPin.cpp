@@ -13,7 +13,7 @@ void InputPinISR ( void *pParam )
 InputPin::InputPin ( pin_size_t pin, uint32_t debouncems, PinStatus matchStatus, PinMode mode, PinStatus status ) : m_Pin ( pin ), m_Debouncems ( debouncems ), m_MatchStatus ( matchStatus )
 {
 	pinMode ( m_Pin, mode );
-	delay ( 10 );				// allow time before first read after setting mode
+	delay ( 10 ); // allow time before first read after setting mode
 	m_LastChangedTime	  = millis ();
 	m_LastPinRead		  = digitalRead ( m_Pin );
 	m_CurrentMatchedState = m_LastPinRead == m_MatchStatus ? true : false;
@@ -22,13 +22,13 @@ InputPin::InputPin ( pin_size_t pin, uint32_t debouncems, PinStatus matchStatus,
 
 void InputPin::ProcessISR ( void )
 {
-	PinStatus	  newReading = digitalRead ( m_Pin );
+	PinStatus newReading = digitalRead ( m_Pin );
 
 	m_ISRCalledCount++;
 	if ( newReading != m_LastPinRead )
 	{
 		// different reading from last time, so check it
-		unsigned long ulNow		 = millis ();
+		unsigned long ulNow = millis ();
 		if ( newReading == m_MatchStatus )
 		{
 			if ( ulNow - m_LastChangedTime >= m_Debouncems /* && ulNow - m_LastChangedTime < 1000UL */ )
@@ -36,7 +36,7 @@ void InputPin::ProcessISR ( void )
 				// Wanted state
 				m_MatchedCount++;
 				m_CurrentMatchedState = true;
-				m_MatchedDuration = ulNow - m_LastChangedTime;
+				m_MatchedDuration	  = ulNow - m_LastChangedTime;
 				MatchAction ();
 			}
 			else
@@ -47,12 +47,21 @@ void InputPin::ProcessISR ( void )
 		}
 		else
 		{
-			m_UnmatchedCount++;
-			m_CurrentMatchedState = false;
-			UnmatchAction ();
+			if ( ulNow - m_LastChangedTime >= m_Debouncems /* && ulNow - m_LastChangedTime < 1000UL */ )
+			{
+				m_UnmatchedCount++;
+				m_CurrentMatchedState = false;
+				m_MatchedDuration	  = ulNow - m_LastChangedTime;
+				UnmatchAction ();
+			}
+			else
+			{
+				// changed state to wanted state but too quickly, ignore as a spurious chnage
+				m_SpuriousCount++;
+			}
 		}
 		m_LastChangedTime = ulNow;
-		m_LastPinRead = newReading;
+		m_LastPinRead	  = newReading;
 	}
 	else
 	{
@@ -96,7 +105,7 @@ uint32_t InputPin::GetLastMatchedDuration ()
 	return m_MatchedDuration;
 }
 
-bool	 InputPin::GetCurrentMatchedState()
+bool InputPin::GetCurrentMatchedState ()
 {
 	return digitalRead ( m_Pin ) == m_MatchStatus;
 }

@@ -144,10 +144,10 @@ void   Error ( String s, bool bInISR = false )
 	{
 		GetLocalTime ( Result );
 	}
-	Result			  += s;
-	sInfoErrorMsg	   = Result;
+	//Result			  += s;
+	sInfoErrorMsg	   = Result + s;
 	fgInfoErrorColour  = ansiVT220Logger::FG_BRIGHTWHITE;
-	bgInfoErrorColour  = ansiVT220Logger::BG_BRIGHTBLUE;
+	bgInfoErrorColour  = ansiVT220Logger::BG_BRIGHTRED;
 }
 
 /// @brief Logs info to error line the provided error message prepended with local date and time
@@ -161,8 +161,8 @@ void Info ( String s, bool bInISR = false )
 	{
 		GetLocalTime ( Result );
 	}
-	Result			  += s;
-	sInfoErrorMsg	   = Result;
+	//Result			  += s;
+	sInfoErrorMsg	   = Result + s;
 	fgInfoErrorColour  = ansiVT220Logger::FG_WHITE;
 	bgInfoErrorColour  = ansiVT220Logger::BG_BLUE;
 }
@@ -359,7 +359,7 @@ void setup ()
 
 	// now we have state table set up and temp sensor configured, allow users to query state
 
-	TheMKR_RGB_LED.Invert();		// Only if required!
+	TheMKR_RGB_LED.Invert (); // Only if required!
 	if ( !pMyUDPService->Begin ( ProcessUDPMsg, ssid, pass, MyHostName, &TheMKR_RGB_LED ) )
 	{
 		Error ( "Cannot connect WiFI " );
@@ -570,7 +570,7 @@ void loop ()
 		{
 			if ( pDoorSwitchPin->GetCurrentMatchedState () )
 			{
-				Info ( "Switch pressed" );
+				//Info ( "Switch pressed" );
 			}
 			SwitchPressedCount = LatestSwitchPressedCount;
 		}

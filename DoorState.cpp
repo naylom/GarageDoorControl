@@ -29,8 +29,8 @@ extern void			   Error ( String s, bool bInISR = false );
 extern void			   Info ( String s, bool bInISR = false );
 
 constexpr auto		   DOOR_FLASHTIME = 10;				// every 2 seconds
-const int16_t		   SIGNAL_PULSE	  = 2000 * 5;		// 2000 per sec, so every 1/5 sec, 200 ms
-constexpr uint32_t	   DEBOUNCE_MS	  = 0;				// min ms between consecutive pin interrupts before signal accepted
+const int16_t		   SIGNAL_PULSE	  = 2000 * 2;		// 2000 per sec, so every 1/5 sec, 200 ms
+constexpr uint32_t	   DEBOUNCE_MS	  = 50;				// min ms between consecutive pin interrupts before signal accepted
 constexpr PinStatus	   UAP_TRUE		  = PinStatus::HIGH; // UAP signals HIGH when sensor is TRUE
 
 const char			  *StateNames []  =					// In order of State enums!
@@ -140,35 +140,33 @@ void DoorState::NowOpening ( Event )
 /// <returns>None
 void DoorState::SwitchPressed ( Event )
 {
-#ifndef MNDEBUG
+//#ifndef MNDEBUG
 	switch ( m_theDoorState )
 	{
 		case State::Closed:
 			// Open door
-			ResetTimer ();
+			//ResetTimer ();
 			// rely on UAP outpins to signal this is happening
-			Info ( "Door closed - open pin on                  ", true );
-			m_pDoorOpenCtrlPin->On ();
-			// SetRelayPin ( m_DoorOpenCtrlPin );
+			Info ( "Door closed - open pin on", true );
+			//m_pDoorOpenCtrlPin->On ();
 			break;
 
 		case State::Open:
 			// Close Door
-			ResetTimer ();
+			//ResetTimer ();
 			// rely on UAP outpins to signal this is happening
-			Info ( "Door open - close pin on                  ", true );
-			m_pDoorCloseCtrlPin->On ();
-			// SetRelayPin ( m_DoorCloseCtrlPin );
+			Info ( "Door open - close pin on", true );
+			//m_pDoorCloseCtrlPin->On ();
 			break;
 
 		case State::Opening:
 		case State::Closing:
 			// Stop Door
-			ResetTimer ();
-			m_pDoorStopCtrlPin->On ();
-			// SetRelayPin ( m_DoorStopCtrlPin );
+			//ResetTimer ();
+			//m_pDoorStopCtrlPin->On ();
 			//  Have to set state since there is no UAP output that signals when this happens
-			m_theDoorState = Stopped;
+			Info ( "Door moving - stop pin on");
+			//m_theDoorState = Stopped;
 			break;
 
 		case State::Stopped:
@@ -177,17 +175,15 @@ void DoorState::SwitchPressed ( Event )
 			{
 				case Direction::Down:
 					// Were closing so now open
-					ResetTimer ();
+					//ResetTimer ();
 					Info ( "Door stopped, was going down - open pin on", true );
-					m_pDoorOpenCtrlPin->On ();
-					// SetRelayPin ( m_DoorOpenCtrlPin );
+					//m_pDoorOpenCtrlPin->On ();
 					break;
 
 				case Direction::Up:
-					ResetTimer ();
+					//ResetTimer ();
 					Info ( "Door stopped, was going up - close pin on", true );
-					m_pDoorCloseCtrlPin->On ();
-					// SetRelayPin ( m_DoorCloseCtrlPin );
+					//m_pDoorCloseCtrlPin->On ();
 					break;
 
 				default:
@@ -200,7 +196,7 @@ void DoorState::SwitchPressed ( Event )
 		case State::Unknown:
 			break;
 	}
-#endif
+//#endif
 }
 
 /// <summary>
@@ -238,39 +234,35 @@ void DoorState::DoRequest ( Request eRequest )
 	{
 		case Request::LightOn:
 			ResetTimer ();
-			Result += " Turn Light On      ";
+			Result = " Toggle Light On";
 			m_pDoorLightCtrlPin->On ();
-			// SetRelayPin ( m_DoorLightCtrlPin );
 			break;
 
 		case Request::LightOff:
-			Result += " Turn Light Off     ";
-			// ClearRelayPin ( m_DoorLightCtrlPin );
-			m_pDoorLightCtrlPin->Off ();
+			ResetTimer ();
+			Result = " Toggle Light Off";
+			m_pDoorLightCtrlPin->On ();
 			break;
 
 		case Request::CloseDoor:
-			Result += " Close Door         ";
+			Result = " Close Door";
 			ResetTimer ();
 			m_pDoorCloseCtrlPin->On ();
-			// SetRelayPin ( m_DoorCloseCtrlPin );
 			break;
 
 		case Request::OpenDoor:
-			Result += " Open Door          ";
+			Result = " Open Door";
 			ResetTimer ();
 			m_pDoorOpenCtrlPin->On ();
-			// SetRelayPin ( m_DoorOpenCtrlPin );
 			break;
 
 		case Request::StopDoor:
-			Result += " Stop Door          ";
+			Result = " Stop Door";
 			ResetTimer ();
 			m_pDoorStopCtrlPin->On ();
-			// SetRelayPin ( m_DoorStopCtrlPin );
 			break;
 	}
-	Info ( Result, true );
+	Info ( Result );
 }
 
 /// <summary>
@@ -375,6 +367,12 @@ void DoorState::GetPinStates ( String &states )
 	states += m_pDoorOpenStatusPin->IsMatched() ? "On" : "Off";
 	states += String ( " Closed: ");
 	states += m_pDoorClosedStatusPin->IsMatched() ? "On" : "Off";
+	states += String ( " Curr Light: ");
+	states += m_pDoorLightStatusPin->GetCurrentMatchedState() ? "On" : "Off";
+	states += String ( " Opn: ");
+	states += m_pDoorOpenStatusPin->GetCurrentMatchedState() ? "On" : "Off";
+	states += String ( " Clsed: ");
+	states += m_pDoorClosedStatusPin->GetCurrentMatchedState() ? "On" : "Off";
 }
 
 /// <summary>

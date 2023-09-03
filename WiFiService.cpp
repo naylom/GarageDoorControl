@@ -526,7 +526,7 @@ void UDPWiFiService::ProcessUDPMessage ( const String &sRecvMessage )
 		}
 		else if ( sRecvMessage.substring ( sizeof ( cMsgVersion1 ) + sizeof ( PartSeparator ) - 2 ).startsWith ( DoorLightOffReqMsg ) )
 		{
-			// Error ( "Light Off request" );
+			// Info ( "Light Off request" );
 			m_MsgHandlerCallback ( UDPWiFiService::ReqMsgType::LIGHTOFF );
 		}
 		else
