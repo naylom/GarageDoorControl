@@ -555,6 +555,7 @@ void loop ()
 	// if door state has changed, multicast news
 	if ( pGarageDoor != nullptr )
 	{
+		pGarageDoor->UpdateDoorState();
 		if ( pGarageDoor->GetDoorState () != LastDoorState || LastLightState != pGarageDoor->IsLit () )
 		{
 			LastDoorState  = pGarageDoor->GetDoorState ();

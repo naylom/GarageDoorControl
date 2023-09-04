@@ -38,6 +38,7 @@ constexpr PinStatus RELAY_ON				  = LOW;
 constexpr PinStatus RELAY_OFF				  = HIGH;
 
 class DoorStatusPin;
+class DoorStatusCalc;
 
 class DoorState
 {
@@ -88,7 +89,7 @@ class DoorState
 		const pin_size_t m_DoorOpenStatusPin;	// Used to get status if door is open or not
 		const pin_size_t m_DoorClosedStatusPin; // Used to get status if door is closed or not
 		const pin_size_t m_DoorLightStatusPin;	// Used to get status if door light is on or not
-
+		DoorStatusCalc	*m_pDoorStatus = nullptr;
 		OutputPin		*m_pDoorOpenCtrlPin	 = nullptr; // Objects to handle controlling door actions
 		OutputPin		*m_pDoorCloseCtrlPin = nullptr;
 		OutputPin		*m_pDoorStopCtrlPin	 = nullptr;
@@ -97,9 +98,8 @@ class DoorState
 		enum Direction : uint8_t { Up, Down, None };
 
 		volatile Direction m_LastDirection = Direction::None;
-		// void			   ClearRelayPin ( pin_size_t thePin );
 		void			   ResetTimer ();
-		// void			   SetRelayPin ( pin_size_t thePin );
+		void			   SetState ( DoorState::State newState );
 		void			   TurnOffControlPins (); // bring low all pins controlling garage functions
 
 	public:
@@ -123,6 +123,7 @@ class DoorState
 		uint32_t	GetDoorClosedCount ();
 		uint32_t	GetDoorClosingCount ();
 		void		GetPinStates ( String &states );
+		void		UpdateDoorState();
 };
 
 /// @brief DoorStatusPin is a type of InputPin that performs additional actions when the pin matches or fails to match the required state
@@ -137,4 +138,21 @@ class DoorStatusPin : public InputPin
 		DoorState::Event m_doorUnmatchEvent;
 		void			 MatchAction ();
 		void			 UnmatchAction ();
+};
+
+class DoorStatusCalc
+{
+	public:
+		enum Direction : uint8_t { Up, Down, None };
+		
+		DoorStatusCalc ( DoorStatusPin &openPin, DoorStatusPin &closePin );
+		void UpdateStatus ();
+		DoorState::State GetDoorState();
+		DoorStatusCalc::Direction GetDoorDirection ();		
+
+	private:
+		DoorStatusPin	&m_openPin;
+		DoorStatusPin	&m_closePin;
+		DoorState::State m_currentState;
+		Direction m_LastDirection = Direction::None;
 };
