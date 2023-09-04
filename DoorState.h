@@ -89,7 +89,7 @@ class DoorState
 		const pin_size_t m_DoorOpenStatusPin;	// Used to get status if door is open or not
 		const pin_size_t m_DoorClosedStatusPin; // Used to get status if door is closed or not
 		const pin_size_t m_DoorLightStatusPin;	// Used to get status if door light is on or not
-		DoorStatusCalc	*m_pDoorStatus = nullptr;
+		DoorStatusCalc	*m_pDoorStatus		 = nullptr;
 		OutputPin		*m_pDoorOpenCtrlPin	 = nullptr; // Objects to handle controlling door actions
 		OutputPin		*m_pDoorCloseCtrlPin = nullptr;
 		OutputPin		*m_pDoorStopCtrlPin	 = nullptr;
@@ -116,6 +116,7 @@ class DoorState
 		bool		IsMoving ();
 		bool		IsClosed ();
 		bool		IsLit ();
+		const char *GetDoorDirection ();
 		uint32_t	GetLightOnCount ();
 		uint32_t	GetLightOffCount ();
 		uint32_t	GetDoorOpenedCount ();
@@ -123,7 +124,7 @@ class DoorState
 		uint32_t	GetDoorClosedCount ();
 		uint32_t	GetDoorClosingCount ();
 		void		GetPinStates ( String &states );
-		void		UpdateDoorState();
+		void		UpdateDoorState ();
 };
 
 /// @brief DoorStatusPin is a type of InputPin that performs additional actions when the pin matches or fails to match the required state
@@ -144,15 +145,17 @@ class DoorStatusCalc
 {
 	public:
 		enum Direction : uint8_t { Up, Down, None };
-		
+
 		DoorStatusCalc ( DoorStatusPin &openPin, DoorStatusPin &closePin );
-		void UpdateStatus ();
-		DoorState::State GetDoorState();
-		DoorStatusCalc::Direction GetDoorDirection ();		
+		void					  UpdateStatus ();
+		DoorState::State		  GetDoorState ();
+		DoorStatusCalc::Direction GetDoorDirection ();
+		const char				 *GetDoorDirectionName ();
+		void					  SetStopped ();
 
 	private:
 		DoorStatusPin	&m_openPin;
 		DoorStatusPin	&m_closePin;
 		DoorState::State m_currentState;
-		Direction m_LastDirection = Direction::None;
+		Direction		 m_LastDirection = Direction::None;
 };

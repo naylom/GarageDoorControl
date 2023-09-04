@@ -45,8 +45,9 @@ History:
 	Ver 1.0.8		Moved logging to object SerialLogger
 	Ver 1.0.10      Added BME280 support and changed logging to inherit from Stream class
 	Ver 1.0.11      Added external LED usage in Non UAP mode to show how far from desired humidity we are
+	Ver 1.0.12		Detect door state in main loop rather than calc on pin change
 */
-#define VERSION "1.0.11 Beta"
+#define VERSION "1.0.12 Beta"
 #define TELNET
 #ifdef MNDEBUG
 	#ifdef TELNET
@@ -199,38 +200,30 @@ void DisplayStats ( void )
 	if ( pGarageDoor != nullptr )
 	{
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 4, 0, F ( "Light is " ) );
-		MyLogger.ClearPartofLine ( 4, 10, 8 );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 4, 10, pGarageDoor->IsLit () ? "On" : "Off" );
+		MyLogger.ClearPartofLine ( 4, 14, 3 );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 4, 14, pGarageDoor->IsLit () ? "On" : "Off" );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 0, F ( "State is " ) );
-		MyLogger.ClearPartofLine ( 5, 10, 8 );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 5, 10, pGarageDoor->GetDoorDisplayState () );
+		MyLogger.ClearPartofLine ( 5, 14, 8 );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 5, 14, pGarageDoor->GetDoorDisplayState () );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 6, 0, F ( "Direction is " ) );
+		MyLogger.ClearPartofLine ( 6, 14, 10 );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 6, 14, pGarageDoor->GetDoorDirection() );
 
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 3, 41, "Count     Called Unchngd Matched UnMtchdSpurious Duration" );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 4, 20, F ( "Light Off count     " ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 41, String ( pGarageDoor->GetLightOffCount () ) );
-		pGarageDoor->m_pDoorLightStatusPin->DebugStats ( result );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 49, result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 4, 25, F ( "Light Off count     " ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 43, String ( pGarageDoor->GetLightOffCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 25, F ( "Door Opened count   " ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 5, 43, String ( pGarageDoor->GetDoorOpenedCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 6, 25, F ( "Door Closed count   " ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 43, String ( pGarageDoor->GetDoorClosedCount () ) );
 
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 20, F ( "Pin States          " ) );
-		pGarageDoor->GetPinStates ( result );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 5, 41, result );
-
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 6, 20, F ( "Door Opened count   " ) );
-		pGarageDoor->m_pDoorOpenStatusPin->DebugStats ( result );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 41, String ( pGarageDoor->GetDoorOpenedCount () ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 49, result );
-
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 8, 20, F ( "Door Closed count   " ) );
-		pGarageDoor->m_pDoorClosedStatusPin->DebugStats ( result );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 8, 41, String ( pGarageDoor->GetDoorClosedCount () ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 8, 49, result );
 	}
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 20, F ( "Switch Presssed " ) );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 9, 43, "Count     Called Unchngd Matched UnMtchdSpurious Duration" );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 25, F ( "Switch Presssed " ) );
 	if ( pDoorSwitchPin != nullptr )
 	{
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 10, 41, String ( pDoorSwitchPin->GetMatchedCount () ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 10, 43, String ( pDoorSwitchPin->GetMatchedCount () ) );
 		pDoorSwitchPin->DebugStats ( result );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 49, result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 50, result );
 	}
 	#endif
 
