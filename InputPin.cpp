@@ -10,7 +10,7 @@ void InputPinISR ( void *pParam )
 	pInputPinObj->ProcessISR ();
 }
 
-InputPin::InputPin ( pin_size_t pin, uint32_t debouncems, PinStatus matchStatus, PinMode mode, PinStatus status ) : m_Pin ( pin ), m_Debouncems ( debouncems ), m_MatchStatus ( matchStatus )
+InputPin::InputPin ( pin_size_t pin, uint32_t debouncems, uint32_t maxMatchedTimems, PinStatus matchStatus, PinMode mode, PinStatus status ) : m_Pin ( pin ), m_Debouncems ( debouncems ), m_maxMatchedTimems ( maxMatchedTimems ), m_MatchStatus ( matchStatus )
 {
 	pinMode ( m_Pin, mode );
 	delay ( 10 ); // allow time before first read after setting mode
@@ -31,12 +31,12 @@ void InputPin::ProcessISR ( void )
 		unsigned long ulNow = millis ();
 		if ( newReading == m_MatchStatus )
 		{
-			if ( ulNow - m_LastChangedTime >= m_Debouncems /* && ulNow - m_LastChangedTime < 1000UL */ )
+			if ( ulNow - m_LastChangedTime >= m_Debouncems )
 			{
 				// Wanted state
 				m_MatchedCount++;
 				m_CurrentMatchedState = true;
-				m_MatchedDuration	  = ulNow - m_LastChangedTime;
+				// m_MatchedDuration	  = ulNow - m_LastChangedTime;
 				MatchAction ();
 			}
 			else
@@ -47,12 +47,20 @@ void InputPin::ProcessISR ( void )
 		}
 		else
 		{
-			if ( ulNow - m_LastChangedTime >= m_Debouncems /* && ulNow - m_LastChangedTime < 1000UL */ )
+			if ( ulNow - m_LastChangedTime >= m_Debouncems )
 			{
-				m_UnmatchedCount++;
-				m_CurrentMatchedState = false;
-				m_MatchedDuration	  = ulNow - m_LastChangedTime;
-				UnmatchAction ();
+				if ( m_maxMatchedTimems == 0 || ulNow - m_LastChangedTime < m_maxMatchedTimems )
+				{
+					m_UnmatchedCount++;
+					m_CurrentMatchedState = false;
+					m_MatchedDuration	  = ulNow - m_LastChangedTime;
+					UnmatchAction ();
+				}
+				else
+				{
+					// change back to unmatched state happened but outside of required time window
+					m_SpuriousCount++;
+				}
 			}
 			else
 			{

@@ -91,7 +91,8 @@ constexpr uint8_t	 CLOSE_DOOR_OUTPUT_PIN	   = 3;
 constexpr uint8_t	 OPEN_DOOR_OUTPUT_PIN	   = 4;
 constexpr uint8_t	 STOP_DOOR_OUTPUT_PIN	   = 5;
 
-constexpr uint32_t	 SWITCH_DEBOUNCE_MS		   = 50; // min ms between consecutive pin interrupts before signal accepted from manual switch
+constexpr uint32_t	 SWITCH_DEBOUNCE_MS		   = 100;  // min ms between consecutive pin interrupts before signal accepted from manual switch
+constexpr uint32_t	 MAX_SWITCH_MATCH_TIMER_MS = 0; // max time pin should be in matched state to be considered a real signal
 DoorState			*pGarageDoor			   = nullptr;
 DoorStatusPin		*pDoorSwitchPin			   = nullptr;
 
@@ -145,10 +146,10 @@ void   Error ( String s, bool bInISR = false )
 	{
 		GetLocalTime ( Result );
 	}
-	//Result			  += s;
-	sInfoErrorMsg	   = Result + s;
-	fgInfoErrorColour  = ansiVT220Logger::FG_BRIGHTWHITE;
-	bgInfoErrorColour  = ansiVT220Logger::BG_BRIGHTRED;
+	// Result			  += s;
+	sInfoErrorMsg	  = Result + s;
+	fgInfoErrorColour = ansiVT220Logger::FG_BRIGHTWHITE;
+	bgInfoErrorColour = ansiVT220Logger::BG_BRIGHTRED;
 }
 
 /// @brief Logs info to error line the provided error message prepended with local date and time
@@ -162,10 +163,10 @@ void Info ( String s, bool bInISR = false )
 	{
 		GetLocalTime ( Result );
 	}
-	//Result			  += s;
-	sInfoErrorMsg	   = Result + s;
-	fgInfoErrorColour  = ansiVT220Logger::FG_WHITE;
-	bgInfoErrorColour  = ansiVT220Logger::BG_BLUE;
+	// Result			  += s;
+	sInfoErrorMsg	  = Result + s;
+	fgInfoErrorColour = ansiVT220Logger::FG_WHITE;
+	bgInfoErrorColour = ansiVT220Logger::BG_BLUE;
 }
 
 void DisplaylastInfoErrorMsg ()
@@ -207,7 +208,7 @@ void DisplayStats ( void )
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 5, 14, pGarageDoor->GetDoorDisplayState () );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 6, 0, F ( "Direction is " ) );
 		MyLogger.ClearPartofLine ( 6, 14, 10 );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 6, 14, pGarageDoor->GetDoorDirection() );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 6, 14, pGarageDoor->GetDoorDirection () );
 
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 4, 25, F ( "Light Off count     " ) );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 43, String ( pGarageDoor->GetLightOffCount () ) );
@@ -215,7 +216,6 @@ void DisplayStats ( void )
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 5, 43, String ( pGarageDoor->GetDoorOpenedCount () ) );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 6, 25, F ( "Door Closed count   " ) );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 43, String ( pGarageDoor->GetDoorClosedCount () ) );
-
 	}
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 9, 43, "Count     Called Unchngd Matched UnMtchdSpurious Duration" );
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 25, F ( "Switch Presssed " ) );
@@ -385,7 +385,8 @@ void setup ()
 #ifdef UAP_SUPPORT
 	// Setup so we are called if the state of door changes
 	pGarageDoor	   = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, DOOR_IS_OPEN_STATUS_PIN, DOOR_IS_CLOSED_STATUS_PIN, LIGHT_IS_ON_STATUS_PIN );
-	pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
+	// pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
+	pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::Nothing, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, MAX_SWITCH_MATCH_TIMER_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	SetLED ();
 #endif
 }
@@ -548,7 +549,7 @@ void loop ()
 	// if door state has changed, multicast news
 	if ( pGarageDoor != nullptr )
 	{
-		pGarageDoor->UpdateDoorState();
+		pGarageDoor->UpdateDoorState ();
 		if ( pGarageDoor->GetDoorState () != LastDoorState || LastLightState != pGarageDoor->IsLit () )
 		{
 			LastDoorState  = pGarageDoor->GetDoorState ();
@@ -564,7 +565,7 @@ void loop ()
 		{
 			if ( pDoorSwitchPin->GetCurrentMatchedState () )
 			{
-				//Info ( "Switch pressed" );
+				// Info ( "Switch pressed" );
 			}
 			SwitchPressedCount = LatestSwitchPressedCount;
 		}

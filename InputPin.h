@@ -8,7 +8,7 @@
 class InputPin
 {
 	public:
-		InputPin ( pin_size_t pin, uint32_t debouncems, PinStatus matchStatus, PinMode mode = PinMode::INPUT, PinStatus status = PinStatus::CHANGE );
+		InputPin ( pin_size_t pin, uint32_t debouncems, uint32_t maxMatchedTimems, PinStatus matchStatus, PinMode mode = PinMode::INPUT, PinStatus status = PinStatus::CHANGE );
 		void	 ProcessISR ();
 		bool	 IsMatched ();
 		uint32_t GetMatchedCount ();
@@ -26,6 +26,7 @@ class InputPin
 
 		const pin_size_t   m_Pin;
 		const uint32_t	   m_Debouncems;
+		const uint32_t	   m_maxMatchedTimems;
 		const PinStatus	   m_MatchStatus;
 		volatile PinStatus m_LastPinRead;
 		volatile uint32_t  m_LastChangedTime;
@@ -38,5 +39,4 @@ class InputPin
 		volatile uint32_t  m_UnmatchedCount			 = 0UL;
 		volatile uint32_t  m_SpuriousCount			 = 0UL;
 		volatile uint32_t  m_MatchedDuration		 = 0UL;
-		volatile uint32_t  m_ToQuick				 = 0UL;
 };

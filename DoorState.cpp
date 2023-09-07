@@ -28,12 +28,13 @@ extern UDPWiFiService *pMyUDPService;
 extern void			   Error ( String s, bool bInISR = false );
 extern void			   Info ( String s, bool bInISR = false );
 
-constexpr auto		   DOOR_FLASHTIME = 10;				 // every 2 seconds
-const int16_t		   SIGNAL_PULSE	  = 2000 * 2;		 // 2000 per sec, so every 1/5 sec, 200 ms
-constexpr uint32_t	   DEBOUNCE_MS	  = 50;				 // min ms between consecutive pin interrupts before signal accepted
-constexpr PinStatus	   UAP_TRUE		  = PinStatus::HIGH; // UAP signals HIGH when sensor is TRUE
+constexpr auto		   DOOR_FLASHTIME	  = 10;				 // every 2 seconds
+const int16_t		   SIGNAL_PULSE		  = 2000 * 2;		 // 2000 per sec, so every 1/5 sec, 200 ms
+constexpr uint32_t	   DEBOUNCE_MS		  = 50;				 // min ms between consecutive pin interrupts before signal accepted
+constexpr uint32_t	   MAX_MATCH_TIMER_MS = 1000;			 // max time pin should be in matched state to be considered a real signal
+constexpr PinStatus	   UAP_TRUE			  = PinStatus::HIGH; // UAP signals HIGH when sensor is TRUE
 
-const char			  *StateNames []  = // In order of State enums!
+const char			  *StateNames []	  = // In order of State enums!
 	{ "Opened", "Opening", "Closed", "Closing", "Stopped", "Unknown", "Bad" };
 const char *DirectionNames [] = // In order of enums
 	{ "Up", "Down", "Stationary" };
@@ -42,10 +43,10 @@ DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopP
 	: m_DoorOpenCtrlPin ( OpenPin ), m_DoorCloseCtrlPin ( ClosePin ), m_DoorStopCtrlPin ( StopPin ), m_DoorLightCtrlPin ( LightPin ), m_DoorOpenStatusPin ( DoorOpenStatusPin ), m_DoorClosedStatusPin ( DoorClosedStatusPin ), m_DoorLightStatusPin ( DoorLightStatusPin )
 {
 	// m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::DoorOpenTrue, DoorState::Event::DoorOpenFalse, m_DoorOpenStatusPin, DEBOUNCE_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorOpenStatusPin, DEBOUNCE_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
+	m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorOpenStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	// m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::DoorClosedTrue, DoorState::Event::DoorClosedFalse, m_DoorClosedStatusPin, DEBOUNCE_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorClosedStatusPin, DEBOUNCE_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	m_pDoorLightStatusPin  = new DoorStatusPin ( nullptr, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorLightStatusPin, DEBOUNCE_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
+	m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorClosedStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
+	m_pDoorLightStatusPin  = new DoorStatusPin ( nullptr, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorLightStatusPin, DEBOUNCE_MS, 0, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	m_pDoorOpenCtrlPin	   = new OutputPin ( m_DoorOpenCtrlPin, RELAY_ON );
 	m_pDoorCloseCtrlPin	   = new OutputPin ( m_DoorCloseCtrlPin, RELAY_ON );
 	m_pDoorStopCtrlPin	   = new OutputPin ( m_DoorStopCtrlPin, RELAY_ON );
@@ -392,8 +393,8 @@ void DoorState::TurnOffControlPins ()
 	m_pDoorLightCtrlPin->Off ();
 }
 
-DoorStatusPin::DoorStatusPin ( DoorState *pDoor, DoorState::Event matchEvent, DoorState::Event unmatchEvent, pin_size_t pin, uint32_t debouncems, PinStatus matchStatus, PinMode mode, PinStatus status )
-	: InputPin ( pin, debouncems, matchStatus, mode, status ), m_pDoor ( pDoor ), m_doorMatchEvent ( matchEvent ), m_doorUnmatchEvent ( unmatchEvent )
+DoorStatusPin::DoorStatusPin ( DoorState *pDoor, DoorState::Event matchEvent, DoorState::Event unmatchEvent, pin_size_t pin, uint32_t debouncems, uint32_t maxMatchedTimems, PinStatus matchStatus, PinMode mode, PinStatus status )
+	: InputPin ( pin, debouncems, maxMatchedTimems, matchStatus, mode, status ), m_pDoor ( pDoor ), m_doorMatchEvent ( matchEvent ), m_doorUnmatchEvent ( unmatchEvent )
 {
 }
 
