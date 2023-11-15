@@ -396,6 +396,8 @@ void DoorState::TurnOffControlPins ()
 DoorStatusPin::DoorStatusPin ( DoorState *pDoor, DoorState::Event matchEvent, DoorState::Event unmatchEvent, pin_size_t pin, uint32_t debouncems, uint32_t maxMatchedTimems, PinStatus matchStatus, PinMode mode, PinStatus status )
 	: InputPin ( pin, debouncems, maxMatchedTimems, matchStatus, mode, status ), m_pDoor ( pDoor ), m_doorMatchEvent ( matchEvent ), m_doorUnmatchEvent ( unmatchEvent )
 {
+	// Set pin to source 7mA and sink 10mA rather than default 2 / 2.5 mA, see https://forum.arduino.cc/t/are-the-zeros-pins-set-to-strong-drive-strength-by-default/404930
+	PORT->Group[g_APinDescription[pin].ulPort].PINCFG[g_APinDescription[pin].ulPin].bit.DRVSTR = 1;
 }
 
 void DoorStatusPin::MatchAction ()
