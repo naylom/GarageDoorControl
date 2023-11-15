@@ -41,5 +41,11 @@ pin_size_t OutputPin::pinNumber ()
 void OutputPin::Write ( PinStatus status )
 {
 	m_pinStatus = status;
-	digitalWrite ( m_Pin, (int)m_pinStatus );	
+	digitalWrite ( m_Pin, (int)m_pinStatus );
+	m_ulTimeWritten = millis();
+}
+
+uint32_t  OutputPin::GetTimeWritten()
+{
+	return m_ulTimeWritten;
 }

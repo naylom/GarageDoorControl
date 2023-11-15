@@ -82,6 +82,7 @@ class DoorState
 
 		volatile State	 m_theDoorState		 = State::Unknown;
 		volatile bool	 m_bDoorStateChanged = true;
+		volatile uint32_t	m_ulSwitchPressedTime = 0UL;
 		const pin_size_t m_DoorOpenCtrlPin;		// Used to request door is opened
 		const pin_size_t m_DoorCloseCtrlPin;	// Used to request door is closed
 		const pin_size_t m_DoorStopCtrlPin;		// Used to request door is stopped

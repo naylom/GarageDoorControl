@@ -47,7 +47,7 @@ History:
 	Ver 1.0.11      Added external LED usage in Non UAP mode to show how far from desired humidity we are
 	Ver 1.0.12		Detect door state in main loop rather than calc on pin change
 */
-#define VERSION "1.0.12 Beta"
+#define VERSION "1.0.13 Beta"
 #define TELNET
 #ifdef MNDEBUG
 	#ifdef TELNET
@@ -132,6 +132,7 @@ void			  GetLocalTime ( String &Result )
 }
 
 String sInfoErrorMsg;
+bool bInfoUseBestTime = false;
 auto   fgInfoErrorColour = ansiVT220Logger::FG_WHITE;
 auto   bgInfoErrorColour = ansiVT220Logger::BG_GREEN;
 
@@ -161,7 +162,12 @@ void Info ( String s, bool bInISR = false )
 	// do not call when in ISR level code path
 	if ( !bInISR )
 	{
+		bInfoUseBestTime = false;
 		GetLocalTime ( Result );
+	}
+	else
+	{
+		bInfoUseBestTime = true;
 	}
 	// Result			  += s;
 	sInfoErrorMsg	  = Result + s;
@@ -172,6 +178,13 @@ void Info ( String s, bool bInISR = false )
 void DisplaylastInfoErrorMsg ()
 {
 #ifdef MNDEBUG
+	String sTime;
+	if ( bInfoUseBestTime )
+	{
+		pMyUDPService->GetLocalTime( sTime );
+		sInfoErrorMsg = sTime + sInfoErrorMsg;
+	}
+
 	MyLogger.ClearLine ( ERROR_LINE );
 	MyLogger.COLOUR_AT ( fgInfoErrorColour, bgInfoErrorColour, ERROR_LINE, 1, sInfoErrorMsg );
 #endif
@@ -205,7 +218,14 @@ void DisplayStats ( void )
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 4, 14, pGarageDoor->IsLit () ? "On" : "Off" );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 0, F ( "State is " ) );
 		MyLogger.ClearPartofLine ( 5, 14, 8 );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 5, 14, pGarageDoor->GetDoorDisplayState () );
+		if ( pGarageDoor->GetDoorState() == DoorState::Closed )
+		{
+			MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 5, 14, pGarageDoor->GetDoorDisplayState () );
+		}
+		else
+		{
+			MyLogger.COLOUR_AT ( ansiVT220Logger::FG_RED, ansiVT220Logger::BG_BLACK, 5, 14, pGarageDoor->GetDoorDisplayState () );
+		}
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 6, 0, F ( "Direction is " ) );
 		MyLogger.ClearPartofLine ( 6, 14, 10 );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 6, 14, pGarageDoor->GetDoorDirection () );

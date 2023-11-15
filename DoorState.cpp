@@ -131,62 +131,77 @@ void DoorState::NowOpening ( Event )
 /// <returns>None
 void DoorState::SwitchPressed ( Event )
 {
-	switch ( GetDoorState () )
+	uint32_t now = millis();
+	static bool bAwaitingSecondPush = false;
+	if ( now - m_ulSwitchPressedTime > 2000UL )
 	{
-		case State::Closed:
-			// Open door
-			ResetTimer ();
-			// rely on UAP outpins to signal this is happening
-			Info ( "Switch pressed when door closed - opening", true );
-			m_pDoorOpenCtrlPin->On ();
-			break;
-
-		case State::Open:
-			// Close Door
-			ResetTimer ();
-			// rely on UAP outpins to signal this is happening
-			Info ( "Switch pressed when door open - closing", true );
-			m_pDoorCloseCtrlPin->On ();
-			break;
-
-		case State::Opening:
-		case State::Closing:
-			// Stop Door
-			ResetTimer ();
-			m_pDoorStopCtrlPin->On ();
-			//  Have to set state since there is no UAP output that signals when this happens
-			Info ( "Switch pressed during moving, stopping door", true );
-			m_pDoorStatus->SetStopped ();
-			break;
-
-		case State::Stopped:
-			// go in reverse
-			switch ( m_LastDirection )
+		// been > 2 secs since last switch press so restart looking for 2 consecutive pushes
+		bAwaitingSecondPush = true;
+	}
+	else
+	{
+		if ( bAwaitingSecondPush )
+		{
+			// second push within 2 secs
+			bAwaitingSecondPush = false;	// reset
+			switch ( GetDoorState () )
 			{
-				case Direction::Down:
-					// Were closing so now open
+				case State::Closed:
+					// Open door
 					ResetTimer ();
-					Info ( "Switch pressed when door stopped, was going down - opening", true );
+					// rely on UAP outpins to signal this is happening
+					Info ( "Switch pressed when door closed - opening", true );
 					m_pDoorOpenCtrlPin->On ();
 					break;
 
-				case Direction::Up:
+				case State::Open:
+					// Close Door
 					ResetTimer ();
-					Info ( "Switch pressed when door stopped, was going up - closing", true );
+					// rely on UAP outpins to signal this is happening
+					Info ( "Switch pressed when door open - closing", true );
 					m_pDoorCloseCtrlPin->On ();
 					break;
 
-				default:
+				case State::Opening:
+				case State::Closing:
+					// Stop Door
+					ResetTimer ();
+					m_pDoorStopCtrlPin->On ();
+					//  Have to set state since there is no UAP output that signals when this happens
+					Info ( "Switch pressed during moving, stopping door", true );
+					m_pDoorStatus->SetStopped ();
+					break;
+
+				case State::Stopped:
+					// go in reverse
+					switch ( m_LastDirection )
+					{
+						case Direction::Down:
+							// Were closing so now open
+							ResetTimer ();
+							Info ( "Switch pressed when door stopped, was going down - opening", true );
+							m_pDoorOpenCtrlPin->On ();
+							break;
+
+						case Direction::Up:
+							ResetTimer ();
+							Info ( "Switch pressed when door stopped, was going up - closing", true );
+							m_pDoorCloseCtrlPin->On ();
+							break;
+
+						default:
+							break;
+					}
+					break;
+
+				case State::Bad:
+				case State::Unknown:
+					Info ( "Switch pressed when state is bad / unknown, doing nothing", true );
 					break;
 			}
-
-			break;
-
-		case State::Bad:
-		case State::Unknown:
-			Info ( "Switch pressed when state is bad / unknown, doing nothing", true );
-			break;
+		}
 	}
+	m_ulSwitchPressedTime = now;
 }
 
 /// <summary>
@@ -396,6 +411,8 @@ void DoorState::TurnOffControlPins ()
 DoorStatusPin::DoorStatusPin ( DoorState *pDoor, DoorState::Event matchEvent, DoorState::Event unmatchEvent, pin_size_t pin, uint32_t debouncems, uint32_t maxMatchedTimems, PinStatus matchStatus, PinMode mode, PinStatus status )
 	: InputPin ( pin, debouncems, maxMatchedTimems, matchStatus, mode, status ), m_pDoor ( pDoor ), m_doorMatchEvent ( matchEvent ), m_doorUnmatchEvent ( unmatchEvent )
 {
+	// Set pin to source 7mA and sink 10mA rather than default 2 / 2.5 mA, see https://forum.arduino.cc/t/are-the-zeros-pins-set-to-strong-drive-strength-by-default/404930
+	PORT->Group[g_APinDescription[pin].ulPort].PINCFG[g_APinDescription[pin].ulPin].bit.DRVSTR = 1;
 }
 
 void DoorStatusPin::MatchAction ()
