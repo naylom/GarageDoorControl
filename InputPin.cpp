@@ -121,6 +121,6 @@ bool InputPin::GetCurrentMatchedState ()
 void InputPin::DebugStats ( String &result )
 {
 	char cMsg [ 50 ];
-	result = sprintf ( cMsg, "%8ld%8ld%8ld%8ld%8ld %8ld", m_ISRCalledCount, m_DiscardedUnchangedCount, m_MatchedCount, m_UnmatchedCount, m_SpuriousCount, m_MatchedDuration );
+	sprintf ( cMsg, "%8ld%8ld%8ld%8ld%8ld %8ld", m_ISRCalledCount, m_DiscardedUnchangedCount, m_MatchedCount, m_UnmatchedCount, m_SpuriousCount, m_MatchedDuration );
 	result = cMsg;
 }
