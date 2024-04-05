@@ -183,6 +183,7 @@ void DisplaylastInfoErrorMsg ()
 	{
 		pMyUDPService->GetLocalTime( sTime );
 		sInfoErrorMsg = sTime + sInfoErrorMsg;
+		bInfoUseBestTime = false;
 	}
 
 	MyLogger.ClearLine ( ERROR_LINE );
