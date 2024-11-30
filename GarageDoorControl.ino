@@ -81,9 +81,9 @@ BME280I2C			MyBME280 ( settings );
 // PIN allocations, input & output from arduino perspective
 
 // Need to be interrupt pins
-constexpr pin_size_t DOOR_IS_OPEN_STATUS_PIN   = 8;
-constexpr uint8_t	 DOOR_IS_CLOSED_STATUS_PIN = 7;
-constexpr uint8_t	 LIGHT_IS_ON_STATUS_PIN	   = 6;
+constexpr pin_size_t DOOR_IS_OPEN_STATUS_PIN   = 9;
+constexpr uint8_t	 DOOR_IS_CLOSED_STATUS_PIN = 8;
+constexpr uint8_t	 LIGHT_IS_ON_STATUS_PIN	   = 7;
 constexpr uint8_t	 DOOR_SWITCH_INPUT_PIN	   = 0;
 // Don't need to be interrupt pins
 constexpr uint8_t	 TURN_LIGHT_ON_OUTPUT_PIN  = 2;
@@ -97,7 +97,7 @@ DoorState			*pGarageDoor			   = nullptr;
 DoorStatusPin		*pDoorSwitchPin			   = nullptr;
 
 #endif
-
+// use pwm pins
 constexpr uint8_t RED_PIN	= A4;
 constexpr uint8_t GREEN_PIN = 10;
 constexpr uint8_t BLUE_PIN	= A3;
