@@ -23,6 +23,7 @@ class InputPin
 	private:
 		virtual void	   MatchAction ()	= 0;
 		virtual void	   UnmatchAction () = 0;
+		static void		   InputPinISR ( void *pParam );
 
 		const pin_size_t   m_Pin;
 		const uint32_t	   m_Debouncems;
