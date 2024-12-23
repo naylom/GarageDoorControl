@@ -4,12 +4,21 @@
 	InputPin.cpp - implemntation of InputPin.h
 
 */
-void InputPinISR ( void *pParam )
+/// @brief static method to call the instance method to process the ISR, this is required as the ISR cannot be a member function and is called for any instance of the class
+void InputPin::InputPinISR ( void *pParam )
 {
+	// get pointer to the instance of the InputPin object that was created for the pin
 	InputPin *pInputPinObj = (InputPin *)pParam;
+	// Invoke instance method to process the ISR for the specific pin
 	pInputPinObj->ProcessISR ();
 }
-
+/// @brief Initialises the class with the pin to monitor, the debounce time, the maximum time the pin should be in the matched state to be considered a real signal
+/// @param pin must be a valid pin number that supports interrupts
+/// @param debouncems minimum time between consecutive pin interrupts before signal accepted
+/// @param maxMatchedTimems maximum time pin should be in matched state to be considered a real signal
+/// @param matchStatus  the status that the pin should be in to be considered a match ie HIGH or LOW
+/// @param mode  the mode of the pin INPUT, INPUT_PULLUP, INPUT_PULLDOWN
+/// @param status  the type of interrupt to trigger on CHANGE, RISING, FALLING
 InputPin::InputPin ( pin_size_t pin, uint32_t debouncems, uint32_t maxMatchedTimems, PinStatus matchStatus, PinMode mode, PinStatus status ) : m_Pin ( pin ), m_Debouncems ( debouncems ), m_maxMatchedTimems ( maxMatchedTimems ), m_MatchStatus ( matchStatus )
 {
 	pinMode ( m_Pin, mode );
@@ -19,7 +28,8 @@ InputPin::InputPin ( pin_size_t pin, uint32_t debouncems, uint32_t maxMatchedTim
 	m_CurrentMatchedState = m_LastPinRead == m_MatchStatus ? true : false;
 	attachInterruptParam ( digitalPinToInterrupt ( m_Pin ), InputPinISR, status, this );
 }
-
+/// @brief Handles interrupts specifically for the pin being monitored
+/// @param  
 void InputPin::ProcessISR ( void )
 {
 	PinStatus newReading = digitalRead ( m_Pin );
@@ -28,7 +38,7 @@ void InputPin::ProcessISR ( void )
 	if ( newReading != m_LastPinRead )
 	{
 		// different reading from last time, so check it
-		unsigned long ulNow = millis ();
+		uint32_t ulNow = millis ();
 		if ( newReading == m_MatchStatus )
 		{
 			if ( ulNow - m_LastChangedTime >= m_Debouncems )

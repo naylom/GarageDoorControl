@@ -47,7 +47,7 @@ History:
 	Ver 1.0.11      Added external LED usage in Non UAP mode to show how far from desired humidity we are
 	Ver 1.0.12		Detect door state in main loop rather than calc on pin change
 */
-#define VERSION "1.0.13 Beta"
+#define VERSION "1.0.14 Beta"
 #define TELNET
 #ifdef MNDEBUG
 	#ifdef TELNET
@@ -80,16 +80,16 @@ BME280I2C			MyBME280 ( settings );
 	#include "DoorState.h"
 // PIN allocations, input & output from arduino perspective
 
-// Need to be interrupt pins
-constexpr pin_size_t 	DOOR_IS_OPEN_STATUS_PIN		= 8;
-constexpr pin_size_t	DOOR_IS_CLOSED_STATUS_PIN	= 7;
-constexpr pin_size_t	LIGHT_IS_ON_STATUS_PIN		= 6;
-constexpr pin_size_t	DOOR_SWITCH_INPUT_PIN		= 0;
-// Don't need to be interrupt pins
-constexpr pin_size_t	TURN_LIGHT_ON_OUTPUT_PIN	= 2;
-constexpr pin_size_t	CLOSE_DOOR_OUTPUT_PIN		= 3;
-constexpr pin_size_t	OPEN_DOOR_OUTPUT_PIN		= 4;
-constexpr pin_size_t	STOP_DOOR_OUTPUT_PIN		= 5;
+// Need to be interrupt pins, inputs of status from UAP
+constexpr pin_size_t DOOR_IS_OPEN_STATUS_PIN   = 9;
+constexpr uint8_t	 DOOR_IS_CLOSED_STATUS_PIN = 8;
+constexpr uint8_t	 LIGHT_IS_ON_STATUS_PIN	   = 7;
+constexpr uint8_t	 DOOR_SWITCH_INPUT_PIN	   = 0;
+// Don't need to be interrupt pins, outputs to UAP
+constexpr uint8_t	 TURN_LIGHT_ON_OUTPUT_PIN  = 5; //2;
+constexpr uint8_t	 CLOSE_DOOR_OUTPUT_PIN	   = 4; //3;
+constexpr uint8_t	 OPEN_DOOR_OUTPUT_PIN	   = 2; //4;
+constexpr uint8_t	 STOP_DOOR_OUTPUT_PIN	   = 3; //5;
 
 constexpr uint32_t	 SWITCH_DEBOUNCE_MS		   = 100;  // min ms between consecutive pin interrupts before signal accepted from manual switch
 constexpr uint32_t	 MAX_SWITCH_MATCH_TIMER_MS = 2000; // max time pin should be in matched state to be considered a real signal
