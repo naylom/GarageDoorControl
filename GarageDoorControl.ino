@@ -47,7 +47,7 @@ History:
 	Ver 1.0.11      Added external LED usage in Non UAP mode to show how far from desired humidity we are
 	Ver 1.0.12		Detect door state in main loop rather than calc on pin change
 */
-#define VERSION "1.0.13 Beta"
+#define VERSION "1.0.14 Beta"
 #define TELNET
 #ifdef MNDEBUG
 	#ifdef TELNET
