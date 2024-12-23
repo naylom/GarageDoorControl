@@ -81,15 +81,15 @@ BME280I2C			MyBME280 ( settings );
 // PIN allocations, input & output from arduino perspective
 
 // Need to be interrupt pins
-constexpr pin_size_t DOOR_IS_OPEN_STATUS_PIN   = 8;
-constexpr uint8_t	 DOOR_IS_CLOSED_STATUS_PIN = 7;
-constexpr uint8_t	 LIGHT_IS_ON_STATUS_PIN	   = 6;
-constexpr uint8_t	 DOOR_SWITCH_INPUT_PIN	   = 0;
+constexpr pin_size_t 	DOOR_IS_OPEN_STATUS_PIN		= 8;
+constexpr pin_size_t	DOOR_IS_CLOSED_STATUS_PIN	= 7;
+constexpr pin_size_t	LIGHT_IS_ON_STATUS_PIN		= 6;
+constexpr pin_size_t	DOOR_SWITCH_INPUT_PIN		= 0;
 // Don't need to be interrupt pins
-constexpr uint8_t	 TURN_LIGHT_ON_OUTPUT_PIN  = 2;
-constexpr uint8_t	 CLOSE_DOOR_OUTPUT_PIN	   = 3;
-constexpr uint8_t	 OPEN_DOOR_OUTPUT_PIN	   = 4;
-constexpr uint8_t	 STOP_DOOR_OUTPUT_PIN	   = 5;
+constexpr pin_size_t	TURN_LIGHT_ON_OUTPUT_PIN	= 2;
+constexpr pin_size_t	CLOSE_DOOR_OUTPUT_PIN		= 3;
+constexpr pin_size_t	OPEN_DOOR_OUTPUT_PIN		= 4;
+constexpr pin_size_t	STOP_DOOR_OUTPUT_PIN		= 5;
 
 constexpr uint32_t	 SWITCH_DEBOUNCE_MS		   = 100;  // min ms between consecutive pin interrupts before signal accepted from manual switch
 constexpr uint32_t	 MAX_SWITCH_MATCH_TIMER_MS = 2000; // max time pin should be in matched state to be considered a real signal
@@ -98,9 +98,9 @@ DoorStatusPin		*pDoorSwitchPin			   = nullptr;
 
 #endif
 
-constexpr uint8_t RED_PIN	= A4;
-constexpr uint8_t GREEN_PIN = 10;
-constexpr uint8_t BLUE_PIN	= A3;
+constexpr pin_size_t RED_PIN	= PIN_A4;
+constexpr pin_size_t GREEN_PIN	= PIN_A3;
+constexpr pin_size_t BLUE_PIN	= 10;
 MNRGBLEDBaseLib	 *pMyLED	= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 180, 120 ); // new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 90, 60 );
 
 /*
@@ -109,7 +109,7 @@ MNRGBLEDBaseLib	 *pMyLED	= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 180,
 constexpr char	  ssid []	= "Naylorfamily"; // your network SSID (name)
 constexpr char	  pass []	= "welcome1";	  // your network password
 #ifdef UAP_SUPPORT
-constexpr char MyHostName [] = "GarageControl";
+constexpr char MyHostName [] = "GarageControl2";
 #else
 constexpr char MyHostName [] = "OfficeTHSensor";
 #endif
