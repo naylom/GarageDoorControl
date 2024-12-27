@@ -34,8 +34,8 @@ constexpr RGBType	DOOR_BAD_COLOUR			  = MNRGBLEDBaseLib::DARK_YELLOW;
 constexpr RGBType	DOOR_UNKNOWN_COLOUR		  = MNRGBLEDBaseLib::BLUE;
 constexpr uint8_t	DOOR_STATIONARY_FLASHTIME = 0;
 constexpr uint8_t	DOOR_MOVING_FLASHTIME	  = 10; // 20 = 1 sec
-constexpr PinStatus RELAY_ON				  = LOW;
-constexpr PinStatus RELAY_OFF				  = HIGH;
+constexpr PinStatus RELAY_ON				  = HIGH;
+constexpr PinStatus RELAY_OFF				  = LOW;
 
 class DoorStatusPin;
 class DoorStatusCalc;
