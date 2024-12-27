@@ -46,6 +46,7 @@ History:
 	Ver 1.0.10      Added BME280 support and changed logging to inherit from Stream class
 	Ver 1.0.11      Added external LED usage in Non UAP mode to show how far from desired humidity we are
 	Ver 1.0.12		Detect door state in main loop rather than calc on pin change
+	Ver 1.0.14		Improve InputPin encapsulation
 */
 #define VERSION "1.0.14 Beta"
 #define TELNET
