@@ -119,6 +119,14 @@ void WiFiService::SetState ( WiFiService::Status state )
 	}
 }
 
+/**
+ * @brief Initializes the WiFi service with the provided parameters.
+ * 
+ * @param HostName The hostname to set for the WiFi connection.
+ * @param WiFissid The SSID of the WiFi network to connect to.
+ * @param WiFipwd The password of the WiFi network.
+ * @param pLED Pointer to an LED object for indicating status.
+ */
 void WiFiService::Begin ( const char *HostName, const char *WiFissid, const char *WiFipwd, MNRGBLEDBaseLib *pLED )
 {
 	m_SSID	   = WiFissid;
@@ -136,6 +144,7 @@ void WiFiService::Begin ( const char *HostName, const char *WiFissid, const char
 	}
 	else
 	{
+		// Set the initial state to UNCONNECTED as the WiFi connection has not been established yet
 		SetState ( Status::UNCONNECTED );
 	}
 }
@@ -164,7 +173,7 @@ void WiFiService::CalcMulticastAddress ( IPAddress ip, IPAddress &subnetMask )
 		// Class C
 		subnetMask = IPAddress ( 255, 255, 255, 0 );
 	}
-	subnetMask = ( ip & subnetMask ) | ( ~subnetMask );
+	subnetMask = ( ip & subnetMask ) | ( ~subnetMask & 0x00FFFFFF );
 }
 
 IPAddress WiFiService::GetMulticastAddress ()
@@ -293,13 +302,15 @@ void UDPWiFiService::GetLocalTime ( String &result, time_t timeError )
 {
 	if ( timeError == 0 )
 	{
-		timeError = (time_t)GetTime ();
+		timeError = GetTime ();
 	}
 	if ( timeError != 0 )
 	{
-		tm	*localtm = localtime ( &timeError );
+		tm localtm;
+		localtime_r ( &timeError, &localtm );
 		char sTime [ 20 ];
-		sprintf ( sTime, "%02d/%02d/%02d %02d:%02d:%02d", localtm->tm_mday, localtm->tm_mon + 1, ( localtm->tm_year - 100 ), localtm->tm_hour, localtm->tm_min, localtm->tm_sec );
+		// Format: DD/MM/YY HH:MM:SS
+		sprintf ( sTime, "%02d/%02d/%02d %02d:%02d:%02d", localtm.tm_mday, localtm.tm_mon + 1, ( localtm.tm_year - 100 ), localtm.tm_hour, localtm.tm_min, localtm.tm_sec );
 		result += sTime;
 	}
 }
@@ -329,16 +340,23 @@ bool UDPWiFiService::ReadUDPMessage ( String &sRecvMessage )
 	{
 		SetLED ( PROCESSING_MSG_COLOUR );
 		delay ( 500 );
-		String s = "Received packet of size " + String ( packetSize ) + " From " + ToIPString ( m_myUDP.remoteIP () ) + ", port " + String ( m_myUDP.remotePort () );
-		// Info ( s ) ;
+		String logMessage = "Received packet of size " + String ( packetSize ) + " From " + ToIPString ( m_myUDP.remoteIP () ) + ", port " + String ( m_myUDP.remotePort () );
+		// Info ( logMessage ) ;
 		if ( packetSize < sizeof ( sBuffer ) - 1 )
 		{
 			// read the packet into packetBufffer
-			int len			= m_myUDP.read ( sBuffer, sizeof ( sBuffer ) - 1 );
-			sBuffer [ len ] = 0;
-			sRecvMessage	= sBuffer;
-			bResult			= true;
-			m_ulReqCount++;
+			int len = m_myUDP.read ( sBuffer, sizeof ( sBuffer ) - 1 );
+			if ( len >= 0 ) 
+			{
+				sBuffer [ len ] = 0;
+				sRecvMessage	= sBuffer;
+				bResult			= true;
+				m_ulReqCount++;
+			} 
+			else 
+			{
+				Error("Failed to read UDP packet");
+			}
 			// create multicast address from send ip and add to list of subnets to send multicasts to and add to list
 			IPAddress result;
 			CalcMulticastAddress ( m_myUDP.remoteIP (), result );
