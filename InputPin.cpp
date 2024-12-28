@@ -57,24 +57,28 @@ void InputPin::ProcessISR ( void )
 		}
 		else
 		{
+			// Unwanted state ie Not matched state
 			if ( ulNow - m_LastChangedTime >= m_Debouncems )
 			{
+				// change back to not matched state, happened after debounce time threshold
+				m_CurrentMatchedState = false;
 				if ( m_maxMatchedTimems == 0 || ulNow - m_LastChangedTime < m_maxMatchedTimems )
 				{
+					// change back to unmatched state happened within maximum time allowed in matched state or no maximum time set
 					m_UnmatchedCount++;
-					m_CurrentMatchedState = false;
+					// calculate duration in matched state
 					m_MatchedDuration	  = ulNow - m_LastChangedTime;
 					UnmatchAction ();
 				}
 				else
 				{
-					// change back to unmatched state happened but outside of required time window
+					// change back to unmatched state happened but outside of maximum time allowed in matched state
 					m_SpuriousCount++;
 				}
 			}
 			else
 			{
-				// changed state to wanted state but too quickly, ignore as a spurious chnage
+				// changed state but too quickly, ignore as a spurious change
 				m_SpuriousCount++;
 			}
 		}
