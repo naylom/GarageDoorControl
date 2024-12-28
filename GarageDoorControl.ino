@@ -100,10 +100,10 @@ DoorState			*pGarageDoor			   = nullptr;
 DoorStatusPin		*pDoorSwitchPin			   = nullptr;
 
 #endif
-// use pwm pins
-constexpr uint8_t RED_PIN	= A4;
-constexpr uint8_t GREEN_PIN = 10;
-constexpr uint8_t BLUE_PIN	= A3;
+
+constexpr pin_size_t RED_PIN	= PIN_A4;
+constexpr pin_size_t GREEN_PIN	= PIN_A3;
+constexpr pin_size_t BLUE_PIN	= 10;
 MNRGBLEDBaseLib	 *pMyLED	= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 180, 120 ); // new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 90, 60 );
 
 /*
@@ -112,7 +112,7 @@ MNRGBLEDBaseLib	 *pMyLED	= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 180,
 constexpr char	  ssid []	= "Naylorfamily"; // your network SSID (name)
 constexpr char	  pass []	= "welcome1";	  // your network password
 #ifdef UAP_SUPPORT
-constexpr char MyHostName [] = "GarageControl";
+constexpr char MyHostName [] = "GarageControl2";
 #else
 constexpr char MyHostName [] = "OfficeTHSensor";
 #endif
