@@ -1,6 +1,9 @@
 #pragma once
+#include <Arduino.h>
+#include <WiFiNINA.h>
+#include "GarageControl.h"
 /*
-
+t
 Logging.h
 
 Arduino macros and function definitions for logging
@@ -22,9 +25,9 @@ History:
 	Debug Config
 */
 constexpr auto BAUD_RATE = 115200;
-#include <Arduino.h>
-#include <WiFiNINA.h>
-#define MNDEBUG
+
+
+
 
 namespace MN ::Utils
 {

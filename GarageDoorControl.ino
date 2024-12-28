@@ -8,6 +8,7 @@
 #include <WiFiNINA.h>
 #include <WiFiUdp.h>
 #include <time.h>
+#include "GarageControl.h"
 #include "WiFiService.h"
 #include "logging.h"
 #include "Display.h"
@@ -51,8 +52,8 @@ History:
 	Ver 1.0.15		Moved display code to own file
 */
 const char * VERSION = "1.0.15 Beta";
-#define TELNET
-#define MNDEBUG
+
+
 #ifdef MNDEBUG
 	#ifdef TELNET
 		ansiVT220Logger MyLogger ( Telnet );
@@ -62,11 +63,12 @@ const char * VERSION = "1.0.15 Beta";
 	#endif
 #endif
 
-#define UAP_SUPPORT
-#define BME280_SUPPORT
+
+
 
 #ifdef BME280_SUPPORT // Temp, humidity and pressure sensor
-struct
+
+struct TEMP_STATS
 {
 		float	 temperature;
 		float	 pressure; // at sea level
@@ -309,6 +311,7 @@ void loop ()
 	if ( millis () - ulLastSensorTime > 30 * 1000 )
 	{
 		MyBME280.read ( EnvironmentResults.pressure, EnvironmentResults.temperature, EnvironmentResults.humidity, BME280::TempUnit::TempUnit_Celsius, BME280::PresUnit::PresUnit_hPa );
+		//Info ( "Temperature: " + String ( EnvironmentResults.temperature ) + "C" );
 		EnvironmentResults.pressure			 = EnvironmentCalculations::EquivalentSeaLevelPressure ( ALTITUDE_COMPENSATION, EnvironmentResults.temperature, EnvironmentResults.pressure );
 		EnvironmentResults.dewpoint			 = EnvironmentCalculations::DewPoint ( EnvironmentResults.temperature, EnvironmentResults.humidity );
 		EnvironmentResults.ulTimeOfReadingms = pMyUDPService->GetTime ();

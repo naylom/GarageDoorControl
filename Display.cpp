@@ -3,10 +3,28 @@
 #include "logging.h"
 #include "WiFiService.h"
 #include "Display.h"
+#include "DoorState.h"
 
 bool	bInfoUseBestTime = false;
 extern ansiVT220Logger MyLogger;
 extern UDPWiFiService	 *pMyUDPService;
+
+#ifdef UAP_SUPPORT
+extern DoorState			*pGarageDoor;
+extern DoorStatusPin		*pDoorSwitchPin;
+#endif
+
+#ifdef BME280_SUPPORT
+extern struct TEMP_STATS
+{
+		float	 temperature;
+		float	 pressure; // at sea level
+		float	 humidity;
+		float	 dewpoint;
+		uint32_t ulTimeOfReadingms;
+} EnvironmentResults;
+#endif
+
 extern const char * VERSION;
 // Error message process used when generating messages during interrupt
 constexpr uint8_t ERROR_LINE	   = 25;
@@ -189,7 +207,7 @@ void DisplayStats ( void )
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 12, 0, F ( "Temperature is " ) );
 	MyLogger.ClearPartofLine ( 12, 16, 6 );
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_RED, ansiVT220Logger::BG_BLACK, 12, 16, String ( EnvironmentResults.temperature ) );
-
+	
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 13, 0, F ( "Humidity is " ) );
 	MyLogger.ClearPartofLine ( 13, 16, 6 );
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 13, 16, String ( EnvironmentResults.humidity ) );
@@ -198,10 +216,16 @@ void DisplayStats ( void )
 	MyLogger.ClearPartofLine ( 14, 16, 7 );
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_YELLOW, ansiVT220Logger::BG_BLACK, 14, 16, String ( EnvironmentResults.pressure ) );
 	#endif
+
 	DisplayNWStatus ( MyLogger );
 	DisplaylastInfoErrorMsg ();
 #endif
 }
+
+/**
+ * @brief Displays the network status on the screen
+ * @param logger the logger to use for displaying the network status
+ */
 void DisplayNWStatus ( ansiVT220Logger logger )
 {
 	// print the SSID of the network you're attached to:
@@ -214,7 +238,7 @@ void DisplayNWStatus ( ansiVT220Logger logger )
 		{
 			uint8_t	  iterator = m_pMulticastDestList->GetIterator ();
 			IPAddress mcastDest;
-			while ( (long unsigned int)( mcastDest = m_pMulticastDestList->GetNext ( iterator ) ) != 0UL )
+			while ( (mcastDest = m_pMulticastDestList->GetNext ( iterator )) != IPAddress((uint32_t)0) )
 			{
 				logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + iterator - 1, 41, "Mcast #" + String ( iterator ) + ": " );
 				logger.ClearPartofLine ( NWPrintStartLine + iterator - 1, 61, 15 );
@@ -248,10 +272,10 @@ void DisplayNWStatus ( ansiVT220Logger logger )
 		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 61, String ( pMyUDPService->GetReplySentCount () ) );
 
 		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 0, F ( "Mac address: " ) );
-		byte bMac [ 6 ];
+		byte bMac [ 6 ] = {0};
 		WiFi.macAddress ( bMac );
 		char s [ 18 ];
-		sprintf ( s, "%02X:%02X:%02X:%02X:%02X:%02X", bMac [ 5 ], bMac [ 4 ], bMac [ 3 ], bMac [ 2 ], bMac [ 1 ], bMac [ 0 ] );
+		snprintf ( s, sizeof(s), "%02X:%02X:%02X:%02X:%02X:%02X", bMac [ 5 ], bMac [ 4 ], bMac [ 3 ], bMac [ 2 ], bMac [ 1 ], bMac [ 0 ] );
 		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 23, s );
 
 		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 6, 0, F ( "Gateway Address: " ) );
