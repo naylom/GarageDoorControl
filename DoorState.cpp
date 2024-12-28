@@ -1,6 +1,7 @@
 #include <MNTimerLib.h>
 #include "DoorState.h"
 #include "Logging.h"
+#include "WiFiService.h"
 /*
 
 DoorState.cpp
@@ -23,7 +24,7 @@ History:
 	Ver 1.0			Initial version
 */
 #define CALL_MEMBER_FN( object, ptrToMember ) ( ( object )->*( ptrToMember ) )
-#include "WiFiService.h"
+
 extern UDPWiFiService *pMyUDPService;
 extern void			   Error ( String s, bool bInISR = false );
 extern void			   Info ( String s, bool bInISR = false );
@@ -40,19 +41,33 @@ const char *DirectionNames [] = // In order of enums
 	{ "Up", "Down", "Stationary" };
 
 DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopPin, pin_size_t LightPin, pin_size_t DoorOpenStatusPin, pin_size_t DoorClosedStatusPin, pin_size_t DoorLightStatusPin )
-	: m_DoorOpenCtrlPin ( OpenPin ), m_DoorCloseCtrlPin ( ClosePin ), m_DoorStopCtrlPin ( StopPin ), m_DoorLightCtrlPin ( LightPin ), m_DoorOpenStatusPin ( DoorOpenStatusPin ), m_DoorClosedStatusPin ( DoorClosedStatusPin ), m_DoorLightStatusPin ( DoorLightStatusPin )
+	: m_DoorOpenCtrlPin ( OpenPin ), 
+	  m_DoorCloseCtrlPin ( ClosePin ), 
+	  m_DoorStopCtrlPin ( StopPin ), 
+	  m_DoorLightCtrlPin ( LightPin ), 
+	  m_DoorOpenStatusPin ( DoorOpenStatusPin ), 
+	  m_DoorClosedStatusPin ( DoorClosedStatusPin ), 
+	  m_DoorLightStatusPin ( DoorLightStatusPin ),
+	  m_pDoorOpenStatusPin ( new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorOpenStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE ) ),
+	  m_pDoorClosedStatusPin ( new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorClosedStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE ) ),
+	  m_pDoorLightStatusPin  ( new DoorStatusPin ( nullptr, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorLightStatusPin, DEBOUNCE_MS, 0, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE ) ),
+	  m_pDoorOpenCtrlPin ( new OutputPin ( m_DoorOpenCtrlPin, RELAY_ON ) ),
+	  m_pDoorCloseCtrlPin ( new OutputPin ( m_DoorCloseCtrlPin, RELAY_ON ) ),
+	  m_pDoorStopCtrlPin ( new OutputPin ( m_DoorStopCtrlPin, RELAY_ON ) ),
+	  m_pDoorLightCtrlPin ( new OutputPin ( m_DoorLightCtrlPin, RELAY_ON ) ),
+	  m_pDoorStatus ( new DoorStatusCalc ( *m_pDoorOpenStatusPin, *m_pDoorClosedStatusPin ) )
 {
 	// m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::DoorOpenTrue, DoorState::Event::DoorOpenFalse, m_DoorOpenStatusPin, DEBOUNCE_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorOpenStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
+	// m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorOpenStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	// m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::DoorClosedTrue, DoorState::Event::DoorClosedFalse, m_DoorClosedStatusPin, DEBOUNCE_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorClosedStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	m_pDoorLightStatusPin  = new DoorStatusPin ( nullptr, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorLightStatusPin, DEBOUNCE_MS, 0, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	m_pDoorOpenCtrlPin	   = new OutputPin ( m_DoorOpenCtrlPin, RELAY_ON );
-	m_pDoorCloseCtrlPin	   = new OutputPin ( m_DoorCloseCtrlPin, RELAY_ON );
-	m_pDoorStopCtrlPin	   = new OutputPin ( m_DoorStopCtrlPin, RELAY_ON );
-	m_pDoorLightCtrlPin	   = new OutputPin ( m_DoorLightCtrlPin, RELAY_ON );
+	// m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorClosedStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
+	// m_pDoorLightStatusPin  = new DoorStatusPin ( nullptr, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorLightStatusPin, DEBOUNCE_MS, 0, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
+	// m_pDoorOpenCtrlPin	   = new OutputPin ( m_DoorOpenCtrlPin, RELAY_ON );
+	// m_pDoorCloseCtrlPin	   = new OutputPin ( m_DoorCloseCtrlPin, RELAY_ON );
+	// m_pDoorStopCtrlPin	   = new OutputPin ( m_DoorStopCtrlPin, RELAY_ON );
+	// m_pDoorLightCtrlPin	   = new OutputPin ( m_DoorLightCtrlPin, RELAY_ON );
 	TurnOffControlPins ();
-	m_pDoorStatus = new DoorStatusCalc ( *m_pDoorOpenStatusPin, *m_pDoorClosedStatusPin );
+	// m_pDoorStatus = new DoorStatusCalc ( *m_pDoorOpenStatusPin, *m_pDoorClosedStatusPin );
 	SetState ( GetDoorInitialState () );
 }
 
@@ -61,11 +76,8 @@ DoorState::State DoorState::GetDoorInitialState ()
 {
 	//  ensure we can read from pins connected to UAP1 outputs
 
-	bool OpenState;
-	bool CloseState;
-
-	CloseState = m_pDoorClosedStatusPin->IsMatched ();
-	OpenState  = m_pDoorOpenStatusPin->IsMatched ();
+	bool OpenState = m_pDoorOpenStatusPin->IsMatched ();
+	bool CloseState = m_pDoorClosedStatusPin->IsMatched ();
 
 	if ( OpenState == CloseState )
 	{
@@ -74,14 +86,7 @@ DoorState::State DoorState::GetDoorInitialState ()
 	}
 	else
 	{
-		if ( OpenState )
-		{
-			return DoorState::State::Open;
-		}
-		else
-		{
-			return DoorState::State::Closed;
-		}
+		return OpenState ? DoorState::State::Open : DoorState::State::Closed;
 	}
 }
 
@@ -216,7 +221,6 @@ void DoorState::ResetTimer ()
 		Error ( "Timer callback add failed", true );
 	}
 }
-
 /// <summary>
 /// DoEvent - Invokes the statetable to execute appropriate action for provided event
 /// </summary>
@@ -226,55 +230,49 @@ void DoorState::DoEvent ( DoorState::Event eEvent )
 {
 	CALL_MEMBER_FN ( this, StateTableFn [ GetDoorState () ][ eEvent ] ) ( eEvent );
 }
-
-/// <summary>
-/// DoRequest - processes request to manipulate door
-/// </summary>
-/// <param name="eRequest">Request that occurred
-/// <returns>None
-void DoorState::DoRequest ( Request eRequest )
+/**
+ * @brief Processes request to manipulate the door
+ * @param eRequest The request that occurred
+ */
+void DoorState::DoRequest(Request eRequest) 
 {
-	String Result;
-	switch ( eRequest )
+    String result;
+    auto handleRequest = [&](const char* action, OutputPin* pin) 
 	{
-		case Request::LightOn:
-			ResetTimer ();
-			Result = " Toggle Light On request";
-			m_pDoorLightCtrlPin->On ();
-			break;
+        ResetTimer();
+        result = action;
+        pin->On();
+    };
 
-		case Request::LightOff:
-			ResetTimer ();
-			Result = " Toggle Light Off request";
-			m_pDoorLightCtrlPin->On ();
-			break;
+    switch (eRequest) {
+        case Request::LightOn:
+            handleRequest("Toggle Light On request", m_pDoorLightCtrlPin);
+            break;
 
-		case Request::CloseDoor:
-			Result = " Close Door request";
-			ResetTimer ();
-			m_pDoorCloseCtrlPin->On ();
-			break;
+        case Request::LightOff:
+            handleRequest("Toggle Light Off request", m_pDoorLightCtrlPin);
+            break;
 
-		case Request::OpenDoor:
-			Result = " Open Door request";
-			ResetTimer ();
-			m_pDoorOpenCtrlPin->On ();
-			break;
+        case Request::CloseDoor:
+            handleRequest("Close Door request", m_pDoorCloseCtrlPin);
+            break;
 
-		case Request::StopDoor:
-			Result = " Stop Door request";
-			ResetTimer ();
-			m_pDoorStopCtrlPin->On ();
-			break;
-	}
-	Info ( Result );
+        case Request::OpenDoor:
+            handleRequest("Open Door request", m_pDoorOpenCtrlPin);
+            break;
+
+        case Request::StopDoor:
+            handleRequest("Stop Door request", m_pDoorStopCtrlPin);
+            break;
+    }
+
+    Info(result);
 }
 
 /// <summary>
 /// GetState - Gets current state
 /// </summary>
 /// <returns> current state
-
 DoorState::State DoorState::GetDoorState ()
 {
 	// return m_theDoorState;

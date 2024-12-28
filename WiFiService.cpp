@@ -53,6 +53,7 @@ void		TerminateProgram ( const __FlashStringHelper *pErrMsg )
 
 WiFiService::WiFiService ()
 {
+	// Set the timezone to GMT with daylight saving time adjustments
 	setenv ( "TZ", "GMTGMT-1,M3.4.0/01,M10.4.0/02", 1 );
 }
 
