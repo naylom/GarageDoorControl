@@ -137,14 +137,14 @@ void setup ()
 	TheMKR_RGB_LED.Invert (); // Only if required!
 	if ( !pMyUDPService->Begin ( ProcessUDPMsg, ssid, pass, MyHostName, &TheMKR_RGB_LED ) )
 	{
-		Error ( "Cannot connect WiFI " );
+		Error ( F ( "Cannot connect WiFI " ) );
 	}
 
 #ifdef BME280_SUPPORT
 	Wire.begin ();
 	if ( !MyBME280.begin () )
 	{
-		Error ( "Could not find BME280 sensor!" );
+		Error ( F ( "Could not find BME280 sensor!" ) );
 		delay ( 1000 );
 	}
 	else
@@ -152,13 +152,13 @@ void setup ()
 		switch ( MyBME280.chipModel () )
 		{
 			case BME280::ChipModel_BME280:
-				Info ( "Found BME280 sensor! Success." );
+				Info (  F ( "Found BME280 sensor! Success." ) );
 				break;
 			case BME280::ChipModel_BMP280:
-				Info ( "Found BMP280 sensor! No Humidity available." );
+				Info ( F ( "Found BMP280 sensor! No Humidity available." ) );
 				break;
 			default:
-				Error ( "Found UNKNOWN sensor! Error!" );
+				Error ( F ( "Found UNKNOWN sensor! Error!" ) );
 		}
 	}
 	DisplaylastInfoErrorMsg ();
@@ -385,7 +385,7 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 				sResponse  = F ( "S=" );
 				sResponse += pGarageDoor->GetDoorDisplayState (); // Door State
 				sResponse += F ( ",L=" );
-				sResponse += pGarageDoor->IsLit () ? "On" : "Off"; // Light on or not
+				sResponse += pGarageDoor->IsLit () ? F ( "On" ) : F ( "Off" ); // Light on or not
 				sResponse += F ( ",C=" );
 				sResponse += pGarageDoor->IsClosed () ? F ( "Y" ) : F ( "N" ); // Closed or not
 				sResponse += F ( ",O=" );
@@ -398,7 +398,7 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 			}
 			else
 			{
-				Error ( "Doordata unavailable" );
+				Error ( F ( "Door data unavailable: pGarageDoor is null" ) );
 			}
 			break;
 

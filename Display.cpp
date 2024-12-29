@@ -119,7 +119,7 @@ void DisplayUptime ( ansiVT220Logger logger, uint8_t line, uint8_t row, ansiVT22
 	}
 	else
 	{
-		// check for wrap around
+		// check for wrap around (when millis() overflows and resets to zero)
 		if ( ulNow > ulStartTime )
 		{
 			uint32_t ulTotalNumSeconds = ( ulNow-ulStartTime ) / 1000;
@@ -129,7 +129,7 @@ void DisplayUptime ( ansiVT220Logger logger, uint8_t line, uint8_t row, ansiVT22
 			uint32_t ulSecs			   = ulTotalNumSeconds % 60;
 
 			char	 sUpTime [ 20 ];
-			sprintf ( sUpTime, "%02d:%02d:%02d:%02d", ulDays, ulHours, ulMinutes, ulSecs );
+			snprintf ( sUpTime, sizeof(sUpTime), "%02d:%02d:%02d:%02d", ulDays, ulHours, ulMinutes, ulSecs );
 			logger.COLOUR_AT ( Foreground, Background, line, row, sUpTime );
 		}
 		else
@@ -166,7 +166,7 @@ void DisplayStats ( void )
 	{
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 4, 0, F ( "Light is " ) );
 		MyLogger.ClearPartofLine ( 4, 14, 3 );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 4, 14, pGarageDoor->IsLit () ? "On" : "Off" );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 4, 14, pGarageDoor->IsLit () ? F ( "On" ) : F ( "Off" ) );
 
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 0, F ( "State is " ) );
 		MyLogger.ClearPartofLine ( 5, 14, 8 );
@@ -192,7 +192,7 @@ void DisplayStats ( void )
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 6, 25, F ( "Door Closed count   " ) );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 43, String ( pGarageDoor->GetDoorClosedCount () ) );
 	}
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 9, 43, "Count     Called Unchngd Matched UnMtchdSpurious Duration" );
+	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 9, 43, F ( "Count     Called Unchngd Matched UnMtchdSpurious Duration" ) );
 	
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 25, F ( "Switch Presssed " ) );
 	if ( pDoorSwitchPin != nullptr )
@@ -252,23 +252,23 @@ void DisplayNWStatus ( ansiVT220Logger logger )
 		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 2, 0, F ( "IP Address: " ) );
 		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 2, 23, pMyUDPService->ToIPString ( WiFi.localIP () ) );
 
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 3, 0, "Subnet Mask: " );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 3, 0, F ( "Subnet Mask: " ) );
 		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 3, 23, pMyUDPService->ToIPString ( WiFi.subnetMask () ) );
 
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 0, "Local Multicast Addr: " );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 0, F ( "Local Multicast Addr: " ) );
 		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 23, pMyUDPService->ToIPString ( pMyUDPService->GetMulticastAddress () ) );
 
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 41, "WiFi connect/fail: " );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 41, F ( "WiFi connect/fail: " ) );
 		logger.ClearPartofLine ( NWPrintStartLine + 4, 61, 10 );
 		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 61, String ( pMyUDPService->GetBeginCount () ) + "/" + String ( pMyUDPService->GetBeginTimeOutCount () ) );
 
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 41, "Multicasts sent: " );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 41, F ( "Multicasts sent: " ) );
 		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 61, String ( pMyUDPService->GetMCastSentCount () ) );
 
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 6, 41, "Requests recvd: " );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 6, 41, F ( "Requests recvd: " ) );
 		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 6, 61, String ( pMyUDPService->GetRequestsReceivedCount () ) );
 
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 41, "Replies sent: " );
+		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 41, F ( "Replies sent: " ) );
 		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 61, String ( pMyUDPService->GetReplySentCount () ) );
 
 		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 0, F ( "Mac address: " ) );

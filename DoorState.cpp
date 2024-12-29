@@ -131,11 +131,14 @@ void DoorState::NowOpening ( Event )
 	m_bDoorStateChanged = true;
 }
 
-/// <summary>
-/// SwitchPressed - controls action when switch pressed
-/// </summary>
-/// <param name="Event">event that occurred
-/// <returns>None
+/**
+ * @brief Handles the event when the switch is pressed.
+ * 
+ * This function determines the action to take based on the current state of the door
+ * and the timing of the switch press. It can open, close, or stop the door.
+ * 
+ * @param Event The event that occurred.
+ */
 void DoorState::SwitchPressed ( Event )
 {
 	uint32_t now = millis();
@@ -157,7 +160,7 @@ void DoorState::SwitchPressed ( Event )
 					// Open door
 					ResetTimer ();
 					// rely on UAP outpins to signal this is happening
-					Info ( "Switch pressed when door closed - opening", true );
+					Info ( F ( "Switch pressed when door closed - opening" ), true );
 					m_pDoorOpenCtrlPin->On ();
 					break;
 
@@ -165,7 +168,7 @@ void DoorState::SwitchPressed ( Event )
 					// Close Door
 					ResetTimer ();
 					// rely on UAP outpins to signal this is happening
-					Info ( "Switch pressed when door open - closing", true );
+					Info ( F ( "Switch pressed when door open - closing" ), true );
 					m_pDoorCloseCtrlPin->On ();
 					break;
 
@@ -175,7 +178,7 @@ void DoorState::SwitchPressed ( Event )
 					ResetTimer ();
 					m_pDoorStopCtrlPin->On ();
 					//  Have to set state since there is no UAP output that signals when this happens
-					Info ( "Switch pressed during moving, stopping door", true );
+					Info ( F ( "Switch pressed during moving, stopping door" ), true );
 					m_pDoorStatus->SetStopped ();
 					break;
 
@@ -186,13 +189,13 @@ void DoorState::SwitchPressed ( Event )
 						case Direction::Down:
 							// Were closing so now open
 							ResetTimer ();
-							Info ( "Switch pressed when door stopped, was going down - opening", true );
+							Info ( F ( "Switch pressed when door stopped, was going down - opening" ), true );
 							m_pDoorOpenCtrlPin->On ();
 							break;
 
 						case Direction::Up:
 							ResetTimer ();
-							Info ( "Switch pressed when door stopped, was going up - closing", true );
+							Info ( F ( "Switch pressed when door stopped, was going up - closing" ), true );
 							m_pDoorCloseCtrlPin->On ();
 							break;
 
@@ -203,7 +206,7 @@ void DoorState::SwitchPressed ( Event )
 
 				case State::Bad:
 				case State::Unknown:
-					Info ( "Switch pressed when state is bad / unknown, doing nothing", true );
+					Info ( F ( "Switch pressed when state is bad / unknown, doing nothing" ), true );
 					break;
 			}
 		}
@@ -220,7 +223,7 @@ void DoorState::ResetTimer ()
 	TurnOffControlPins ();
 	if ( !TheTimer.AddCallBack ( (MNTimerClass *)this, (aMemberFunction)&DoorState::TurnOffControlPins, SIGNAL_PULSE ) )
 	{
-		Error ( "Timer callback add failed", true );
+		Error ( F ( "Timer callback add failed" ), true );
 	}
 }
 /// <summary>
@@ -248,7 +251,7 @@ void DoorState::DoRequest(Request eRequest)
 
     switch (eRequest) {
         case Request::LightOn:
-            handleRequest("Toggle Light On request", m_pDoorLightCtrlPin);
+            handleRequest ( "Toggle Light On request" , m_pDoorLightCtrlPin);
             break;
 
         case Request::LightOff:
@@ -373,18 +376,18 @@ uint32_t DoorState::GetDoorClosingCount ()
 
 void DoorState::GetPinStates ( String &states )
 {
-	states	= String ( "Light: " );
-	states += m_pDoorLightStatusPin->IsMatched () ? "On" : "Off";
-	states += String ( " Open: " );
-	states += m_pDoorOpenStatusPin->IsMatched () ? "On" : "Off";
-	states += String ( " Closed: " );
-	states += m_pDoorClosedStatusPin->IsMatched () ? "On" : "Off";
-	states += String ( " Curr Light: " );
-	states += m_pDoorLightStatusPin->GetCurrentMatchedState () ? "On" : "Off";
-	states += String ( " Opn: " );
-	states += m_pDoorOpenStatusPin->GetCurrentMatchedState () ? "On" : "Off";
-	states += String ( " Clsed: " );
-	states += m_pDoorClosedStatusPin->GetCurrentMatchedState () ? "On" : "Off";
+	states	= String ( F ( "Light: " ) );
+	states += m_pDoorLightStatusPin->IsMatched () ? F ( "On" ) : F ( "Off" );
+	states += String ( F ( " Open: " ) );
+	states += m_pDoorOpenStatusPin->IsMatched () ? F ( "On" ) : F ( "Off" );
+	states += String ( F ( " Closed: " ) );
+	states += m_pDoorClosedStatusPin->IsMatched () ? F ( "On" ) : F ( "Off" );
+	states += String ( F ( " Curr Light: " ) );
+	states += m_pDoorLightStatusPin->GetCurrentMatchedState () ? F ( "On" ) : F ( "Off" );
+	states += String ( F ( " Opn: " ) );
+	states += m_pDoorOpenStatusPin->GetCurrentMatchedState () ? F ( "On" ) : F ( "Off" );
+	states += String ( F ( " Clsed: " ) );
+	states += m_pDoorClosedStatusPin->GetCurrentMatchedState () ? F ( "On" ) : F ( "Off" );
 }
 
 void DoorState::UpdateDoorState ()

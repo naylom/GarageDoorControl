@@ -106,7 +106,7 @@ void ansiVT220Logger::OnClientConnect ( void *plog )
 	Logger *pLog = (Logger *)plog;
 	pLog->print ( SCREEN_SIZE132 );
 	pLog->print ( ansiVT220Logger::OSC + "2;GarageControl Debug\x1b\\" + STRING_TERMINATOR );
-	pLog->print ( "\x1b[63;2\"p" );
+	pLog->print ( F ( "\x1b[63;2\"p" ) );
 }
 
 void ansiVT220Logger::LogStart ()

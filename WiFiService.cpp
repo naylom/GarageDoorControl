@@ -289,7 +289,7 @@ bool UDPWiFiService::Begin ( UDPWiFiServiceCallback pHandleReqData, const char *
 }
 
 void UDPWiFiService::CheckUDP ()
-{
+{ 
 	String Msg = "?";
 	if ( GetUDPMessage ( Msg ) )
 	{
