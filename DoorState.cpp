@@ -30,7 +30,7 @@ extern void			   Error ( String s, bool bInISR = false );
 extern void			   Info ( String s, bool bInISR = false );
 
 constexpr auto		   DOOR_FLASHTIME	  = 10;				 // every 2 seconds
-const int16_t		   SIGNAL_PULSE		  = 2000 * 2;		 // 2000 per sec, so every 1/5 sec, 200 ms
+const int16_t		   SIGNAL_PULSE		  = 2000 * 10;		 // 2000 per sec, so every 1/5 sec, 200 ms
 constexpr uint32_t	   DEBOUNCE_MS		  = 50;				 // min ms between consecutive pin interrupts before signal accepted
 constexpr uint32_t	   MAX_MATCH_TIMER_MS = 1000;			 // max time pin should be in matched state to be considered a real signal
 constexpr PinStatus	   UAP_TRUE			  = PinStatus::HIGH; // UAP signals HIGH when sensor is TRUE

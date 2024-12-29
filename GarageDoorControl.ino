@@ -92,10 +92,10 @@ constexpr uint8_t	 DOOR_IS_CLOSED_STATUS_PIN = 8;
 constexpr uint8_t	 LIGHT_IS_ON_STATUS_PIN	   = 7;
 constexpr uint8_t	 DOOR_SWITCH_INPUT_PIN	   = 0;
 // Don't need to be interrupt pins, outputs to UAP
-constexpr uint8_t	 TURN_LIGHT_ON_OUTPUT_PIN  = 5; //2;
-constexpr uint8_t	 CLOSE_DOOR_OUTPUT_PIN	   = 4; //3;
-constexpr uint8_t	 OPEN_DOOR_OUTPUT_PIN	   = 2; //4;
-constexpr uint8_t	 STOP_DOOR_OUTPUT_PIN	   = 3; //5;
+constexpr uint8_t	 TURN_LIGHT_ON_OUTPUT_PIN  = 2;
+constexpr uint8_t	 CLOSE_DOOR_OUTPUT_PIN	   = 3;
+constexpr uint8_t	 OPEN_DOOR_OUTPUT_PIN	   = 4;
+constexpr uint8_t	 STOP_DOOR_OUTPUT_PIN	   = 5;
 
 constexpr uint32_t	 SWITCH_DEBOUNCE_MS		   = 100;  // min ms between consecutive pin interrupts before signal accepted from manual switch
 constexpr uint32_t	 MAX_SWITCH_MATCH_TIMER_MS = 2000; // max time pin should be in matched state to be considered a real signal

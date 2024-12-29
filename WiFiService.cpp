@@ -173,7 +173,7 @@ void WiFiService::CalcMulticastAddress ( IPAddress ip, IPAddress &subnetMask )
 		// Class C
 		subnetMask = IPAddress ( 255, 255, 255, 0 );
 	}
-	subnetMask = ( ip & subnetMask ) | ( ~subnetMask & 0x00FFFFFF );
+	subnetMask = ( ip & subnetMask ) | ( ~subnetMask );
 }
 
 IPAddress WiFiService::GetMulticastAddress ()
