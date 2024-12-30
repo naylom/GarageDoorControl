@@ -90,12 +90,14 @@ class DoorState
 		const pin_size_t m_DoorOpenStatusPin;	// Used to get status if door is open or not
 		const pin_size_t m_DoorClosedStatusPin; // Used to get status if door is closed or not
 		const pin_size_t m_DoorLightStatusPin;	// Used to get status if door light is on or not
+		const pin_size_t m_DoorSwitchStatusPin; // Used to get status of switch press
+
 		DoorStatusCalc	*m_pDoorStatus		 = nullptr;
 		OutputPin		*m_pDoorOpenCtrlPin	 = nullptr; // Objects to handle controlling door actions
 		OutputPin		*m_pDoorCloseCtrlPin = nullptr;
 		OutputPin		*m_pDoorStopCtrlPin	 = nullptr;
 		OutputPin		*m_pDoorLightCtrlPin = nullptr;
-
+		
 		enum Direction : uint8_t { Up, Down, None };
 
 		volatile Direction m_LastDirection = Direction::None;
@@ -107,8 +109,9 @@ class DoorState
 		DoorStatusPin *m_pDoorOpenStatusPin	  = nullptr; // Objects to handle pins giving door status
 		DoorStatusPin *m_pDoorClosedStatusPin = nullptr;
 		DoorStatusPin *m_pDoorLightStatusPin  = nullptr;
+		DoorStatusPin *m_pDoorSwitchStatusPin = nullptr; // Object to handle switch press
 
-		DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopPin, pin_size_t LightPin, pin_size_t DoorOpenStatusPin, pin_size_t DoorClosedStatusPin, pin_size_t DoorLightStatusPin );
+		DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopPin, pin_size_t LightPin, pin_size_t DoorOpenStatusPin, pin_size_t DoorClosedStatusPin, pin_size_t DoorLightStatusPin, pin_size_t m_DoorSwitchStatusPin );
 		void		DoEvent ( Event eEvent );
 		void		DoRequest ( Request eRequest );
 		const char *GetDoorDisplayState ();

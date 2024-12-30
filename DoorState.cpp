@@ -29,6 +29,8 @@ extern UDPWiFiService *pMyUDPService;
 extern void			   Error ( String s, bool bInISR = false );
 extern void			   Info ( String s, bool bInISR = false );
 
+constexpr uint32_t	 SWITCH_DEBOUNCE_MS		   = 100;  // min ms between consecutive pin interrupts before signal accepted from manual switch
+constexpr uint32_t	 MAX_SWITCH_MATCH_TIMER_MS = 2000; // max time pin should be in matched state to be considered a real signal
 constexpr auto		   DOOR_FLASHTIME	  = 10;				 // every 2 seconds
 const int16_t		   SIGNAL_PULSE		  = 2000 * 10;		 // 2000 per sec, so every 1/5 sec, 200 ms
 constexpr uint32_t	   DEBOUNCE_MS		  = 50;				 // min ms between consecutive pin interrupts before signal accepted
@@ -40,7 +42,7 @@ const char			  *StateNames []	  = // In order of State enums!
 const char *DirectionNames [] = // In order of enums
 	{ "Up", "Down", "Stationary" };
 
-DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopPin, pin_size_t LightPin, pin_size_t DoorOpenStatusPin, pin_size_t DoorClosedStatusPin, pin_size_t DoorLightStatusPin )
+DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopPin, pin_size_t LightPin, pin_size_t DoorOpenStatusPin, pin_size_t DoorClosedStatusPin, pin_size_t DoorLightStatusPin, pin_size_t DoorSwitchStatusPin )
 	: m_DoorOpenCtrlPin ( OpenPin ), 
 	  m_DoorCloseCtrlPin ( ClosePin ), 
 	  m_DoorStopCtrlPin ( StopPin ), 
@@ -48,11 +50,11 @@ DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopP
 	  m_DoorOpenStatusPin ( DoorOpenStatusPin ), 
 	  m_DoorClosedStatusPin ( DoorClosedStatusPin ), 
 	  m_DoorLightStatusPin ( DoorLightStatusPin ),
-	  //m_DoorSwitchStatusPin ( DoorSwitchPin ),
+	  m_DoorSwitchStatusPin ( DoorSwitchStatusPin ),
 	  m_pDoorOpenStatusPin ( new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorOpenStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE ) ),
 	  m_pDoorClosedStatusPin ( new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorClosedStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE ) ),
 	  m_pDoorLightStatusPin  ( new DoorStatusPin ( nullptr, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorLightStatusPin, DEBOUNCE_MS, 0, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE ) ),
-	//m_pDoorSwitchStatusPin = new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::SwitchPress, m_DoorSwitchStatusPin, SWITCH_DEBOUNCE_MS, MAX_SWITCH_MATCH_TIMER_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );	  
+	  m_pDoorSwitchStatusPin ( new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::SwitchPress, m_DoorSwitchStatusPin, SWITCH_DEBOUNCE_MS, MAX_SWITCH_MATCH_TIMER_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE ) ),
 	  m_pDoorOpenCtrlPin ( new OutputPin ( m_DoorOpenCtrlPin, RELAY_ON_VALUE ) ),
 	  m_pDoorCloseCtrlPin ( new OutputPin ( m_DoorCloseCtrlPin, RELAY_ON_VALUE ) ),
 	  m_pDoorStopCtrlPin ( new OutputPin ( m_DoorStopCtrlPin, RELAY_ON_VALUE ) ),

@@ -11,7 +11,7 @@ extern UDPWiFiService	 *pMyUDPService;
 
 #ifdef UAP_SUPPORT
 extern DoorState			*pGarageDoor;
-extern DoorStatusPin		*pDoorSwitchPin;
+//extern DoorStatusPin		*pDoorSwitchPin;
 #endif
 
 #ifdef BME280_SUPPORT
@@ -195,10 +195,10 @@ void DisplayStats ( void )
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 9, 43, F ( "Count     Called Unchngd Matched UnMtchdSpurious Duration" ) );
 	
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 25, F ( "Switch Presssed " ) );
-	if ( pDoorSwitchPin != nullptr )
+	if ( pGarageDoor->m_pDoorSwitchStatusPin != nullptr )
 	{
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 10, 43, String ( pDoorSwitchPin->GetMatchedCount () ) );
-		pDoorSwitchPin->DebugStats ( result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 10, 43, String ( pGarageDoor->m_pDoorSwitchStatusPin->GetMatchedCount () ) );
+		pGarageDoor->m_pDoorSwitchStatusPin->DebugStats ( result );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 50, result );
 	}
 	#endif
