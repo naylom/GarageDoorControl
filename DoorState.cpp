@@ -144,6 +144,7 @@ void DoorState::NowOpening ( Event )
 void DoorState::SwitchPressed ( Event )
 {
 	uint32_t now = millis();
+/*	
 	static bool bAwaitingSecondPush = false;
 	if ( now - m_ulSwitchPressedTime > 2000UL )
 	{
@@ -156,6 +157,7 @@ void DoorState::SwitchPressed ( Event )
 		{
 			// second push within 2 secs
 			bAwaitingSecondPush = false;	// reset
+*/			
 			switch ( GetDoorState () )
 			{
 				case State::Closed:
@@ -211,8 +213,10 @@ void DoorState::SwitchPressed ( Event )
 					Info ( F ( "Switch pressed when state is bad / unknown, doing nothing" ), true );
 					break;
 			}
+/*			
 		}
 	}
+*/	
 	m_ulSwitchPressedTime = now;
 }
 
