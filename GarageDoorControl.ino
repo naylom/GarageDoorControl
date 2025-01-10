@@ -127,6 +127,9 @@ unsigned long	  ulLastClientReq  = 0UL; // millis of last wifi incoming message
 // main setup routine
 void setup ()
 {
+	//Serial.begin ( 115200 );
+	//while ( !Serial )
+		;
 	MyLogger.LogStart ();
 	MyLogger.ClearScreen ();
 

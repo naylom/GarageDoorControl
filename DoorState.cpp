@@ -58,8 +58,8 @@ DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopP
 	  m_pDoorOpenCtrlPin ( new OutputPin ( m_DoorOpenCtrlPin, RELAY_ON_VALUE ) ),
 	  m_pDoorCloseCtrlPin ( new OutputPin ( m_DoorCloseCtrlPin, RELAY_ON_VALUE ) ),
 	  m_pDoorStopCtrlPin ( new OutputPin ( m_DoorStopCtrlPin, RELAY_ON_VALUE ) ),
-	  m_pDoorLightCtrlPin ( new OutputPin ( m_DoorLightCtrlPin, RELAY_ON_VALUE ) ),
-	  m_pDoorStatus ( new DoorStatusCalc ( *m_pDoorOpenStatusPin, *m_pDoorClosedStatusPin ) )
+	  m_pDoorLightCtrlPin ( new OutputPin ( m_DoorLightCtrlPin, RELAY_ON_VALUE ) )
+	  //m_pDoorStatus ( new DoorStatusCalc ( *m_pDoorOpenStatusPin, *m_pDoorClosedStatusPin ) )
 {
 	// m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::DoorOpenTrue, DoorState::Event::DoorOpenFalse, m_DoorOpenStatusPin, DEBOUNCE_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
 	// m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorOpenStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
@@ -71,7 +71,8 @@ DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopP
 	// m_pDoorStopCtrlPin	   = new OutputPin ( m_DoorStopCtrlPin, RELAY_ON );
 	// m_pDoorLightCtrlPin	   = new OutputPin ( m_DoorLightCtrlPin, RELAY_ON );
 	TurnOffControlPins ();
-	// m_pDoorStatus = new DoorStatusCalc ( *m_pDoorOpenStatusPin, *m_pDoorClosedStatusPin );
+	delay ( 10 );
+	m_pDoorStatus = new DoorStatusCalc ( *m_pDoorOpenStatusPin, *m_pDoorClosedStatusPin ) ;
 	SetState ( GetDoorInitialState () );
 }
 
@@ -105,7 +106,7 @@ void DoorState::NowOpen ( Event )
 {
 	// State has changed
 	SetState ( State::Open );
-	m_LastDirection		= Direction::Up;
+	SetDoorDirection ( Direction::Up );
 	m_bDoorStateChanged = true;
 }
 
@@ -164,7 +165,7 @@ void DoorState::SwitchPressed ( Event )
 					// Open door
 					ResetTimer ();
 					// rely on UAP outpins to signal this is happening
-					Info ( F ( "Switch pressed when door closed - opening" ), true );
+					//Info ( F ( "Switch pressed when door closed - opening" ), true );
 					m_pDoorOpenCtrlPin->On ();
 					break;
 
@@ -172,7 +173,7 @@ void DoorState::SwitchPressed ( Event )
 					// Close Door
 					ResetTimer ();
 					// rely on UAP outpins to signal this is happening
-					Info ( F ( "Switch pressed when door open - closing" ), true );
+					//Info ( F ( "Switch pressed when door open - closing" ), true );
 					m_pDoorCloseCtrlPin->On ();
 					break;
 
@@ -182,7 +183,7 @@ void DoorState::SwitchPressed ( Event )
 					ResetTimer ();
 					m_pDoorStopCtrlPin->On ();
 					//  Have to set state since there is no UAP output that signals when this happens
-					Info ( F ( "Switch pressed during moving, stopping door" ), true );
+					//Info ( F ( "Switch pressed during moving, stopping door" ), true );
 					m_pDoorStatus->SetStopped ();
 					break;
 
@@ -193,24 +194,26 @@ void DoorState::SwitchPressed ( Event )
 						case Direction::Down:
 							// Were closing so now open
 							ResetTimer ();
-							Info ( F ( "Switch pressed when door stopped, was going down - opening" ), true );
+							//Info ( F ( "Switch pressed when door stopped, was going down - opening" ), true );
 							m_pDoorOpenCtrlPin->On ();
 							break;
 
 						case Direction::Up:
 							ResetTimer ();
-							Info ( F ( "Switch pressed when door stopped, was going up - closing" ), true );
+							//Info ( F ( "Switch pressed when door stopped, was going up - closing" ), true );
 							m_pDoorCloseCtrlPin->On ();
 							break;
 
 						default:
+							String s = "Switch pressed when door stopped, unknown last direction - doing nothing" ;
+							//Info ( s, true );
 							break;
 					}
 					break;
 
 				case State::Bad:
 				case State::Unknown:
-					Info ( F ( "Switch pressed when state is bad / unknown, doing nothing" ), true );
+					//Info ( F ( "Switch pressed when state is bad / unknown, doing nothing" ), true );
 					break;
 			}
 /*			
@@ -421,7 +424,7 @@ DoorStatusPin::DoorStatusPin ( DoorState *pDoor, DoorState::Event matchEvent, Do
 	: InputPin ( pin, debouncems, maxMatchedTimems, matchStatus, mode, status ), m_pDoor ( pDoor ), m_doorMatchEvent ( matchEvent ), m_doorUnmatchEvent ( unmatchEvent )
 {
 	// Set pin to source 7mA and sink 10mA rather than default 2 / 2.5 mA, see https://forum.arduino.cc/t/are-the-zeros-pins-set-to-strong-drive-strength-by-default/404930
-	PORT->Group[g_APinDescription[pin].ulPort].PINCFG[g_APinDescription[pin].ulPin].bit.DRVSTR = 1;
+	//PORT->Group[g_APinDescription[pin].ulPort].PINCFG[g_APinDescription[pin].ulPin].bit.DRVSTR = 1;
 }
 
 void DoorStatusPin::MatchAction ()
@@ -468,7 +471,12 @@ void DoorStatusCalc::UpdateStatus ()
 
 			case DoorState::State::Bad:
 				m_LastDirection = Direction::None;
+				Info ( "State None false, false, Bad" );
 				m_currentState	= DoorState::State::Unknown;
+				break;
+
+			case DoorState::State::Stopped:
+				//Info ( "State stopped, " + String (m_LastDirection) );
 				break;
 
 			default:
@@ -478,17 +486,20 @@ void DoorStatusCalc::UpdateStatus ()
 	}
 	else if ( bIsClosed == false && bIsOpen == true )
 	{
+		//Info ( "Setting door as open" );
 		m_currentState	= DoorState::State::Open;
-		m_LastDirection = Direction::None;
+		m_LastDirection = Direction::None;		
 	}
 	else if ( bIsClosed == true && bIsOpen == false )
 	{
+		//Info ( "Setting door as closed" );
 		m_currentState	= DoorState::State::Closed;
 		m_LastDirection = Direction::None;
 	}
 	else
 	{
 		// both true!
+		Info ( "Setting door status as bad" );
 		m_currentState	= DoorState::State::Bad;
 		m_LastDirection = Direction::None;
 	}
@@ -503,10 +514,14 @@ DoorStatusCalc::Direction DoorStatusCalc::GetDoorDirection ()
 {
 	return m_LastDirection;
 }
+void DoorStatusCalc::SetDoorDirection ( DoorStatusCalc::Direction direction )
+{
+	m_LastDirection = direction;
+}
 
 const char *DoorStatusCalc::GetDoorDirectionName ()
 {
-	return DirectionNames [ GetDoorDirection () ];
+	return DirectionNames [ GetDoorDirection () % ( sizeof ( DirectionNames ) /  sizeof ( DirectionNames [ 0 ] ) ) ];	
 }
 
 void DoorStatusCalc::SetStopped ()

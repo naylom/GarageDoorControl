@@ -154,6 +154,7 @@ class DoorStatusCalc
 		void					  UpdateStatus ();
 		DoorState::State		  GetDoorState ();
 		DoorStatusCalc::Direction GetDoorDirection ();
+		void 					  SetDoorDirection ( DoorStatusCalc::Direction direction) ;
 		const char				 *GetDoorDirectionName ();
 		void					  SetStopped ();
 

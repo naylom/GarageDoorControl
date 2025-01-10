@@ -53,6 +53,7 @@ void			  GetLocalTime ( String &Result )
 void   Error ( String s, bool bInISR )
 {
 	String Result;
+	//Serial.println ( s );
 	// do not call when in ISR level code path
 	if ( !bInISR )
 	{
@@ -69,6 +70,7 @@ void   Error ( String s, bool bInISR )
 void Info ( String s, bool bInISR )
 {
 	String Result;
+	//Serial.println ( s);
 	// do not call when in ISR level code path
 	if ( !bInISR )
 	{
