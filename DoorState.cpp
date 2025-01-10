@@ -101,7 +101,6 @@ void DoorState::SetDoorState ( DoorState::State newState )
 	{
 		m_pDoorStatus->SetDoorState ( newState );
 	}
-	//m_theDoorState == newState;
 }
 
 // routines called when event occurs, these are called from within an interrupt and need to be short
@@ -110,7 +109,7 @@ void DoorState::NowOpen ( Event )
 {
 	// State has changed
 	SetDoorState ( State::Open );
-	SetDoorDirection ( Direction::Up );
+	SetDoorDirection ( DoorState::Direction::Up );
 	m_bDoorStateChanged = true;
 }
 
@@ -118,14 +117,14 @@ void DoorState::NowClosed ( Event )
 {
 	// State has changed
 	SetDoorState ( State::Closed );
-	SetDoorDirection ( Direction::Down );
+	SetDoorDirection ( DoorState::Direction::Down );
 	m_bDoorStateChanged = true;
 }
 
 void DoorState::NowClosing ( Event )
 {
 	// State has changed
-	SetDoorState ( State::Closing );
+	SetDoorState ( DoorState::State::Closing );
 	SetDoorDirection ( Direction::Down );
 	m_bDoorStateChanged = true;
 }
@@ -133,7 +132,7 @@ void DoorState::NowClosing ( Event )
 void DoorState::NowOpening ( Event )
 {
 	// State has changed
-	SetDoorState ( State::Opening );
+	SetDoorState ( DoorState::State::Opening );
 	SetDoorDirection ( Direction::Up );
 	m_bDoorStateChanged = true;
 }
@@ -169,7 +168,6 @@ void DoorState::SwitchPressed ( Event )
 					// Open door
 					ResetTimer ();
 					// rely on UAP outpins to signal this is happening
-					//Info ( F ( "Switch pressed when door closed - opening" ), true );
 					m_pDoorOpenCtrlPin->On ();
 					break;
 
@@ -177,7 +175,6 @@ void DoorState::SwitchPressed ( Event )
 					// Close Door
 					ResetTimer ();
 					// rely on UAP outpins to signal this is happening
-					//Info ( F ( "Switch pressed when door open - closing" ), true );
 					m_pDoorCloseCtrlPin->On ();
 					break;
 
@@ -187,8 +184,7 @@ void DoorState::SwitchPressed ( Event )
 					ResetTimer ();
 					m_pDoorStopCtrlPin->On ();
 					//  Have to set state since there is no UAP output that signals when this happens
-					//Info ( F ( "Switch pressed during moving, stopping door" ), true );
-					SetDoorDirection ( DoorState::Direction::None );
+					// do not set direction as we need to know what it was doing before we stopped
 					SetDoorState ( DoorState::State::Stopped );
 					m_pDoorStatus->SetStopped ();
 					break;
@@ -196,31 +192,27 @@ void DoorState::SwitchPressed ( Event )
 				case State::Stopped:
 					// go in reverse
 					switch ( GetDoorDirection() )
-					//switch ( m_LastDirection )
 					{
 						case Direction::Down:
 							// Were closing so now open
 							ResetTimer ();
-							//Info ( F ( "Switch pressed when door stopped, was going down - opening" ), true );
 							m_pDoorOpenCtrlPin->On ();
 							break;
 
 						case Direction::Up:
 							ResetTimer ();
-							//Info ( F ( "Switch pressed when door stopped, was going up - closing" ), true );
 							m_pDoorCloseCtrlPin->On ();
 							break;
 
 						default:
-							String s = "Switch pressed when door stopped, unknown last direction - doing nothing" ;
-							//Info ( s, true );
+							Info ( "Switch pressed when door stopped, unknown last direction - doing nothing", true );
 							break;
 					}
 					break;
 
 				case State::Bad:
 				case State::Unknown:
-					//Info ( F ( "Switch pressed when state is bad / unknown, doing nothing" ), true );
+					Info ( "Switch pressed when state is bad / unknown, doing nothing", true );
 					break;
 			}
 /*			
@@ -495,6 +487,7 @@ void DoorStatusCalc::UpdateStatus ()
 {
 	bool bIsClosed = m_closePin.GetCurrentMatchedState ();
 	bool bIsOpen   = m_openPin.GetCurrentMatchedState ();
+	static bool once = true;
 
 	if ( bIsClosed == false && bIsOpen == false )
 	{
@@ -527,15 +520,13 @@ void DoorStatusCalc::UpdateStatus ()
 	}
 	else if ( bIsClosed == false && bIsOpen == true )
 	{
-		//Info ( "Setting door as open" );
 		SetDoorState ( DoorState::State::Open );
 		SetDoorDirection ( DoorState::Direction::None );		
 	}
 	else if ( bIsClosed == true && bIsOpen == false )
 	{
-		//Info ( "Setting door as closed" );
 		SetDoorState ( DoorState::State::Closed );
-		SetDoorDirection ( DoorState::Direction::None );
+		SetDoorDirection ( DoorState::Direction::None );			
 	}
 	else
 	{
