@@ -183,7 +183,7 @@ void DisplayStats ( void )
 
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 6, 0, F ( "Direction is " ) );
 		MyLogger.ClearPartofLine ( 6, 14, 10 );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 6, 14, pGarageDoor->GetDoorDirection () );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 6, 14, pGarageDoor->GetDoorDirectionName () );
 
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 4, 25, F ( "Light Off count     " ) );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 43, String ( pGarageDoor->GetLightOffCount () ) );

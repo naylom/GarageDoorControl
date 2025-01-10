@@ -46,6 +46,8 @@ class DoorState
 	public:
 		enum State : uint8_t { Open = 0, Opening, Closed, Closing, Stopped, Unknown, Bad };
 
+		enum Direction : uint8_t { Up, Down, None };
+
 		enum Event : uint8_t { DoorOpenTrue = 0, DoorOpenFalse, DoorClosedTrue, DoorClosedFalse, SwitchPress, Nothing };
 
 		enum Request : uint8_t { LightOn = 0, LightOff, OpenDoor, CloseDoor, StopDoor };
@@ -80,7 +82,7 @@ class DoorState
 			{ &DoorState::NowOpen, &DoorState::NowClosing, &DoorState::NowClosed, &DoorState::NowOpening, &DoorState::SwitchPressed, &DoorState::DoNowt }  // Actions when current state is Bad
 		};
 
-		volatile State	 m_theDoorState		 = State::Unknown;
+		volatile State	 m_theDoorState		 = DoorState::State::Unknown;
 		volatile bool	 m_bDoorStateChanged = true;
 		volatile uint32_t	m_ulSwitchPressedTime = 0UL;
 		const pin_size_t m_DoorOpenCtrlPin;		// Used to request door is opened
@@ -97,12 +99,11 @@ class DoorState
 		OutputPin		*m_pDoorCloseCtrlPin = nullptr;
 		OutputPin		*m_pDoorStopCtrlPin	 = nullptr;
 		OutputPin		*m_pDoorLightCtrlPin = nullptr;
-		
-		enum Direction : uint8_t { Up, Down, None };
 
-		volatile Direction m_LastDirection = Direction::None;
+		volatile Direction m_LastDirection = DoorState::Direction::None;
+		void			   SetDoorDirection ( DoorState::Direction direction );
 		void			   ResetTimer ();
-		void			   SetState ( DoorState::State newState );
+		void			   SetDoorState ( DoorState::State newState );
 		void			   TurnOffControlPins (); // bring low all pins controlling garage functions
 
 	public:
@@ -112,23 +113,24 @@ class DoorState
 		DoorStatusPin *m_pDoorSwitchStatusPin = nullptr; // Object to handle switch press
 
 		DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopPin, pin_size_t LightPin, pin_size_t DoorOpenStatusPin, pin_size_t DoorClosedStatusPin, pin_size_t DoorLightStatusPin, pin_size_t m_DoorSwitchStatusPin );
-		void		DoEvent ( Event eEvent );
-		void		DoRequest ( Request eRequest );
-		const char *GetDoorDisplayState ();
-		State		GetDoorState ();
-		bool		IsOpen ();
-		bool		IsMoving ();
-		bool		IsClosed ();
-		bool		IsLit ();
-		const char *GetDoorDirection ();
-		uint32_t	GetLightOnCount ();
-		uint32_t	GetLightOffCount ();
-		uint32_t	GetDoorOpenedCount ();
-		uint32_t	GetDoorOpeningCount ();
-		uint32_t	GetDoorClosedCount ();
-		uint32_t	GetDoorClosingCount ();
-		void		GetPinStates ( String &states );
-		void		UpdateDoorState ();
+		void				DoEvent ( Event eEvent );
+		void				DoRequest ( Request eRequest );
+		const char *		GetDoorDisplayState ();
+		DoorState::State	GetDoorState ();
+		DoorState::Direction GetDoorDirection ();
+		bool				IsOpen ();
+		bool				IsMoving ();
+		bool				IsClosed ();
+		bool				IsLit ();
+		const char *		GetDoorDirectionName ();
+		uint32_t			GetLightOnCount ();
+		uint32_t			GetLightOffCount ();
+		uint32_t			GetDoorOpenedCount ();
+		uint32_t			GetDoorOpeningCount ();
+		uint32_t			GetDoorClosedCount ();
+		uint32_t			GetDoorClosingCount ();
+		void				GetPinStates ( String &states );
+		void				UpdateDoorState ();
 };
 
 /// @brief DoorStatusPin is a type of InputPin that performs additional actions when the pin matches or fails to match the required state
@@ -145,22 +147,24 @@ class DoorStatusPin : public InputPin
 		void			 UnmatchAction ();
 };
 
+/// @brief sets the door status based on current input pin readings from UAP and prior state
 class DoorStatusCalc
 {
 	public:
-		enum Direction : uint8_t { Up, Down, None };
+		//enum Direction : uint8_t { Up, Down, None };
 
 		DoorStatusCalc ( DoorStatusPin &openPin, DoorStatusPin &closePin );
 		void					  UpdateStatus ();
 		DoorState::State		  GetDoorState ();
-		DoorStatusCalc::Direction GetDoorDirection ();
-		void 					  SetDoorDirection ( DoorStatusCalc::Direction direction) ;
+		void					  SetDoorState ( DoorState::State state );	
+		DoorState::Direction 	  GetDoorDirection ();
+		void 					  SetDoorDirection ( DoorState::Direction direction );
 		const char				 *GetDoorDirectionName ();
 		void					  SetStopped ();
 
 	private:
-		DoorStatusPin	&m_openPin;
-		DoorStatusPin	&m_closePin;
-		DoorState::State m_currentState;
-		Direction		 m_LastDirection = Direction::None;
+		DoorStatusPin			 		&m_openPin;
+		DoorStatusPin			 		&m_closePin;
+		volatile DoorState::State 		 m_currentState;
+		volatile DoorState::Direction 	 m_LastDirection = DoorState::Direction::None;
 };

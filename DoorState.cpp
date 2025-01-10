@@ -73,7 +73,7 @@ DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopP
 	TurnOffControlPins ();
 	delay ( 10 );
 	m_pDoorStatus = new DoorStatusCalc ( *m_pDoorOpenStatusPin, *m_pDoorClosedStatusPin ) ;
-	SetState ( GetDoorInitialState () );
+	SetDoorState ( GetDoorInitialState () );
 }
 
 // Find initial state of door
@@ -95,9 +95,13 @@ DoorState::State DoorState::GetDoorInitialState ()
 	}
 }
 
-void DoorState::SetState ( DoorState::State newState )
+void DoorState::SetDoorState ( DoorState::State newState )
 {
-	m_theDoorState == newState;
+	if ( m_pDoorStatus != nullptr )
+	{
+		m_pDoorStatus->SetDoorState ( newState );
+	}
+	//m_theDoorState == newState;
 }
 
 // routines called when event occurs, these are called from within an interrupt and need to be short
@@ -105,7 +109,7 @@ void DoorState::SetState ( DoorState::State newState )
 void DoorState::NowOpen ( Event )
 {
 	// State has changed
-	SetState ( State::Open );
+	SetDoorState ( State::Open );
 	SetDoorDirection ( Direction::Up );
 	m_bDoorStateChanged = true;
 }
@@ -113,24 +117,24 @@ void DoorState::NowOpen ( Event )
 void DoorState::NowClosed ( Event )
 {
 	// State has changed
-	SetState ( State::Closed );
-	m_LastDirection		= Direction::Down;
+	SetDoorState ( State::Closed );
+	SetDoorDirection ( Direction::Down );
 	m_bDoorStateChanged = true;
 }
 
 void DoorState::NowClosing ( Event )
 {
 	// State has changed
-	SetState ( State::Closing );
-	m_LastDirection		= Direction::Down;
+	SetDoorState ( State::Closing );
+	SetDoorDirection ( Direction::Down );
 	m_bDoorStateChanged = true;
 }
 
 void DoorState::NowOpening ( Event )
 {
 	// State has changed
-	SetState ( State::Opening );
-	m_LastDirection		= Direction::Up;
+	SetDoorState ( State::Opening );
+	SetDoorDirection ( Direction::Up );
 	m_bDoorStateChanged = true;
 }
 
@@ -184,12 +188,15 @@ void DoorState::SwitchPressed ( Event )
 					m_pDoorStopCtrlPin->On ();
 					//  Have to set state since there is no UAP output that signals when this happens
 					//Info ( F ( "Switch pressed during moving, stopping door" ), true );
+					SetDoorDirection ( DoorState::Direction::None );
+					SetDoorState ( DoorState::State::Stopped );
 					m_pDoorStatus->SetStopped ();
 					break;
 
 				case State::Stopped:
 					// go in reverse
-					switch ( m_LastDirection )
+					switch ( GetDoorDirection() )
+					//switch ( m_LastDirection )
 					{
 						case Direction::Down:
 							// Were closing so now open
@@ -221,6 +228,14 @@ void DoorState::SwitchPressed ( Event )
 	}
 */	
 	m_ulSwitchPressedTime = now;
+}
+
+void DoorState::SetDoorDirection ( DoorState::Direction direction )
+{
+	if ( m_pDoorStatus != nullptr )
+	{
+		m_pDoorStatus->SetDoorDirection ( direction );
+	}	
 }
 
 /// <summary>
@@ -290,7 +305,29 @@ void DoorState::DoRequest(Request eRequest)
 DoorState::State DoorState::GetDoorState ()
 {
 	// return m_theDoorState;
-	return m_pDoorStatus->GetDoorState ();
+	if ( m_pDoorStatus != nullptr )
+	{
+		return m_pDoorStatus->GetDoorState ();
+	}
+	else
+	{
+		return DoorState::State::Unknown;
+	}
+}
+/// <summary>
+/// GetDirection - Gets current direction
+/// </summary>
+/// <returns> current state
+DoorState::Direction DoorState::GetDoorDirection()
+{
+	if ( m_pDoorStatus != nullptr )
+	{
+		return m_pDoorStatus->GetDoorDirection ();
+	}
+	else
+	{
+		return DoorState::Direction::None;
+	}
 }
 
 /// <summary>
@@ -299,7 +336,7 @@ DoorState::State DoorState::GetDoorState ()
 /// <returns> current state as string
 const char *DoorState::GetDoorDisplayState ()
 {
-	return StateNames [ GetDoorState () ];
+	return StateNames [ GetDoorState () % ( sizeof ( StateNames ) / sizeof ( StateNames [ 0 ] ) )];
 }
 
 /// <summary>
@@ -336,7 +373,7 @@ bool DoorState::IsLit ()
 	return m_pDoorLightStatusPin->IsMatched ();
 }
 
-const char *DoorState::GetDoorDirection ()
+const char *DoorState::GetDoorDirectionName ()
 {
 	return m_pDoorStatus->GetDoorDirectionName ();
 }
@@ -443,10 +480,14 @@ void DoorStatusPin::UnmatchAction ()
 	}
 }
 
+/* -------------------------------------------------------------------------------------------------------------------------------------------------- */
+/* DoorStatusCalc */
+/* -------------------------------------------------------------------------------------------------------------------------------------------------- */
+
 DoorStatusCalc::DoorStatusCalc ( DoorStatusPin &openPin, DoorStatusPin &closePin ) : m_closePin ( closePin ), m_openPin ( openPin )
 {
-	m_currentState	= DoorState::Unknown;
-	m_LastDirection = Direction::None;
+	SetDoorState ( DoorState::Unknown );
+	SetDoorDirection ( DoorState::None );
 }
 
 /// @brief sets the door status based on current input pin readings and prior state
@@ -457,22 +498,22 @@ void DoorStatusCalc::UpdateStatus ()
 
 	if ( bIsClosed == false && bIsOpen == false )
 	{
-		switch ( m_currentState )
+		switch ( GetDoorState () )
 		{
 			case DoorState::State::Open:
-				m_LastDirection = Direction::Down;
-				m_currentState	= DoorState::State::Closing;
+				SetDoorDirection ( DoorState::Direction::Down );
+				SetDoorState ( DoorState::State::Closing );
 				break;
 
 			case DoorState::State::Closed:
-				m_LastDirection = Direction::Up;
-				m_currentState	= DoorState::State::Opening;
+				SetDoorDirection ( DoorState::Direction::Up );
+				SetDoorState ( DoorState::State::Opening );
 				break;
 
 			case DoorState::State::Bad:
-				m_LastDirection = Direction::None;
+				SetDoorDirection ( DoorState::Direction::None );
 				Info ( "State None false, false, Bad" );
-				m_currentState	= DoorState::State::Unknown;
+				SetDoorState ( DoorState::State::Unknown );
 				break;
 
 			case DoorState::State::Stopped:
@@ -487,21 +528,21 @@ void DoorStatusCalc::UpdateStatus ()
 	else if ( bIsClosed == false && bIsOpen == true )
 	{
 		//Info ( "Setting door as open" );
-		m_currentState	= DoorState::State::Open;
-		m_LastDirection = Direction::None;		
+		SetDoorState ( DoorState::State::Open );
+		SetDoorDirection ( DoorState::Direction::None );		
 	}
 	else if ( bIsClosed == true && bIsOpen == false )
 	{
 		//Info ( "Setting door as closed" );
-		m_currentState	= DoorState::State::Closed;
-		m_LastDirection = Direction::None;
+		SetDoorState ( DoorState::State::Closed );
+		SetDoorDirection ( DoorState::Direction::None );
 	}
 	else
 	{
 		// both true!
 		Info ( "Setting door status as bad" );
-		m_currentState	= DoorState::State::Bad;
-		m_LastDirection = Direction::None;
+		SetDoorState ( DoorState::State::Bad );
+		SetDoorDirection ( DoorState::Direction::None );
 	}
 }
 
@@ -510,11 +551,17 @@ DoorState::State DoorStatusCalc::GetDoorState ()
 	return m_currentState;
 }
 
-DoorStatusCalc::Direction DoorStatusCalc::GetDoorDirection ()
+void DoorStatusCalc::SetDoorState(DoorState::State state)
+{
+	m_currentState = state;
+}
+
+DoorState::Direction DoorStatusCalc::GetDoorDirection ()
 {
 	return m_LastDirection;
 }
-void DoorStatusCalc::SetDoorDirection ( DoorStatusCalc::Direction direction )
+
+void DoorStatusCalc::SetDoorDirection ( DoorState::Direction direction )
 {
 	m_LastDirection = direction;
 }
@@ -526,5 +573,5 @@ const char *DoorStatusCalc::GetDoorDirectionName ()
 
 void DoorStatusCalc::SetStopped ()
 {
-	m_currentState = DoorState::State::Stopped;
+	SetDoorState ( DoorState::State::Stopped );
 }
