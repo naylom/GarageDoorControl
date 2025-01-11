@@ -34,7 +34,7 @@ optocouplers.
 
 I also wanted to add a manual momentary switch in the garage to opwn and shut the door. This was
 unexpectedly one of the more troublesome parts of the project. I found that using a MKR WiFI 1010
-3.3V pin to detect the switch being pressed suffered from a lot of moise and eevn with debounce
+3.3V pin to detect the switch being pressed suffered from a lot of noise and even with debounce
 logic gave false positives. After trying many things including using cat6 shielded FTP cable, 
 I found the answer was to use 24V (borrowed from the Hormann UAP) to drive the switch connection
 and again to use an EL815 optocoupler to allow the Arduino to monitor the result with a 3.3V pin.
@@ -44,16 +44,27 @@ display VT220 based diagnostic information over telnet. This removed the need to
 and PC close to this garage controller.
 
 In summary the hardware components are:
+
 Arduino MKR WIFI 1010
+
 5 EL815 optocouplers
+
 1 Momentary switch
+
 1 BME280 Temperature / Humnidity / Pressuree sensor
+
 1 Hormann UAP connecte dto the Hormann door motor
 
 The software components are
+
 Software to process status signals from the UAP
+
 Software to send command signals to the UAP
+
 Software to process in coming UDP packets with commands from the user
+
 Software to send UDP packets in response to the user commands
+
 Software to send UDP broadcast packets when door status or temperature / humidity / pressure changes
+
 Software to process manual switch presses.
