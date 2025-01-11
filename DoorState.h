@@ -34,7 +34,7 @@ constexpr RGBType	DOOR_BAD_COLOUR			  = MNRGBLEDBaseLib::DARK_YELLOW;
 constexpr RGBType	DOOR_UNKNOWN_COLOUR		  = MNRGBLEDBaseLib::BLUE;
 constexpr uint8_t	DOOR_STATIONARY_FLASHTIME = 0;
 constexpr uint8_t	DOOR_MOVING_FLASHTIME	  = 10; // 20 = 1 sec
-constexpr PinStatus RELAY_ON_VALUE				  = HIGH;
+constexpr PinStatus RELAY_ON_VALUE			  = HIGH;
 constexpr PinStatus RELAY_OFF				  = LOW;
 
 class DoorStatusPin;
@@ -46,7 +46,7 @@ class DoorState
 	public:
 		enum State : uint8_t { Open = 0, Opening, Closed, Closing, Stopped, Unknown, Bad };
 
-		enum Direction : uint8_t { Up, Down, None };
+		enum Direction : uint8_t { Up = 0, Down, None };
 
 		enum Event : uint8_t { DoorOpenTrue = 0, DoorOpenFalse, DoorClosedTrue, DoorClosedFalse, SwitchPress, Nothing };
 
@@ -61,11 +61,9 @@ class DoorState
 		void			 NowOpening ( Event event );
 		void			 SwitchPressed ( Event event );
 
-		DoorState::State GetDoorInitialState ();
-
-		typedef void ( DoorState::*StateFunction ) ( Event ); // prototype of function to handle event
-		const StateFunction StateTableFn [ 7 ][ 6 ] = {
-	// [State][Event]
+		typedef void ( DoorState::*StateFunction ) ( Event ); 	// prototype of function to handle event
+		const StateFunction StateTableFn [ 7 ][ 6 ] = 			// State table of functions to call when event occurs. Order : [State][Event]
+		{	
 			{ &DoorState::DoNowt, &DoorState::NowClosing, &DoorState::NowClosed, &DoorState::DoNowt, &DoorState::SwitchPressed, &DoorState::DoNowt }, // Actions when current state is Open
 			{ &DoorState::NowOpen, &DoorState::DoNowt, &DoorState::NowClosed, &DoorState::DoNowt, &DoorState::SwitchPressed, &DoorState::DoNowt }, // Actions when current state is Opening
 			{ &DoorState::NowOpen, &DoorState::DoNowt, &DoorState::DoNowt, &DoorState::NowOpening, &DoorState::SwitchPressed, &DoorState::DoNowt }, // Actions when current state is Closed
@@ -82,25 +80,24 @@ class DoorState
 			{ &DoorState::NowOpen, &DoorState::NowClosing, &DoorState::NowClosed, &DoorState::NowOpening, &DoorState::SwitchPressed, &DoorState::DoNowt }  // Actions when current state is Bad
 		};
 
-		volatile State	 m_theDoorState		 = DoorState::State::Unknown;
-		volatile bool	 m_bDoorStateChanged = true;
+		volatile State	 	m_theDoorState		 = DoorState::State::Unknown;
+		volatile bool	 	m_bDoorStateChanged = true;
 		volatile uint32_t	m_ulSwitchPressedTime = 0UL;
-		const pin_size_t m_DoorOpenCtrlPin;		// Used to request door is opened
-		const pin_size_t m_DoorCloseCtrlPin;	// Used to request door is closed
-		const pin_size_t m_DoorStopCtrlPin;		// Used to request door is stopped
-		const pin_size_t m_DoorLightCtrlPin;	// Used to request light is turned on or off
-		const pin_size_t m_DoorOpenStatusPin;	// Used to get status if door is open or not
-		const pin_size_t m_DoorClosedStatusPin; // Used to get status if door is closed or not
-		const pin_size_t m_DoorLightStatusPin;	// Used to get status if door light is on or not
-		const pin_size_t m_DoorSwitchStatusPin; // Used to get status of switch press
+		const pin_size_t 	m_DoorOpenCtrlPin;		// Used to request door is opened
+		const pin_size_t 	m_DoorCloseCtrlPin;		// Used to request door is closed
+		const pin_size_t 	m_DoorStopCtrlPin;		// Used to request door is stopped
+		const pin_size_t 	m_DoorLightCtrlPin;		// Used to request light is turned on or off
+		const pin_size_t 	m_DoorOpenStatusPin;	// Used to get status if door is open or not
+		const pin_size_t 	m_DoorClosedStatusPin; 	// Used to get status if door is closed or not
+		const pin_size_t 	m_DoorLightStatusPin;	// Used to get status if door light is on or not
+		const pin_size_t 	m_DoorSwitchStatusPin; 	// Used to get status of switch press
 
-		DoorStatusCalc	*m_pDoorStatus		 = nullptr;
-		OutputPin		*m_pDoorOpenCtrlPin	 = nullptr; // Objects to handle controlling door actions
-		OutputPin		*m_pDoorCloseCtrlPin = nullptr;
-		OutputPin		*m_pDoorStopCtrlPin	 = nullptr;
-		OutputPin		*m_pDoorLightCtrlPin = nullptr;
+		DoorStatusCalc		*m_pDoorStatus		 = nullptr;	// Object to handle door status
+		OutputPin			*m_pDoorOpenCtrlPin	 = nullptr; // Objects to handle controlling door actions
+		OutputPin			*m_pDoorCloseCtrlPin = nullptr;
+		OutputPin			*m_pDoorStopCtrlPin	 = nullptr;
+		OutputPin			*m_pDoorLightCtrlPin = nullptr;
 
-		volatile Direction m_LastDirection = DoorState::Direction::None;
 		void			   SetDoorDirection ( DoorState::Direction direction );
 		void			   ResetTimer ();
 		void			   SetDoorState ( DoorState::State newState );
@@ -151,9 +148,7 @@ class DoorStatusPin : public InputPin
 class DoorStatusCalc
 {
 	public:
-		//enum Direction : uint8_t { Up, Down, None };
-
-		DoorStatusCalc ( DoorStatusPin &openPin, DoorStatusPin &closePin );
+								  DoorStatusCalc ( DoorStatusPin &openPin, DoorStatusPin &closePin );
 		void					  UpdateStatus ();
 		DoorState::State		  GetDoorState ();
 		void					  SetDoorState ( DoorState::State state );	

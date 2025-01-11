@@ -29,17 +29,17 @@ extern UDPWiFiService *pMyUDPService;
 extern void			   Error ( String s, bool bInISR = false );
 extern void			   Info ( String s, bool bInISR = false );
 
-constexpr uint32_t	 SWITCH_DEBOUNCE_MS		   = 100;  // min ms between consecutive pin interrupts before signal accepted from manual switch
-constexpr uint32_t	 MAX_SWITCH_MATCH_TIMER_MS = 2000; // max time pin should be in matched state to be considered a real signal
-constexpr auto		   DOOR_FLASHTIME	  = 10;				 // every 2 seconds
-const int16_t		   SIGNAL_PULSE		  = 2000 * 10;		 // 2000 per sec, so every 1/5 sec, 200 ms
-constexpr uint32_t	   DEBOUNCE_MS		  = 50;				 // min ms between consecutive pin interrupts before signal accepted
-constexpr uint32_t	   MAX_MATCH_TIMER_MS = 1000;			 // max time pin should be in matched state to be considered a real signal
-constexpr PinStatus	   UAP_TRUE			  = PinStatus::HIGH; // UAP signals HIGH when sensor is TRUE
+constexpr uint32_t	   SWITCH_DEBOUNCE_MS		   	= 100;  				// min ms between consecutive pin interrupts before signal accepted from manual switch
+constexpr uint32_t	   MAX_SWITCH_MATCH_TIMER_MS 	= 2000; 				// max time pin should be in matched state to be considered a real signal
+constexpr auto		   DOOR_FLASHTIME	  			= 10;				 	// every 2 seconds
+const int16_t		   SIGNAL_PULSE		  			= 2000 * 10;		 	// 2000 per sec, so every 1/5 sec, 200 ms
+constexpr uint32_t	   DEBOUNCE_MS		  			= 50;				 	// min ms between consecutive pin interrupts before signal accepted
+constexpr uint32_t	   MAX_MATCH_TIMER_MS 			= 1000;			 		// max time pin should be in matched state to be considered a real signal
+constexpr PinStatus	   UAP_TRUE			  			= PinStatus::HIGH; 		// UAP signals HIGH when sensor is TRUE
 
 const char			  *StateNames []	  = // In order of State enums!
 	{ "Opened", "Opening", "Closed", "Closing", "Stopped", "Unknown", "Bad" };
-const char *DirectionNames [] = // In order of enums
+const char *DirectionNames [] = // In order of Direction enums
 	{ "Up", "Down", "Stationary" };
 
 DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopPin, pin_size_t LightPin, pin_size_t DoorOpenStatusPin, pin_size_t DoorClosedStatusPin, pin_size_t DoorLightStatusPin, pin_size_t DoorSwitchStatusPin )
@@ -59,41 +59,12 @@ DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopP
 	  m_pDoorCloseCtrlPin ( new OutputPin ( m_DoorCloseCtrlPin, RELAY_ON_VALUE ) ),
 	  m_pDoorStopCtrlPin ( new OutputPin ( m_DoorStopCtrlPin, RELAY_ON_VALUE ) ),
 	  m_pDoorLightCtrlPin ( new OutputPin ( m_DoorLightCtrlPin, RELAY_ON_VALUE ) )
-	  //m_pDoorStatus ( new DoorStatusCalc ( *m_pDoorOpenStatusPin, *m_pDoorClosedStatusPin ) )
 {
-	// m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::DoorOpenTrue, DoorState::Event::DoorOpenFalse, m_DoorOpenStatusPin, DEBOUNCE_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	// m_pDoorOpenStatusPin   = new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorOpenStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	// m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::DoorClosedTrue, DoorState::Event::DoorClosedFalse, m_DoorClosedStatusPin, DEBOUNCE_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	// m_pDoorClosedStatusPin = new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorClosedStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	// m_pDoorLightStatusPin  = new DoorStatusPin ( nullptr, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorLightStatusPin, DEBOUNCE_MS, 0, HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	// m_pDoorOpenCtrlPin	   = new OutputPin ( m_DoorOpenCtrlPin, RELAY_ON );
-	// m_pDoorCloseCtrlPin	   = new OutputPin ( m_DoorCloseCtrlPin, RELAY_ON );
-	// m_pDoorStopCtrlPin	   = new OutputPin ( m_DoorStopCtrlPin, RELAY_ON );
-	// m_pDoorLightCtrlPin	   = new OutputPin ( m_DoorLightCtrlPin, RELAY_ON );
 	TurnOffControlPins ();
 	delay ( 10 );
-	m_pDoorStatus = new DoorStatusCalc ( *m_pDoorOpenStatusPin, *m_pDoorClosedStatusPin ) ;
-	SetDoorState ( GetDoorInitialState () );
+	m_pDoorStatus = new DoorStatusCalc ( *m_pDoorOpenStatusPin, *m_pDoorClosedStatusPin );
 }
 
-// Find initial state of door
-DoorState::State DoorState::GetDoorInitialState ()
-{
-	//  ensure we can read from pins connected to UAP1 outputs
-
-	bool OpenState = m_pDoorOpenStatusPin->IsMatched ();
-	bool CloseState = m_pDoorClosedStatusPin->IsMatched ();
-
-	if ( OpenState == CloseState )
-	{
-		// still not resolved, assume stopped
-		return DoorState::State::Stopped;
-	}
-	else
-	{
-		return OpenState ? DoorState::State::Open : DoorState::State::Closed;
-	}
-}
 
 void DoorState::SetDoorState ( DoorState::State newState )
 {
@@ -105,6 +76,15 @@ void DoorState::SetDoorState ( DoorState::State newState )
 
 // routines called when event occurs, these are called from within an interrupt and need to be short
 // care to be taken to not invoke WifiNina calls or SPI calls to built in LED.
+
+/**
+ * @brief Record state of door when UAP has signalled door is open.
+ * 
+ * This function updates the door state to `Open` and sets the door direction to `Up`.
+ * It also marks that the door state has changed.
+ * 
+ * @param Event unused
+ */
 void DoorState::NowOpen ( Event )
 {
 	// State has changed
@@ -113,22 +93,39 @@ void DoorState::NowOpen ( Event )
 	m_bDoorStateChanged = true;
 }
 
-void DoorState::NowClosed ( Event )
+/**
+ * @brief Record state of door when UAP has signalled door is closed.
+ * 
+ * This function updates the door state to `Closed` and sets the door direction to `Down`.
+ * It also marks that the door state has changed.
+ * 
+ * @param Event unused
+ */
+void DoorState::NowClosed(Event) 
 {
-	// State has changed
-	SetDoorState ( State::Closed );
-	SetDoorDirection ( DoorState::Direction::Down );
-	m_bDoorStateChanged = true;
+    // State has changed
+    SetDoorState(State::Closed);
+    SetDoorDirection(DoorState::Direction::Down);
+    m_bDoorStateChanged = true;
 }
 
-void DoorState::NowClosing ( Event )
-{
-	// State has changed
-	SetDoorState ( DoorState::State::Closing );
-	SetDoorDirection ( Direction::Down );
-	m_bDoorStateChanged = true;
+/**
+ * @brief Record state of door when UAP has signalled door is closing.
+ * 
+ * This function updates the door state to `Closing` and sets the door direction to `Down`.
+ * It also marks that the door state has changed.
+ * 
+ * @param Event unused
+ */
+void DoorState::NowClosing(Event) {
+    // State has changed
+    SetDoorState(DoorState::State::Closing);
+    SetDoorDirection(Direction::Down);
+    m_bDoorStateChanged = true;
 }
 
+/// @brief Record state of door when UAP has signalled door is opening
+/// @param  unused
 void DoorState::NowOpening ( Event )
 {
 	// State has changed
@@ -141,87 +138,71 @@ void DoorState::NowOpening ( Event )
  * @brief Handles the event when the switch is pressed.
  * 
  * This function determines the action to take based on the current state of the door
- * and the timing of the switch press. It can open, close, or stop the door.
+ * It can open, close, or stop the door.
  * 
- * @param Event The event that occurred.
+ * @param Event unused
  */
 void DoorState::SwitchPressed ( Event )
 {
 	uint32_t now = millis();
-/*	
-	static bool bAwaitingSecondPush = false;
-	if ( now - m_ulSwitchPressedTime > 2000UL )
+	switch ( GetDoorState () )
 	{
-		// been > 2 secs since last switch press so restart looking for 2 consecutive pushes
-		bAwaitingSecondPush = true;
-	}
-	else
-	{
-		if ( bAwaitingSecondPush )
-		{
-			// second push within 2 secs
-			bAwaitingSecondPush = false;	// reset
-*/			
-			switch ( GetDoorState () )
+		case State::Closed:
+			// Open door
+			ResetTimer ();
+			// rely on UAP outpins to signal this is happening
+			m_pDoorOpenCtrlPin->On ();
+			break;
+
+		case State::Open:
+			// Close Door
+			ResetTimer ();
+			// rely on UAP outpins to signal this is happening
+			m_pDoorCloseCtrlPin->On ();
+			break;
+
+		case State::Opening:
+		case State::Closing:
+			// Stop Door
+			ResetTimer ();
+			m_pDoorStopCtrlPin->On ();
+			//  Have to set state since there is no UAP output that signals when this happens
+			// do not change direction as we need to know what it was doing before we stopped so we can reverse if needed
+			SetDoorState ( DoorState::State::Stopped );
+			break;
+
+		case State::Stopped:
+			// go in reverse
+			switch ( GetDoorDirection() )
 			{
-				case State::Closed:
-					// Open door
+				case Direction::Down:
+					// Were closing so now open
 					ResetTimer ();
-					// rely on UAP outpins to signal this is happening
 					m_pDoorOpenCtrlPin->On ();
 					break;
 
-				case State::Open:
-					// Close Door
+				case Direction::Up:
+					// was going up when stopped so now close
 					ResetTimer ();
-					// rely on UAP outpins to signal this is happening
 					m_pDoorCloseCtrlPin->On ();
 					break;
 
-				case State::Opening:
-				case State::Closing:
-					// Stop Door
-					ResetTimer ();
-					m_pDoorStopCtrlPin->On ();
-					//  Have to set state since there is no UAP output that signals when this happens
-					// do not set direction as we need to know what it was doing before we stopped
-					SetDoorState ( DoorState::State::Stopped );
-					m_pDoorStatus->SetStopped ();
-					break;
-
-				case State::Stopped:
-					// go in reverse
-					switch ( GetDoorDirection() )
-					{
-						case Direction::Down:
-							// Were closing so now open
-							ResetTimer ();
-							m_pDoorOpenCtrlPin->On ();
-							break;
-
-						case Direction::Up:
-							ResetTimer ();
-							m_pDoorCloseCtrlPin->On ();
-							break;
-
-						default:
-							Info ( "Switch pressed when door stopped, unknown last direction - doing nothing", true );
-							break;
-					}
-					break;
-
-				case State::Bad:
-				case State::Unknown:
-					Info ( "Switch pressed when state is bad / unknown, doing nothing", true );
+				default:
+					Info ( "Switch pressed when door stopped, unknown last direction - doing nothing", true );
 					break;
 			}
-/*			
-		}
+			break;
+
+		case State::Bad:
+		case State::Unknown:
+			Info ( "Switch pressed when state is bad / unknown, doing nothing", true );
+			break;
 	}
-*/	
 	m_ulSwitchPressedTime = now;
 }
 
+/// @brief called from ISR when a UAP status pin is activated
+/// @param direction direction door is moving in
 void DoorState::SetDoorDirection ( DoorState::Direction direction )
 {
 	if ( m_pDoorStatus != nullptr )
@@ -265,7 +246,8 @@ void DoorState::DoRequest(Request eRequest)
         pin->On();
     };
 
-    switch (eRequest) {
+    switch (eRequest) 
+	{
         case Request::LightOn:
             handleRequest ( "Toggle Light On request" , m_pDoorLightCtrlPin);
             break;
@@ -473,16 +455,23 @@ void DoorStatusPin::UnmatchAction ()
 }
 
 /* -------------------------------------------------------------------------------------------------------------------------------------------------- */
-/* DoorStatusCalc */
+//   DoorStatusCalc
 /* -------------------------------------------------------------------------------------------------------------------------------------------------- */
 
+/// @brief Initialises DoorStatusCalc with the pin objects that are used to determine the door status
+/// @param openPin 
+/// @param closePin 
 DoorStatusCalc::DoorStatusCalc ( DoorStatusPin &openPin, DoorStatusPin &closePin ) : m_closePin ( closePin ), m_openPin ( openPin )
 {
 	SetDoorState ( DoorState::Unknown );
 	SetDoorDirection ( DoorState::None );
+	UpdateStatus ();
 }
 
 /// @brief sets the door status based on current input pin readings and prior state
+/// @brief This function is called from the main loop and should not be called from an ISR
+/// @param none
+/// @return none
 void DoorStatusCalc::UpdateStatus ()
 {
 	bool bIsClosed = m_closePin.GetCurrentMatchedState ();
