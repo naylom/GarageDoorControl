@@ -56,8 +56,13 @@ WiFiService::WiFiService ()
 	// Set the timezone to GMT with daylight saving time adjustments
 	setenv ( "TZ", "GMTGMT-1,M3.4.0/01,M10.4.0/02", 1 );
 }
+/// @brief Destructor to clean up the WiFiService
+WiFiService::~WiFiService()
+{
+	WiFiDisconnect();
+}
 
-const char *WiFiService::WiFiStatusToString ( uint8_t iState )
+const char *WiFiService::WiFiStatusToString ( uint8_t iState ) const
 {
 	if ( iState == 255 )
 	{
@@ -76,22 +81,22 @@ const char *WiFiService::WiFiStatusToString ( uint8_t iState )
 	}
 }
 
-uint32_t WiFiService::GetBeginTimeOutCount ()
+uint32_t WiFiService::GetBeginTimeOutCount () const
 {
 	return m_beginTimeouts;
 }
 
-const char *WiFiService::GetHostName ()
+const char *WiFiService::GetHostName () const
 {
 	return m_HostName;
 }
 
-unsigned long WiFiService::GetTime ()
+unsigned long WiFiService::GetTime () const
 {
 	return WiFi.getTime ();
 }
 
-WiFiService::Status WiFiService::GetState ()
+WiFiService::Status WiFiService::GetState () const
 {
 	return m_State;
 }
@@ -149,12 +154,12 @@ void WiFiService::Begin ( const char *HostName, const char *WiFissid, const char
 	}
 }
 
-void WiFiService::CalcMyMulticastAddress ( IPAddress &result )
+void WiFiService::CalcMyMulticastAddress ( IPAddress &result ) const
 {
 	CalcMulticastAddress ( WiFi.localIP (), result );
 }
 
-void WiFiService::CalcMulticastAddress ( IPAddress ip, IPAddress &subnetMask )
+void WiFiService::CalcMulticastAddress ( IPAddress ip, IPAddress &subnetMask ) const
 {
 	subnetMask		   = IPAddress ( 0UL ); // WiFi.subnetMask();
 	uint8_t firstOctet = ( ip & 0xff );
@@ -176,7 +181,7 @@ void WiFiService::CalcMulticastAddress ( IPAddress ip, IPAddress &subnetMask )
 	subnetMask = ( ip & subnetMask ) | ( ~subnetMask );
 }
 
-IPAddress WiFiService::GetMulticastAddress ()
+IPAddress WiFiService::GetMulticastAddress () const
 {
 	return m_multicastAddr;
 }
@@ -237,7 +242,7 @@ String WiFiService::ToIPString ( const IPAddress &address )
 	return String ( address [ 0 ] ) + "." + address [ 1 ] + "." + address [ 2 ] + "." + address [ 3 ];
 }
 
-bool WiFiService::IsConnected ()
+bool WiFiService::IsConnected () const
 {
 	return WiFi.status () == WL_CONNECTED;
 }

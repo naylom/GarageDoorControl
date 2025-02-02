@@ -1,6 +1,6 @@
 #include "OutputPin.h"
 
-OutputPin::OutputPin ( pin_size_t Pin, PinStatus OnStatus ) : m_Pin ( Pin ), m_OnStatus ( OnStatus )
+OutputPin::OutputPin ( pin_size_t Pin, PinStatus OnStatus ) : m_Pin ( Pin ), m_OnStatus ( OnStatus ), m_pinStatus(LOW)
 {
 	pinMode ( m_Pin, OUTPUT );
 	delay ( 10 );
@@ -28,12 +28,12 @@ void OutputPin::Pulse ( uint32_t milliSec )
 	Off();
 }
 
-inline PinStatus OutputPin::Status ()
+inline PinStatus OutputPin::Status () const
 {
 	return m_pinStatus;
 }
 
-pin_size_t OutputPin::pinNumber ()
+pin_size_t OutputPin::pinNumber () const
 {
 	return m_Pin;
 }
@@ -45,7 +45,7 @@ void OutputPin::Write ( PinStatus status )
 	m_ulTimeWritten = millis();
 }
 
-uint32_t  OutputPin::GetTimeWritten()
+uint32_t  OutputPin::GetTimeWritten() const
 {
 	return m_ulTimeWritten;
 }

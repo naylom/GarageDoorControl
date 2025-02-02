@@ -9,18 +9,20 @@ class InputPin
 {
 	public:
 		InputPin ( pin_size_t pin, uint32_t debouncems, uint32_t maxMatchedTimems, PinStatus matchStatus, PinMode mode = PinMode::INPUT, PinStatus status = PinStatus::CHANGE );
-		void	 ProcessISR ();
-		bool	 IsMatched ();
-		uint32_t GetMatchedCount ();
-		uint32_t GetUnmatchedCount ();
-		uint32_t GetInvokedCount ();
-		uint32_t GetSpuriousCount ();
-		uint32_t GetDiscardUnchangedCount ();
-		uint32_t GetLastMatchedDuration();
-		void	 DebugStats ( String &result );
-		bool	 GetCurrentMatchedState();
+		~InputPin();
+
+		bool	 IsMatched () const;
+		uint32_t GetMatchedCount () const;
+		uint32_t GetUnmatchedCount () const;
+		uint32_t GetInvokedCount () const;
+		uint32_t GetSpuriousCount () const;
+		uint32_t GetDiscardUnchangedCount () const;
+		uint32_t GetLastMatchedDuration() const;
+		void	 DebugStats ( String &result ) const;
+		bool	 GetCurrentMatchedState() const ;
 
 	private:
+		void	 		   ProcessISR ();
 		virtual void	   MatchAction ()	= 0;
 		virtual void	   UnmatchAction () = 0;
 		static void		   InputPinISR ( void *pParam );

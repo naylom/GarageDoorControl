@@ -343,16 +343,12 @@ void loop ()
 			MulticastMsg ( UDPWiFiService::ReqMsgType::DOORDATA );
 		}
 	}
-	if ( pGarageDoor->m_pDoorSwitchStatusPin != nullptr && pMyUDPService != nullptr )
+	if ( pGarageDoor->IsSwitchConfigured() && pMyUDPService != nullptr )
 	{
 		static uint16_t SwitchPressedCount		 = 0;
-		uint16_t		LatestSwitchPressedCount = pGarageDoor->m_pDoorSwitchStatusPin->GetMatchedCount ();
+		uint16_t		LatestSwitchPressedCount = pGarageDoor->GetSwitchMatchCount ();
 		if ( LatestSwitchPressedCount > SwitchPressedCount )
 		{
-			if ( pGarageDoor->m_pDoorSwitchStatusPin->GetCurrentMatchedState () )
-			{
-				// Info ( "Switch pressed" );
-			}
 			SwitchPressedCount = LatestSwitchPressedCount;
 		}
 	}

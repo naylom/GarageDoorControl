@@ -42,6 +42,22 @@ const char			  *StateNames []	  = // In order of State enums!
 const char *DirectionNames [] = // In order of Direction enums
 	{ "Up", "Down", "Stationary" };
 
+/**
+ * @brief Constructs a `DoorState` object.
+ * 
+ * This constructor initializes a `DoorState` object with the specified pin configurations for controlling and monitoring the door.
+ * It sets up the control pins for opening, closing, stopping, and lighting the door, as well as the status pins for detecting the door's state.
+ * The constructor also initializes the debounce and match timers for the status pins and sets the initial state of the control pins to off.
+ * 
+ * @param OpenPin The pin used to control opening the door.
+ * @param ClosePin The pin used to control closing the door.
+ * @param StopPin The pin used to control stopping the door.
+ * @param LightPin The pin used to control the door light.
+ * @param DoorOpenStatusPin The pin used to detect if the door is open.
+ * @param DoorClosedStatusPin The pin used to detect if the door is closed.
+ * @param DoorLightStatusPin The pin used to detect the status of the door light.
+ * @param DoorSwitchStatusPin The pin used to detect the status of the door switch.
+ */
 DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopPin, pin_size_t LightPin, pin_size_t DoorOpenStatusPin, pin_size_t DoorClosedStatusPin, pin_size_t DoorLightStatusPin, pin_size_t DoorSwitchStatusPin )
 	: m_DoorOpenCtrlPin ( OpenPin ), 
 	  m_DoorCloseCtrlPin ( ClosePin ), 
@@ -65,7 +81,13 @@ DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopP
 	m_pDoorStatus = new DoorStatusCalc ( *m_pDoorOpenStatusPin, *m_pDoorClosedStatusPin );
 }
 
-
+/**
+ * @brief Sets the state of the door.
+ * 
+ * This function updates the state of the door by calling the `SetDoorState` method of the `m_pDoorStatus` object.
+ * 
+ * @param newState The new state to set for the door.
+ */
 void DoorState::SetDoorState ( DoorState::State newState )
 {
 	if ( m_pDoorStatus != nullptr )
@@ -230,7 +252,8 @@ void DoorState::ResetTimer ()
 /// <returns>None
 void DoorState::DoEvent ( DoorState::Event eEvent )
 {
-	CALL_MEMBER_FN ( this, StateTableFn [ GetDoorState () ][ eEvent ] ) ( eEvent );
+	//CALL_MEMBER_FN ( this, DoorState::StateTableFn [ GetDoorState () ][ eEvent ] ) ( eEvent );
+	(this->*DoorState::StateTableFn[GetDoorState()][eEvent])(eEvent); // Call the appropriate member function based on the current state and event
 }
 /**
  * @brief Processes request to manipulate the door
@@ -239,7 +262,7 @@ void DoorState::DoEvent ( DoorState::Event eEvent )
 void DoorState::DoRequest(Request eRequest) 
 {
     String result;
-    auto handleRequest = [&](const char* action, OutputPin* pin) 
+	auto handleRequest = [&](const char* action, std::unique_ptr<OutputPin>& pin) 
 	{
         ResetTimer();
         result = action;
@@ -352,48 +375,80 @@ const char *DoorState::GetDoorDirectionName ()
 	return m_pDoorStatus->GetDoorDirectionName ();
 }
 
+bool DoorState::IsSwitchConfigured () const
+{
+	return m_pDoorSwitchStatusPin != nullptr;
+}
+
+uint32_t DoorState::GetSwitchMatchCount () const
+{
+	if ( IsSwitchConfigured() )
+	{
+		return m_pDoorSwitchStatusPin->GetMatchedCount ();
+	}
+	else
+	{
+		return 0;
+	}
+}
+
+void DoorState::SwitchDebugStats ( String& result ) const
+{
+	if ( IsSwitchConfigured() )
+	{
+		m_pDoorSwitchStatusPin->DebugStats ( result );
+	}
+}
+
 /// @brief get the number of time the Light has switched on
 /// @return count of times the light was on
-uint32_t DoorState::GetLightOnCount ()
+uint32_t DoorState::GetLightOnCount () const
 {
 	return m_pDoorLightStatusPin->GetMatchedCount ();
 }
 
 /// @brief get the number of time the Light has switched off
 /// @return count of times the light was off
-uint32_t DoorState::GetLightOffCount ()
+uint32_t DoorState::GetLightOffCount () const
 {
 	return m_pDoorLightStatusPin->GetUnmatchedCount ();
 }
 
 /// @brief get the number of time the Door Opened
 /// @return count of times the door was in fully opened state
-uint32_t DoorState::GetDoorOpenedCount ()
+uint32_t DoorState::GetDoorOpenedCount () const
 {
 	return m_pDoorOpenStatusPin->GetMatchedCount ();
 }
 
 /// @brief get the number of time the door started opening
 /// @return count of times the door was no longer closed
-uint32_t DoorState::GetDoorOpeningCount ()
+uint32_t DoorState::GetDoorOpeningCount () const
 {
 	return m_pDoorClosedStatusPin->GetUnmatchedCount ();
 }
 
 /// @brief get the number of time the door Closed
 /// @return count of times the light was fully closed
-uint32_t DoorState::GetDoorClosedCount ()
+uint32_t DoorState::GetDoorClosedCount () const
 {
 	return m_pDoorClosedStatusPin->GetMatchedCount ();
 }
 
 /// @brief get the number of time the door started closing
 /// @return count of times the foor was not fully open
-uint32_t DoorState::GetDoorClosingCount ()
+uint32_t DoorState::GetDoorClosingCount () const
 {
 	return m_pDoorOpenStatusPin->GetUnmatchedCount ();
 }
-
+/**
+ * @brief Retrieves the current states of various door pins and compiles them into a string.
+ * 
+ * This function collects the states of the light, door open, and door closed pins, both their matched and current states.
+ * It then formats these states into a readable string.
+ * 
+ * @param states A reference to a string where the pin states will be stored.
+ */
 void DoorState::GetPinStates ( String &states )
 {
 	states	= String ( F ( "Light: " ) );
@@ -410,6 +465,11 @@ void DoorState::GetPinStates ( String &states )
 	states += m_pDoorClosedStatusPin->GetCurrentMatchedState () ? F ( "On" ) : F ( "Off" );
 }
 
+/**
+ * @brief Updates the door state.
+ * 
+ * This function calls the `UpdateStatus` method of the `m_pDoorStatus` object to update the current state of the door.
+ */
 void DoorState::UpdateDoorState ()
 {
 	if ( m_pDoorStatus != nullptr )
@@ -419,7 +479,8 @@ void DoorState::UpdateDoorState ()
 }
 
 /// <summary>
-/// TurnOffControlPins - Sets all relay control pins
+//// This function removes the callback for turning off control pins and sets all control pins (open, close, stop, light)
+//// to the off state.
 /// </summary>
 /// <returns>none
 void DoorState::TurnOffControlPins ()
@@ -430,7 +491,22 @@ void DoorState::TurnOffControlPins ()
 	m_pDoorStopCtrlPin->Off ();
 	m_pDoorLightCtrlPin->Off ();
 }
-
+/**
+ * @brief Constructs a `DoorStatusPin` object.
+ * 
+ * This constructor initializes a `DoorStatusPin` object with the specified parameters, including the door state, events, pin, debounce time, 
+ * maximum matched time, match status, pin mode, and initial status. It also sets the pin drive strength - now unneeded.
+ * 
+ * @param pDoor Pointer to the `DoorState` object.
+ * @param matchEvent Event to trigger when the pin matches the specified status.
+ * @param unmatchEvent Event to trigger when the pin does not match the specified status.
+ * @param pin The pin number.
+ * @param debouncems Debounce time in milliseconds.
+ * @param maxMatchedTimems Maximum matched time in milliseconds.
+ * @param matchStatus The status to match.
+ * @param mode The pin mode.
+ * @param status The initial pin status.
+ */
 DoorStatusPin::DoorStatusPin ( DoorState *pDoor, DoorState::Event matchEvent, DoorState::Event unmatchEvent, pin_size_t pin, uint32_t debouncems, uint32_t maxMatchedTimems, PinStatus matchStatus, PinMode mode, PinStatus status )
 	: InputPin ( pin, debouncems, maxMatchedTimems, matchStatus, mode, status ), m_pDoor ( pDoor ), m_doorMatchEvent ( matchEvent ), m_doorUnmatchEvent ( unmatchEvent )
 {

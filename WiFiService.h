@@ -29,24 +29,25 @@ class WiFiService
 		enum Status { UNCONNECTED, CONNECTED };
 
 		WiFiService ();
+		~WiFiService();
 		void		  Begin ( const char *HostName, const char *WiFissid, const char *WiFipwd, MNRGBLEDBaseLib *pLED = nullptr );
-		const char	 *GetHostName ();
-		IPAddress	  GetMulticastAddress ();
-		Status		  GetState ();
+		const char	 *GetHostName () const;
+		IPAddress	  GetMulticastAddress () const;
+		Status		  GetState () const;
 		static String ToIPString ( const IPAddress &address );
-		unsigned long GetTime ();
+		unsigned long GetTime () const;
 		uint32_t	  GetBeginCount ();
-		uint32_t	  GetBeginTimeOutCount ();
-		bool		  IsConnected ();
-		const char	 *WiFiStatusToString ( uint8_t iState );
+		uint32_t	  GetBeginTimeOutCount () const;
+		bool		  IsConnected () const;
+		const char	 *WiFiStatusToString ( uint8_t iState ) const;
 
 	protected:
 		void	 WiFiDisconnect ();
 		bool	 WiFiConnect ();
 		void	 SetLED ( RGBType theColour, uint8_t flashTime = 0 );
 		void	 SetState ( WiFiService::Status state );
-		void	 CalcMyMulticastAddress ( IPAddress &result );
-		void	 CalcMulticastAddress ( IPAddress ip, IPAddress &result );
+		void	 CalcMyMulticastAddress ( IPAddress &result ) const;
+		void	 CalcMulticastAddress ( IPAddress ip, IPAddress &result ) const;
 
 		uint32_t m_beginTimeouts = 0UL; // count of times WiFi.begin fails to connect within 10 secs
 		uint32_t m_beginConnects = 0UL; // count of times WiFi.begin has connected successfully
@@ -57,6 +58,7 @@ class WiFiService
 		const char		*m_HostName		 = nullptr;
 		Status			 m_State		 = Status::UNCONNECTED;
 		IPAddress		 m_multicastAddr = 0UL;
+		bool			 m_isConnected   = false;
 		MNRGBLEDBaseLib *m_pLED			 = nullptr;
 };
 

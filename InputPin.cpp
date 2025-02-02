@@ -8,7 +8,8 @@
 void InputPin::InputPinISR ( void *pParam )
 {
 	// get pointer to the instance of the InputPin object that was created for the pin
-	InputPin *pInputPinObj = (InputPin *)pParam;
+	//InputPin *pInputPinObj = (InputPin *)pParam;
+	InputPin* pInputPinObj = static_cast<InputPin*>(pParam);
 	// Invoke instance method to process the ISR for the specific pin
 	pInputPinObj->ProcessISR ();
 }
@@ -19,7 +20,8 @@ void InputPin::InputPinISR ( void *pParam )
 /// @param matchStatus  the status that the pin should be in to be considered a match ie HIGH or LOW
 /// @param mode  the mode of the pin INPUT, INPUT_PULLUP, INPUT_PULLDOWN
 /// @param status  the type of interrupt to trigger on CHANGE, RISING, FALLING
-InputPin::InputPin ( pin_size_t pin, uint32_t debouncems, uint32_t maxMatchedTimems, PinStatus matchStatus, PinMode mode, PinStatus status ) : m_Pin ( pin ), m_Debouncems ( debouncems ), m_maxMatchedTimems ( maxMatchedTimems ), m_MatchStatus ( matchStatus )
+InputPin::InputPin ( pin_size_t pin, uint32_t debouncems, uint32_t maxMatchedTimems, PinStatus matchStatus, PinMode mode, PinStatus status ) 
+		: m_Pin ( pin ), m_Debouncems ( debouncems ), m_maxMatchedTimems ( maxMatchedTimems ), m_MatchStatus ( matchStatus )
 {
 	pinMode ( m_Pin, mode );
 	delay ( 10 ); // allow time before first read after setting mode
@@ -28,6 +30,13 @@ InputPin::InputPin ( pin_size_t pin, uint32_t debouncems, uint32_t maxMatchedTim
 	m_CurrentMatchedState = m_LastPinRead == m_MatchStatus ? true : false;
 	attachInterruptParam ( digitalPinToInterrupt ( m_Pin ), InputPinISR, status, this );
 }
+
+/// @brief Destructor to detach the interrupt
+InputPin::~InputPin() 
+{
+    detachInterrupt ( digitalPinToInterrupt ( m_Pin ) );
+}
+
 /// @brief Handles interrupts specifically for the pin being monitored
 /// @param  
 void InputPin::ProcessISR ( void )
@@ -92,47 +101,47 @@ void InputPin::ProcessISR ( void )
 	}
 }
 
-bool InputPin::IsMatched ()
+bool InputPin::IsMatched () const
 {
 	return m_CurrentMatchedState;
 }
 
-uint32_t InputPin::GetMatchedCount ()
+uint32_t InputPin::GetMatchedCount () const
 {
 	return m_MatchedCount;
 }
 
-uint32_t InputPin::GetUnmatchedCount ()
+uint32_t InputPin::GetUnmatchedCount () const
 {
 	return m_UnmatchedCount;
 }
 
-uint32_t InputPin::GetInvokedCount ()
+uint32_t InputPin::GetInvokedCount () const
 {
 	return m_ISRCalledCount;
 }
 
-uint32_t InputPin::GetSpuriousCount ()
+uint32_t InputPin::GetSpuriousCount () const
 {
 	return m_SpuriousCount;
 }
 
-uint32_t InputPin::GetDiscardUnchangedCount ()
+uint32_t InputPin::GetDiscardUnchangedCount () const
 {
 	return m_DiscardedUnchangedCount;
 }
 
-uint32_t InputPin::GetLastMatchedDuration ()
+uint32_t InputPin::GetLastMatchedDuration () const
 {
 	return m_MatchedDuration;
 }
 
-bool InputPin::GetCurrentMatchedState ()
+bool InputPin::GetCurrentMatchedState () const
 {
 	return digitalRead ( m_Pin ) == m_MatchStatus;
 }
 
-void InputPin::DebugStats ( String &result )
+void InputPin::DebugStats ( String &result ) const
 {
 	char cMsg [ 50 ];
 	sprintf ( cMsg, "%8ld%8ld%8ld%8ld%8ld %8ld", m_ISRCalledCount, m_DiscardedUnchangedCount, m_MatchedCount, m_UnmatchedCount, m_SpuriousCount, m_MatchedDuration );

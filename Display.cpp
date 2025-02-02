@@ -197,10 +197,10 @@ void DisplayStats ( void )
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 9, 43, F ( "Count     Called Unchngd Matched UnMtchdSpurious Duration" ) );
 	
 	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 25, F ( "Switch Presssed " ) );
-	if ( pGarageDoor->m_pDoorSwitchStatusPin != nullptr )
+	if ( pGarageDoor->IsSwitchConfigured() )
 	{
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 10, 43, String ( pGarageDoor->m_pDoorSwitchStatusPin->GetMatchedCount () ) );
-		pGarageDoor->m_pDoorSwitchStatusPin->DebugStats ( result );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 10, 43, String ( pGarageDoor->GetSwitchMatchCount() ) );
+		pGarageDoor->SwitchDebugStats ( result );
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 50, result );
 	}
 	#endif

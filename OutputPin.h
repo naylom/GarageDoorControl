@@ -14,9 +14,9 @@ class OutputPin
 		void	  On ();
 		void	  Off ();
 		void	  Pulse ( uint32_t milliSec );
-		PinStatus Status ();
-		pin_size_t pinNumber();
-		uint32_t  GetTimeWritten();
+		PinStatus Status () const;
+		pin_size_t pinNumber() const;
+		uint32_t  GetTimeWritten() const;
 
 	private:
 		const pin_size_t 		m_Pin;
