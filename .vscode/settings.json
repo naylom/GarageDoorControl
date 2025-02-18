@@ -51,11 +51,17 @@
 	"arduino.logLevel": "verbose",
 	"arduino.useArduinoCli": true,
 	"arduino.additionalUrls": [
-		"F:\\mark_\\OneDrive\\Documents\\Arduino\\*.*",
-		"\"F:\\users\\Mark Naylor\\OneDrive\\Documents\\Arduino\\*.*\"",
-		"\"https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json\","
+		"${OneDrive}/Documents/Arduino/*.*",
+		"https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json"
 	],
 	"arduino.clearOutputOnBuild": true,
 	"arduino.enableUSBDetection": true,
-	"editor.defaultFormatter": "ms-vscode.cpptools"
+	"editor.defaultFormatter": "ms-vscode.cpptools",
+	"C_Cpp.loggingLevel": "Warning",
+	"C_Cpp.vcFormat.indent.caseLabels": true,
+	"C_Cpp.default.compileCommands": [
+
+		""
+	],
+	"arduino.disableIntelliSenseAutoGen": false
 }
