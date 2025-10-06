@@ -38,11 +38,23 @@ constexpr auto	   WIFI_CONNECT_TIMEOUT_MS = 10000;
 
 constexpr uint16_t MulticastSendPort	   = 0xCE5C;
 
-enum eResponseMessage { TEMPDATA, DOORDATA };
+enum class eResponseMessage : uint8_t { TEMPDATA, DOORDATA };
 
 #define CALL_MEMBER_FN_BY_PTR( object, ptrToMember ) ( ( object )->*( ptrToMember ) )
 extern void Error ( String s, bool bInISR = false );
 extern void Info ( String s, bool bInISR = false );
+
+// Helper function to log WiFi/UDP errors with context
+static void logWiFiError ( const String& context, int errorCode )
+{
+	Error ( context + " failed with code: " + String ( errorCode ) );
+}
+
+// Helper function to convert IPAddress to String
+static String ipToString(const IPAddress& address) 
+{
+	return String ( address [ 0 ] ) + "." + String ( address [ 1 ] ) + "." + String ( address [ 2 ] ) + "." + String ( address [ 3 ] );
+}
 
 void		TerminateProgram ( const __FlashStringHelper *pErrMsg )
 {
@@ -62,23 +74,12 @@ WiFiService::~WiFiService()
 	WiFiDisconnect();
 }
 
-const char *WiFiService::WiFiStatusToString ( uint8_t iState ) const
+
+const char* WiFiService::WiFiStatusToString(uint8_t iState) const 
 {
-	if ( iState == 255 )
-	{
-		return WiFiStatus [ 9 ];
-	}
-	else
-	{
-		if ( iState > sizeof ( WiFiStatus ) / sizeof ( WiFiStatus [ 0 ] ) - 1 )
-		{
-			return "Unknown";
-		}
-		else
-		{
-			return WiFiStatus [ iState ];
-		}
-	}
+    static constexpr size_t statusCount = sizeof( WiFiStatus ) / sizeof( WiFiStatus [ 0 ] );
+
+    return (iState < statusCount) ? WiFiStatus [ iState ] : "UNKNOWN";
 }
 
 uint32_t WiFiService::GetBeginTimeOutCount () const
@@ -211,9 +212,8 @@ bool WiFiService::WiFiConnect ()
 		if ( status != WL_CONNECTED )
 		{
 			bResult = false;
-
 			SetState ( WiFiService::Status::UNCONNECTED );
-			Error ( "Connect failed, status is " + String ( WiFiStatusToString ( status ) ) );
+			logWiFiError("Connect", status);
 			iStartCount++;
 			m_beginTimeouts++;
 		}
@@ -239,7 +239,7 @@ void WiFiService::WiFiDisconnect ()
 
 String WiFiService::ToIPString ( const IPAddress &address )
 {
-	return String ( address [ 0 ] ) + "." + address [ 1 ] + "." + address [ 2 ] + "." + address [ 3 ];
+	return ipToString(address);
 }
 
 bool WiFiService::IsConnected () const
@@ -415,25 +415,25 @@ bool UDPWiFiService::SendReply ( String sMsg )
 	{
 		if ( sMsg.length () > 0 )
 		{
-			if ( m_myUDP.beginPacket ( m_myUDP.remoteIP (), m_myUDP.remotePort () ) == 1 )
+			int beginResult = m_myUDP.beginPacket ( m_myUDP.remoteIP (), m_myUDP.remotePort () );
+			if ( beginResult == 1 )
 			{
 				m_myUDP.write ( sMsg.c_str () );
 				if ( m_myUDP.endPacket () == 0 )
 				{
-					Error ( "Message Response failed" );
+					logWiFiError("Message Response", 0);
 					WiFiDisconnect ();
 				}
 				else
 				{
 					m_ulReplyCount++;
-					// Error ( "Sent " + String ( pMsg->substring(0, pMsg->length()-1) ) + " to " + ToIPString ( m_myUDP.remoteIP () ) + ":" + m_myUDP.remotePort() );
 					SetState ( WiFiService::Status::CONNECTED );
 					bResult = true;
 				}
 			}
 			else
 			{
-				Error ( "Unable to send UDP message, beginpacket() failed sending to : " + ToIPString ( m_myUDP.remoteIP () ) + " : " + m_myUDP.remotePort () );
+				logWiFiError("Unable to send UDP message, beginPacket() to: " + ToIPString ( m_myUDP.remoteIP () ) + " : " + m_myUDP.remotePort (), beginResult);
 			}
 		}
 		else

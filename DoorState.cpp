@@ -65,7 +65,7 @@ DoorState::DoorState ( pin_size_t OpenPin, pin_size_t ClosePin, pin_size_t StopP
 	  m_DoorLightCtrlPin ( LightPin ), 
 	  m_DoorOpenStatusPin ( DoorOpenStatusPin ), 
 	  m_DoorClosedStatusPin ( DoorClosedStatusPin ), 
-	  m_DoorLightStatusPin ( DoorLightStatusPin ),
+						  m_DoorLightStatusPin ( DoorLightStatusPin ),
 	  m_DoorSwitchStatusPin ( DoorSwitchStatusPin ),
 	  m_pDoorOpenStatusPin ( new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorOpenStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE ) ),
 	  m_pDoorClosedStatusPin ( new DoorStatusPin ( this, DoorState::Event::Nothing, DoorState::Event::Nothing, m_DoorClosedStatusPin, DEBOUNCE_MS, MAX_MATCH_TIMER_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE ) ),
@@ -96,6 +96,19 @@ void DoorState::SetDoorState ( DoorState::State newState )
 	}
 }
 
+// Helper function to convert bool to "On"/"Off" string
+static String onOff(bool state) 
+{
+	return state ? F("On") : F("Off");
+}
+
+void DoorState::SetStateAndDirection(State state, Direction direction)
+{
+	SetDoorState(state);
+	SetDoorDirection(direction);
+	m_bDoorStateChanged = true;
+}
+
 // routines called when event occurs, these are called from within an interrupt and need to be short
 // care to be taken to not invoke WifiNina calls or SPI calls to built in LED.
 
@@ -109,10 +122,7 @@ void DoorState::SetDoorState ( DoorState::State newState )
  */
 void DoorState::NowOpen ( Event )
 {
-	// State has changed
-	SetDoorState ( State::Open );
-	SetDoorDirection ( DoorState::Direction::Up );
-	m_bDoorStateChanged = true;
+	SetStateAndDirection(State::Open, Direction::Up);
 }
 
 /**
@@ -125,10 +135,7 @@ void DoorState::NowOpen ( Event )
  */
 void DoorState::NowClosed(Event) 
 {
-    // State has changed
-    SetDoorState(State::Closed);
-    SetDoorDirection(DoorState::Direction::Down);
-    m_bDoorStateChanged = true;
+	SetStateAndDirection(State::Closed, Direction::Down);
 }
 
 /**
@@ -140,20 +147,14 @@ void DoorState::NowClosed(Event)
  * @param Event unused
  */
 void DoorState::NowClosing(Event) {
-    // State has changed
-    SetDoorState(DoorState::State::Closing);
-    SetDoorDirection(Direction::Down);
-    m_bDoorStateChanged = true;
+	SetStateAndDirection(State::Closing, Direction::Down);
 }
 
 /// @brief Record state of door when UAP has signalled door is opening
 /// @param  unused
 void DoorState::NowOpening ( Event )
 {
-	// State has changed
-	SetDoorState ( DoorState::State::Opening );
-	SetDoorDirection ( Direction::Up );
-	m_bDoorStateChanged = true;
+	SetStateAndDirection(State::Opening, Direction::Up);
 }
 
 /**
@@ -458,18 +459,18 @@ uint32_t DoorState::GetDoorClosingCount () const
  */
 void DoorState::GetPinStates ( String &states )
 {
-	states	= String ( F ( "Light: " ) );
-	states += m_pDoorLightStatusPin->IsMatched () ? F ( "On" ) : F ( "Off" );
-	states += String ( F ( " Open: " ) );
-	states += m_pDoorOpenStatusPin->IsMatched () ? F ( "On" ) : F ( "Off" );
-	states += String ( F ( " Closed: " ) );
-	states += m_pDoorClosedStatusPin->IsMatched () ? F ( "On" ) : F ( "Off" );
-	states += String ( F ( " Curr Light: " ) );
-	states += m_pDoorLightStatusPin->GetCurrentMatchedState () ? F ( "On" ) : F ( "Off" );
-	states += String ( F ( " Opn: " ) );
-	states += m_pDoorOpenStatusPin->GetCurrentMatchedState () ? F ( "On" ) : F ( "Off" );
-	states += String ( F ( " Clsed: " ) );
-	states += m_pDoorClosedStatusPin->GetCurrentMatchedState () ? F ( "On" ) : F ( "Off" );
+		states  = String ( F ( "Light: " ) );
+		states += onOff(m_pDoorLightStatusPin->IsMatched());
+		states += String ( F ( " Open: " ) );
+		states += onOff(m_pDoorOpenStatusPin->IsMatched());
+		states += String ( F ( " Closed: " ) );
+		states += onOff(m_pDoorClosedStatusPin->IsMatched());
+		states += String ( F ( " Curr Light: " ) );
+		states += onOff(m_pDoorLightStatusPin->GetCurrentMatchedState());
+		states += String ( F ( " Opn: " ) );
+		states += onOff(m_pDoorOpenStatusPin->GetCurrentMatchedState());
+		states += String ( F ( " Clsed: " ) );
+		states += onOff(m_pDoorClosedStatusPin->GetCurrentMatchedState());
 }
 
 /**

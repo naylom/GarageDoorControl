@@ -60,6 +60,7 @@ class DoorState
 		enum class Request : uint8_t { LightOn = 0, LightOff, OpenDoor, CloseDoor, StopDoor };
 
 	private:
+		void 				SetStateAndDirection(State state, Direction direction);
 		void				SetDoorDirection ( DoorState::Direction direction );
 		void				SetDoorState ( DoorState::State newState );
 
