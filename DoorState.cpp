@@ -253,7 +253,7 @@ void DoorState::ResetTimer ()
 void DoorState::DoEvent ( DoorState::Event eEvent )
 {
 	//CALL_MEMBER_FN ( this, DoorState::StateTableFn [ GetDoorState () ][ eEvent ] ) ( eEvent );
-	(this->*DoorState::StateTableFn[GetDoorState()][eEvent])(eEvent); // Call the appropriate member function based on the current state and event
+	(this->*DoorState::StateTableFn[(uint8_t)GetDoorState()][(uint8_t)eEvent])(eEvent); // Call the appropriate member function based on the current state and event
 }
 /**
  * @brief Processes request to manipulate the door
@@ -299,7 +299,7 @@ void DoorState::DoRequest(Request eRequest)
 /// GetState - Gets current state
 /// </summary>
 /// <returns> current state
-DoorState::State DoorState::GetDoorState ()
+DoorState::State DoorState::GetDoorState () const
 {
 	// return m_theDoorState;
 	if ( m_pDoorStatus != nullptr )
@@ -315,7 +315,7 @@ DoorState::State DoorState::GetDoorState ()
 /// GetDirection - Gets current direction
 /// </summary>
 /// <returns> current state
-DoorState::Direction DoorState::GetDoorDirection()
+DoorState::Direction DoorState::GetDoorDirection() const
 {
 	if ( m_pDoorStatus != nullptr )
 	{
@@ -331,16 +331,16 @@ DoorState::Direction DoorState::GetDoorDirection()
 /// GetDoorDisplayState - Gets current state
 /// </summary>
 /// <returns> current state as string
-const char *DoorState::GetDoorDisplayState ()
+const char *DoorState::GetDoorDisplayState () const
 {
-	return StateNames [ GetDoorState () % ( sizeof ( StateNames ) / sizeof ( StateNames [ 0 ] ) )];
+	return StateNames [ (uint8_t)GetDoorState () % ( sizeof ( StateNames ) / sizeof ( StateNames [ 0 ] ) )];
 }
 
 /// <summary>
 /// IsOpen - checks if door is open
 /// </summary>
 /// <returns> true if Open else false
-bool DoorState::IsOpen ()
+bool DoorState::IsOpen () const
 {
 	return GetDoorState () == DoorState::State::Open ? true : false;
 }
@@ -349,7 +349,7 @@ bool DoorState::IsOpen ()
 /// IsMoving - checks if door is moving
 /// </summary>
 /// <returns> true if opening or closing
-bool DoorState::IsMoving ()
+bool DoorState::IsMoving () const
 {
 	return GetDoorState () == DoorState::State::Opening || GetDoorState () == DoorState::State::Closing ? true : false;
 }
@@ -358,23 +358,30 @@ bool DoorState::IsMoving ()
 /// IsClosed - checks if door is closing
 /// </summary>
 /// <returns> true if Closed else false
-bool DoorState::IsClosed ()
+bool DoorState::IsClosed () const
 {
 	return GetDoorState () == DoorState::State::Closed ? true : false;
 }
 
 /// @brief IsLit - checks if Door Light is on
 /// @return true if On else false
-bool DoorState::IsLit ()
+bool DoorState::IsLit () const
 {
 	return m_pDoorLightStatusPin->IsMatched ();
 }
 
-const char *DoorState::GetDoorDirectionName ()
+const char *DoorState::GetDoorDirectionName () const
 {
 	return m_pDoorStatus->GetDoorDirectionName ();
 }
 
+/**
+ * @brief Checks if the door switch is configured.
+ * 
+ * This function checks if the door switch status pin is configured (not null).
+ * 
+ * @return true if the door switch is configured, false otherwise.
+ */
 bool DoorState::IsSwitchConfigured () const
 {
 	return m_pDoorSwitchStatusPin != nullptr;
@@ -514,7 +521,7 @@ DoorStatusPin::DoorStatusPin ( DoorState *pDoor, DoorState::Event matchEvent, Do
 	//PORT->Group[g_APinDescription[pin].ulPort].PINCFG[g_APinDescription[pin].ulPin].bit.DRVSTR = 1;
 }
 
-void DoorStatusPin::MatchAction ()
+void DoorStatusPin::MatchAction () const
 {
 	if ( m_pDoor != nullptr )
 	{
@@ -522,7 +529,7 @@ void DoorStatusPin::MatchAction ()
 	}
 }
 
-void DoorStatusPin::UnmatchAction ()
+void DoorStatusPin::UnmatchAction () const
 {
 	if ( m_pDoor != nullptr )
 	{
@@ -539,8 +546,8 @@ void DoorStatusPin::UnmatchAction ()
 /// @param closePin 
 DoorStatusCalc::DoorStatusCalc ( DoorStatusPin &openPin, DoorStatusPin &closePin ) : m_closePin ( closePin ), m_openPin ( openPin )
 {
-	SetDoorState ( DoorState::Unknown );
-	SetDoorDirection ( DoorState::None );
+	SetDoorState ( DoorState::State::Unknown );
+	SetDoorDirection ( DoorState::Direction::None );
 	UpdateStatus ();
 }
 
@@ -602,7 +609,7 @@ void DoorStatusCalc::UpdateStatus ()
 	}
 }
 
-DoorState::State DoorStatusCalc::GetDoorState ()
+DoorState::State DoorStatusCalc::GetDoorState () const
 {
 	return m_currentState;
 }
@@ -612,7 +619,7 @@ void DoorStatusCalc::SetDoorState(DoorState::State state)
 	m_currentState = state;
 }
 
-DoorState::Direction DoorStatusCalc::GetDoorDirection ()
+DoorState::Direction DoorStatusCalc::GetDoorDirection () const
 {
 	return m_LastDirection;
 }
@@ -622,9 +629,9 @@ void DoorStatusCalc::SetDoorDirection ( DoorState::Direction direction )
 	m_LastDirection = direction;
 }
 
-const char *DoorStatusCalc::GetDoorDirectionName ()
+const char *DoorStatusCalc::GetDoorDirectionName () const
 {
-	return DirectionNames [ GetDoorDirection () % ( sizeof ( DirectionNames ) /  sizeof ( DirectionNames [ 0 ] ) ) ];	
+	return DirectionNames [ (uint8_t)GetDoorDirection () % ( sizeof ( DirectionNames ) /  sizeof ( DirectionNames [ 0 ] ) ) ];
 }
 
 void DoorStatusCalc::SetStopped ()

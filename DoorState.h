@@ -54,10 +54,10 @@ class DoorState
 		void				GetPinStates ( String &states );
 		void				UpdateDoorState ();
 
-		enum State : uint8_t { Open = 0, Opening, Closed, Closing, Stopped, Unknown, Bad };
-		enum Direction : uint8_t { Up = 0, Down, None };
-		enum Event : uint8_t { DoorOpenTrue = 0, DoorOpenFalse, DoorClosedTrue, DoorClosedFalse, SwitchPress, Nothing };
-		enum Request : uint8_t { LightOn = 0, LightOff, OpenDoor, CloseDoor, StopDoor };
+		enum class State : uint8_t { Open = 0, Opening, Closed, Closing, Stopped, Unknown, Bad };
+		enum class Direction : uint8_t { Up = 0, Down, None };
+		enum class Event : uint8_t { DoorOpenTrue = 0, DoorOpenFalse, DoorClosedTrue, DoorClosedFalse, SwitchPress, Nothing };
+		enum class Request : uint8_t { LightOn = 0, LightOff, OpenDoor, CloseDoor, StopDoor };
 
 	private:
 		void				SetDoorDirection ( DoorState::Direction direction );
@@ -113,14 +113,14 @@ class DoorState
 
 		void				DoEvent ( Event eEvent );
 		void				DoRequest ( Request eRequest );
-		const char *		GetDoorDisplayState ();
-		DoorState::State	GetDoorState ();
-		DoorState::Direction GetDoorDirection ();
-		bool				IsOpen ();
-		bool				IsMoving ();
-		bool				IsClosed ();
-		bool				IsLit ();
-		const char *		GetDoorDirectionName ();
+		const char *		GetDoorDisplayState () const;
+		DoorState::State	GetDoorState () const;
+		DoorState::Direction GetDoorDirection () const;
+		bool				IsOpen () const;
+		bool				IsMoving () const;
+		bool				IsClosed () const;
+		bool				IsLit () const;
+		const char *		GetDoorDirectionName () const;
 		bool 				IsSwitchConfigured () const;
 		uint32_t 			GetSwitchMatchCount() const;
 		void				SwitchDebugStats ( String &result ) const;
@@ -144,8 +144,8 @@ class DoorStatusPin : public InputPin
 		DoorState		*m_pDoor;
 		DoorState::Event m_doorMatchEvent;
 		DoorState::Event m_doorUnmatchEvent;
-		void			 MatchAction ();
-		void			 UnmatchAction ();
+		void			 MatchAction () const;
+		void			 UnmatchAction () const;
 };
 
 /// @brief sets the door status based on current input pin readings from UAP and prior state
@@ -154,11 +154,11 @@ class DoorStatusCalc
 	public:
 								  DoorStatusCalc ( DoorStatusPin &openPin, DoorStatusPin &closePin );
 		void					  UpdateStatus ();
-		DoorState::State		  GetDoorState ();
-		void					  SetDoorState ( DoorState::State state );	
-		DoorState::Direction 	  GetDoorDirection ();
+		DoorState::State		  GetDoorState () const;
+		void					  SetDoorState ( DoorState::State state );
+		DoorState::Direction 	  GetDoorDirection () const;
 		void 					  SetDoorDirection ( DoorState::Direction direction );
-		const char				 *GetDoorDirectionName ();
+		const char				 *GetDoorDirectionName () const;
 		void					  SetStopped ();
 
 	private:

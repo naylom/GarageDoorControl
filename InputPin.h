@@ -23,8 +23,8 @@ class InputPin
 
 	private:
 		void	 		   ProcessISR ();
-		virtual void	   MatchAction ()	= 0;
-		virtual void	   UnmatchAction () = 0;
+		virtual void	   MatchAction () const = 0;
+		virtual void	   UnmatchAction () const = 0;
 		static void		   InputPinISR ( void *pParam );
 
 		const pin_size_t   m_Pin;

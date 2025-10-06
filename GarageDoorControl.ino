@@ -48,10 +48,11 @@ History:
 	Ver 1.0.10      Added BME280 support and changed logging to inherit from Stream class
 	Ver 1.0.11      Added external LED usage in Non UAP mode to show how far from desired humidity we are
 	Ver 1.0.12		Detect door state in main loop rather than calc on pin change
-	Ber 1.0.13		Improved encapsulation of InputPin
+	Ver 1.0.13		Improved encapsulation of InputPin
 	Ver 1.0.15		Moved display code to own file
+	Ver 1.0.16      Changed InputPin to use enum class for events and made action functions const
 */
-const char * VERSION = "1.0.15 Beta";
+const char * VERSION = "1.0.16 Beta";
 
 
 #ifdef MNDEBUG
@@ -296,7 +297,7 @@ void loop ()
 	static unsigned long ulLastDisplayTime = 0UL;
 
 #ifdef UAP_SUPPORT
-	static DoorState::State LastDoorState  = DoorState::Unknown;
+	static DoorState::State LastDoorState  = DoorState::State::Unknown;
 	static bool				LastLightState = false;
 
 	// set initial light state

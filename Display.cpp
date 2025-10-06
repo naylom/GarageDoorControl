@@ -172,7 +172,7 @@ void DisplayStats ( void )
 
 		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 0, F ( "State is " ) );
 		MyLogger.ClearPartofLine ( 5, 14, 8 );
-		if ( pGarageDoor->GetDoorState() == DoorState::Closed )
+		if ( pGarageDoor->GetDoorState() == DoorState::State::Closed )
 		{
 			MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 5, 14, pGarageDoor->GetDoorDisplayState () );
 		}
