@@ -314,7 +314,7 @@ void		   SetLED ()
 void loop ()
 {
 #ifdef BME280_SUPPORT
-	float				 pres ( NAN ), temp ( NAN ), hum ( NAN );
+	//float				 pres ( NAN ), temp ( NAN ), hum ( NAN );
 	static unsigned long ulLastSensorTime = millis () - ( 30UL * 1000UL );
 #endif
 

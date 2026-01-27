@@ -545,7 +545,7 @@ void DoorStatusPin::UnmatchAction () const
 /// @brief Initialises DoorStatusCalc with the pin objects that are used to determine the door status
 /// @param openPin 
 /// @param closePin 
-DoorStatusCalc::DoorStatusCalc ( DoorStatusPin &openPin, DoorStatusPin &closePin ) : m_closePin ( closePin ), m_openPin ( openPin )
+DoorStatusCalc::DoorStatusCalc ( DoorStatusPin &openPin, DoorStatusPin &closePin ) : m_openPin ( openPin ), m_closePin ( closePin )
 {
 	SetDoorState ( DoorState::State::Unknown );
 	SetDoorDirection ( DoorState::Direction::None );
