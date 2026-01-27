@@ -131,7 +131,7 @@ void DisplayUptime ( ansiVT220Logger logger, uint8_t line, uint8_t row, ansiVT22
 			uint32_t ulSecs			   = ulTotalNumSeconds % 60;
 
 			char	 sUpTime [ 20 ];
-			snprintf ( sUpTime, sizeof(sUpTime), "%02d:%02d:%02d:%02d", ulDays, ulHours, ulMinutes, ulSecs );
+			snprintf ( sUpTime, sizeof(sUpTime), "%02d:%02d:%02d:%02d", (int)ulDays, (int)ulHours, (int)ulMinutes, (int)ulSecs );
 			logger.COLOUR_AT ( Foreground, Background, line, row, sUpTime );
 		}
 		else
@@ -148,7 +148,6 @@ void DisplayStats ( void )
 #ifdef MNDEBUG
 	// display uptime
 	DisplayUptime ( MyLogger, 1, 1, ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK );
-	static time_t LastTime = 0;
 
 	#ifdef UAP_SUPPORT
 	String Heading = F ( "Garage Door Control -  ver " );

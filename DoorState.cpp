@@ -560,8 +560,7 @@ void DoorStatusCalc::UpdateStatus ()
 {
 	bool bIsClosed = m_closePin.GetCurrentMatchedState ();
 	bool bIsOpen   = m_openPin.GetCurrentMatchedState ();
-	static bool once = true;
-
+	
 	if ( bIsClosed == false && bIsOpen == false )
 	{
 		switch ( GetDoorState () )

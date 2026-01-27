@@ -123,7 +123,31 @@ constexpr char MyHostName [] = "OfficeTHSensor";
 
 UDPWiFiService	 *pMyUDPService	   = nullptr;
 
-unsigned long	  ulLastClientReq  = 0UL; // millis of last wifi incoming message
+unsigned long	  ulLastClientReq  = 0UL; // millis of last wifi incoming message'
+
+// forward references
+void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse );
+void SetLED ();
+
+void MulticastMsg ( UDPWiFiService::ReqMsgType eReqType )
+{
+	String sResponse;
+	BuildMessage ( eReqType, sResponse );
+	if ( sResponse.length () > 0 )
+	{
+		pMyUDPService->SendAll ( sResponse );
+	}
+}
+
+void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
+{
+	String sResponse;
+	BuildMessage ( eReqType, sResponse );
+	if ( sResponse.length () > 0 )
+	{
+		pMyUDPService->SendReply ( sResponse );
+	}
+}
 
 // main setup routine
 void setup ()
@@ -440,22 +464,3 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 	}
 }
 
-void MulticastMsg ( UDPWiFiService::ReqMsgType eReqType )
-{
-	String sResponse;
-	BuildMessage ( eReqType, sResponse );
-	if ( sResponse.length () > 0 )
-	{
-		pMyUDPService->SendAll ( sResponse );
-	}
-}
-
-void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
-{
-	String sResponse;
-	BuildMessage ( eReqType, sResponse );
-	if ( sResponse.length () > 0 )
-	{
-		pMyUDPService->SendReply ( sResponse );
-	}
-}
