@@ -1,17 +1,18 @@
+#include "Display.h"
+#include "GarageControl.h"
+#include "logging.h"
+#include "WiFiService.h"
+
 #include <BME280.h>
 #include <BME280I2C.h>
 #include <EnvironmentCalculations.h>
-#include <Wire.h>
 #include <MNPCIHandler.h>
 #include <MNRGBLEDBaseLib.h>
 #include <MNTimerLib.h>
+#include <time.h>
 #include <WiFiNINA.h>
 #include <WiFiUdp.h>
-#include <time.h>
-#include "GarageControl.h"
-#include "WiFiService.h"
-#include "logging.h"
-#include "Display.h"
+#include <Wire.h>
 
 /*
 
@@ -32,108 +33,115 @@ PURPLE, no flash - Door Stopped
 BLUE, flashing	 - Door unknown state, not open and not closed ie in transit but we cannot determine which
 YELLOW, flashing - Door in a BAD State, UAP says open and closed at same time.
 When not connected to a UAP the colours indicate how close to teh desired humidity threshold it is
-Green - at desired level, the more red the drier and the more blue the more humid it is. Will flash when above min or max threshold
+Green - at desired level, the more red the drier and the more blue the more humid it is. Will flash when above min or
+max threshold
 
 The built in MKR WiFi 1010 RGB LED displays the WiFI status
 
 Author: (c) M. Naylor 2022
 
 History:
-	Ver 1.0			Initial version
-	Ver 1.0.4		Supports config to add/remove UAP, Distance Centre, Barometruc sensor
-	Ver 1.0.5		Add ability to get loggging data over a telnet connection on 0xFEEE
-	Ver 1.0.6       Changed input pins to be simply INPUT and use external pulldown resistors
-	Ver 1.0.7		Moved all input and out pins into DoorState, added InputPin class
-	Ver 1.0.8		Moved logging to object SerialLogger
-	Ver 1.0.10      Added BME280 support and changed logging to inherit from Stream class
-	Ver 1.0.11      Added external LED usage in Non UAP mode to show how far from desired humidity we are
-	Ver 1.0.12		Detect door state in main loop rather than calc on pin change
-	Ver 1.0.13		Improved encapsulation of InputPin
-	Ver 1.0.15		Moved display code to own file
-	Ver 1.0.16      Changed InputPin to use enum class for events and made action functions const
+    Ver 1.0			Initial version
+    Ver 1.0.4		Supports config to add/remove UAP, Distance Centre, Barometruc sensor
+    Ver 1.0.5		Add ability to get loggging data over a telnet connection on 0xFEEE
+    Ver 1.0.6       Changed input pins to be simply INPUT and use external pulldown resistors
+    Ver 1.0.7		Moved all input and out pins into DoorState, added InputPin class
+    Ver 1.0.8		Moved logging to object SerialLogger
+    Ver 1.0.10      Added BME280 support and changed logging to inherit from Stream class
+    Ver 1.0.11      Added external LED usage in Non UAP mode to show how far from desired humidity we are
+    Ver 1.0.12		Detect door state in main loop rather than calc on pin change
+    Ver 1.0.13		Improved encapsulation of InputPin
+    Ver 1.0.15		Moved display code to own file
+    Ver 1.0.16      Changed InputPin to use enum class for events and made action functions const
+	ver 1.0.17	    Added onboarding support and moved WiFi code to WiFiService files, added config storage, added web server for onboarding. Built with platformio 6.1.0
 */
-const char * VERSION = "1.0.16 Beta";
+const char* VERSION = "1.0.17 Beta";
 
 
 #ifdef MNDEBUG
-	#ifdef TELNET
-		ansiVT220Logger MyLogger ( Telnet );
-	#else
-		SerialLogger	slog;
-		ansiVT220Logger MyLogger ( slog ); // create serial comms object to log to
-	#endif
+#ifdef TELNET
+ansiVT220Logger MyLogger ( Telnet );
+#else
+SerialLogger slog;
+ansiVT220Logger MyLogger ( slog );  // create serial comms object to log to
+#endif
 #endif
 
 
-
-
-#ifdef BME280_SUPPORT // Temp, humidity and pressure sensor
+#ifdef BME280_SUPPORT  // Temp, humidity and pressure sensor
 
 struct TEMP_STATS
 {
-		float	 temperature;
-		float	 pressure; // at sea level
-		float	 humidity;
-		float	 dewpoint;
-		uint32_t ulTimeOfReadingms;
-} EnvironmentResults					  = { NAN, NAN, NAN, 0UL };
+	float temperature;
+	float pressure;  // at sea level
+	float humidity;
+	float dewpoint;
+	uint32_t ulTimeOfReadingms;
+} EnvironmentResults = { NAN, NAN, NAN, 0UL };
 
-constexpr float		ALTITUDE_COMPENSATION = 131.0; // sensor is 135 metres aboves sea level, we need this to adjust pressure reading to sea level equivalent.
-BME280I2C::Settings settings ( BME280::OSR_X2, BME280::OSR_X2, BME280::OSR_X2, BME280::Mode_Normal, BME280::StandbyTime_250ms, BME280::Filter_Off, BME280::SpiEnable_False, BME280I2C::I2CAddr_0x76 );
-BME280I2C			MyBME280 ( settings );
+constexpr float ALTITUDE_COMPENSATION =
+    131.0;  // sensor is 135 metres aboves sea level, we need this to adjust pressure reading to sea level equivalent.
+BME280I2C::Settings settings ( BME280::OSR_X2,
+                               BME280::OSR_X2,
+                               BME280::OSR_X2,
+                               BME280::Mode_Normal,
+                               BME280::StandbyTime_250ms,
+                               BME280::Filter_Off,
+                               BME280::SpiEnable_False,
+                               BME280I2C::I2CAddr_0x76 );
+BME280I2C MyBME280 ( settings );
 #endif
 
 #ifdef UAP_SUPPORT
-	#include "DoorState.h"
+#include "DoorState.h"
 // PIN allocations, input & output from arduino perspective
 
 // Need to be interrupt pins, inputs of status from UAP
-constexpr pin_size_t DOOR_IS_OPEN_STATUS_PIN   = 9;
-constexpr uint8_t	 DOOR_IS_CLOSED_STATUS_PIN = 8;
-constexpr uint8_t	 LIGHT_IS_ON_STATUS_PIN	   = 7;
-constexpr uint8_t	 DOOR_SWITCH_INPUT_PIN	   = 0;
+constexpr pin_size_t DOOR_IS_OPEN_STATUS_PIN = 9;
+constexpr uint8_t DOOR_IS_CLOSED_STATUS_PIN = 8;
+constexpr uint8_t LIGHT_IS_ON_STATUS_PIN = 7;
+constexpr uint8_t DOOR_SWITCH_INPUT_PIN = 0;
 // Don't need to be interrupt pins, outputs to UAP
-constexpr uint8_t	 TURN_LIGHT_ON_OUTPUT_PIN  = 2;
-constexpr uint8_t	 CLOSE_DOOR_OUTPUT_PIN	   = 3;
-constexpr uint8_t	 OPEN_DOOR_OUTPUT_PIN	   = 4;
-constexpr uint8_t	 STOP_DOOR_OUTPUT_PIN	   = 5;
+constexpr uint8_t TURN_LIGHT_ON_OUTPUT_PIN = 2;
+constexpr uint8_t CLOSE_DOOR_OUTPUT_PIN = 3;
+constexpr uint8_t OPEN_DOOR_OUTPUT_PIN = 4;
+constexpr uint8_t STOP_DOOR_OUTPUT_PIN = 5;
 
-//constexpr uint32_t	 SWITCH_DEBOUNCE_MS		   = 100;  // min ms between consecutive pin interrupts before signal accepted from manual switch
-//constexpr uint32_t	 MAX_SWITCH_MATCH_TIMER_MS = 2000; // max time pin should be in matched state to be considered a real signal
-DoorState			*pGarageDoor			   = nullptr;
-//DoorStatusPin		*pDoorSwitchPin			   = nullptr;
+// constexpr uint32_t	 SWITCH_DEBOUNCE_MS		   = 100;  // min ms between consecutive pin interrupts before signal
+// accepted from manual switch constexpr uint32_t	 MAX_SWITCH_MATCH_TIMER_MS = 2000; // max time pin should be in
+// matched state to be considered a real signal
+DoorState* pGarageDoor = nullptr;
+// DoorStatusPin		*pDoorSwitchPin			   = nullptr;
 
 #endif
 
-constexpr pin_size_t RED_PIN	= PIN_A4;
-constexpr pin_size_t GREEN_PIN	= PIN_A3;
-constexpr pin_size_t BLUE_PIN	= 10;
-MNRGBLEDBaseLib	 *pMyLED	= new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 180, 120 ); // new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 90, 60 );
+constexpr pin_size_t RED_PIN = PIN_A4;
+constexpr pin_size_t GREEN_PIN = PIN_A3;
+constexpr pin_size_t BLUE_PIN = 10;
+MNRGBLEDBaseLib* pMyLED = new CRGBLED ( RED_PIN,
+                                        GREEN_PIN,
+                                        BLUE_PIN,
+                                        255,
+                                        180,
+                                        120 );  // new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 90, 60 );
 
 /*
-	WiFi config
+    WiFi config - Now uses onboarding
 */
-constexpr char	  ssid []	= "Naylorfamily"; // your network SSID (name)
-constexpr char	  pass []	= "welcome1";	  // your network password
-#ifdef UAP_SUPPORT
-constexpr char MyHostName [] = "GarageControl2";
-#else
-constexpr char MyHostName [] = "OfficeTHSensor";
-#endif
 
-UDPWiFiService	 *pMyUDPService	   = nullptr;
+UDPWiFiService* pMyUDPService = nullptr;
 
-unsigned long	  ulLastClientReq  = 0UL; // millis of last wifi incoming message'
+unsigned long ulLastClientReq = 0UL;  // millis of last wifi incoming message'
 
 // forward references
-void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse );
+void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String& sResponse );
 void SetLED ();
 
 void MulticastMsg ( UDPWiFiService::ReqMsgType eReqType )
 {
 	String sResponse;
 	BuildMessage ( eReqType, sResponse );
-	if ( sResponse.length () > 0 )
+	if ( sResponse.length() > 0 )
 	{
 		pMyUDPService->SendAll ( sResponse );
 	}
@@ -143,7 +151,7 @@ void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
 {
 	String sResponse;
 	BuildMessage ( eReqType, sResponse );
-	if ( sResponse.length () > 0 )
+	if ( sResponse.length() > 0 )
 	{
 		pMyUDPService->SendReply ( sResponse );
 	}
@@ -152,35 +160,53 @@ void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
 // main setup routine
 void setup ()
 {
-	//Serial.begin ( 115200 );
-	//while ( !Serial )
-		;
-	MyLogger.LogStart ();
-	MyLogger.ClearScreen ();
+	// Serial.begin ( 115200 );
+	// while ( !Serial )
+	;
+	MyLogger.LogStart();
+	MyLogger.ClearScreen();
 
-	pMyUDPService = new UDPWiFiService ();
+	pMyUDPService = new UDPWiFiService();
 
 	// now we have state table set up and temp sensor configured, allow users to query state
 
-	TheMKR_RGB_LED.Invert (); // Only if required!
-	if ( !pMyUDPService->Begin ( ProcessUDPMsg, ssid, pass, MyHostName, &TheMKR_RGB_LED ) )
+	TheMKR_RGB_LED.Invert();  // Only if required!
+
+	// Generate dynamic AP SSID based on MAC address
+	String apSSID;
+	byte mac[ 6 ];
+	WiFi.macAddress ( mac );
+
+#ifdef UAP_SUPPORT
+	apSSID = "GARAGE_CONTROL_";
+#else
+	apSSID = "TEMP_HUMID_";
+#endif
+	// Append last 3 bytes of MAC address
+	char macStr[ 9 ];
+	sprintf ( macStr, "%02X%02X%02X", mac[ 3 ], mac[ 4 ], mac[ 5 ] );
+	apSSID += macStr;
+
+	Info ( F ( "Starting WiFi with onboarding support" ) );
+	Info ( "AP SSID will be: " + apSSID );
+	if ( !pMyUDPService->Begin ( ProcessUDPMsg, apSSID.c_str(), nullptr, &TheMKR_RGB_LED ) )
 	{
-		Error ( F ( "Cannot connect WiFI " ) );
+		Error ( F ( "WiFi initialization failed" ) );
 	}
 
 #ifdef BME280_SUPPORT
-	Wire.begin ();
-	if ( !MyBME280.begin () )
+	Wire.begin();
+	if ( !MyBME280.begin() )
 	{
 		Error ( F ( "Could not find BME280 sensor!" ) );
 		delay ( 1000 );
 	}
 	else
 	{
-		switch ( MyBME280.chipModel () )
+		switch ( MyBME280.chipModel() )
 		{
 			case BME280::ChipModel_BME280:
-				Info (  F ( "Found BME280 sensor! Success." ) );
+				Info ( F ( "Found BME280 sensor! Success." ) );
 				break;
 			case BME280::ChipModel_BMP280:
 				Info ( F ( "Found BMP280 sensor! No Humidity available." ) );
@@ -189,26 +215,36 @@ void setup ()
 				Error ( F ( "Found UNKNOWN sensor! Error!" ) );
 		}
 	}
-	DisplaylastInfoErrorMsg ();
+	DisplaylastInfoErrorMsg();
 #endif
 
 #ifdef UAP_SUPPORT
 	// Setup so we are called if the state of door changes
-	pGarageDoor	   = new DoorState ( OPEN_DOOR_OUTPUT_PIN, CLOSE_DOOR_OUTPUT_PIN, STOP_DOOR_OUTPUT_PIN, TURN_LIGHT_ON_OUTPUT_PIN, DOOR_IS_OPEN_STATUS_PIN, DOOR_IS_CLOSED_STATUS_PIN, LIGHT_IS_ON_STATUS_PIN, DOOR_SWITCH_INPUT_PIN );
-	// pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	//pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::Nothing, DoorState::Event::SwitchPress, DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, MAX_SWITCH_MATCH_TIMER_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
-	SetLED ();
+	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN,
+	                              CLOSE_DOOR_OUTPUT_PIN,
+	                              STOP_DOOR_OUTPUT_PIN,
+	                              TURN_LIGHT_ON_OUTPUT_PIN,
+	                              DOOR_IS_OPEN_STATUS_PIN,
+	                              DOOR_IS_CLOSED_STATUS_PIN,
+	                              LIGHT_IS_ON_STATUS_PIN,
+	                              DOOR_SWITCH_INPUT_PIN );
+	// pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::SwitchPress, DoorState::Event::Nothing,
+	// DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN, PinStatus::CHANGE );
+	// pDoorSwitchPin = new DoorStatusPin ( pGarageDoor, DoorState::Event::Nothing, DoorState::Event::SwitchPress,
+	// DOOR_SWITCH_INPUT_PIN, SWITCH_DEBOUNCE_MS, MAX_SWITCH_MATCH_TIMER_MS, PinStatus::HIGH, PinMode::INPUT_PULLDOWN,
+	// PinStatus::CHANGE );
+	SetLED();
 #endif
 }
 #ifdef UAP_SUPPORT
 // set the colour of the inbuilt MKR Wifi 1010 RGB LED based on the current door state
 void SetLED ()
 {
-	static DoorState::State OldState	 = DoorState::State::Opening;
-	DoorState::State		currentState = DoorState::State::Unknown;
+	static DoorState::State OldState = DoorState::State::Opening;
+	DoorState::State currentState = DoorState::State::Unknown;
 	if ( pGarageDoor != nullptr )
 	{
-		currentState = pGarageDoor->GetDoorState ();
+		currentState = pGarageDoor->GetDoorState();
 	}
 
 	if ( currentState != OldState )
@@ -249,18 +285,18 @@ void SetLED ()
 }
 #else
 // When not showing the door (UAP) status then show the humidity status
-void		   SetLED ()
+void SetLED ()
 {
-	uint8_t			   red, green, blue;
-	bool			   bOutsideRange = false;
-	uint8_t			   Flashtime	 = 0U;
-	float			   constrainedHumidity;
-	static float	   OldHumidity			   = NAN;
+	uint8_t red, green, blue;
+	bool bOutsideRange = false;
+	uint8_t Flashtime = 0U;
+	float constrainedHumidity;
+	static float OldHumidity = NAN;
 
 	// calculate color component
-	constexpr float	   HUMIDITY_MAX			   = 60.0;
-	constexpr float	   HUMIDITY_MIN			   = 40.0;
-	constexpr float	   HUMIDITY_MID			   = 50.0;
+	constexpr float HUMIDITY_MAX = 60.0;
+	constexpr float HUMIDITY_MIN = 40.0;
+	constexpr float HUMIDITY_MID = 50.0;
 	constexpr uint32_t OUTSIDE_RANGE_FLASHTIME = 10U;
 	if ( EnvironmentResults.humidity == OldHumidity )
 	{
@@ -296,7 +332,8 @@ void		   SetLED ()
 		blue = 0;
 	}
 	// green level indicates how close to wanted level
-	green = 255.0 - ( ( abs ( constrainedHumidity - HUMIDITY_MID ) * 255.0 ) / ( ( HUMIDITY_MAX - HUMIDITY_MIN ) / 2.0 ) );
+	green =
+	    255.0 - ( ( abs ( constrainedHumidity - HUMIDITY_MID ) * 255.0 ) / ( ( HUMIDITY_MAX - HUMIDITY_MIN ) / 2.0 ) );
 	pMyLED->SetLEDColour ( RGB ( red, green, blue ), Flashtime );
 
 	MyLogger.AT ( 3, 1, "Red   :" );
@@ -314,64 +351,75 @@ void		   SetLED ()
 void loop ()
 {
 #ifdef BME280_SUPPORT
-	//float				 pres ( NAN ), temp ( NAN ), hum ( NAN );
-	static unsigned long ulLastSensorTime = millis () - ( 30UL * 1000UL );
+	// float				 pres ( NAN ), temp ( NAN ), hum ( NAN );
+	static unsigned long ulLastSensorTime = millis() - ( 30UL * 1000UL );
 #endif
 
 	static unsigned long ulLastDisplayTime = 0UL;
 
 #ifdef UAP_SUPPORT
-	static DoorState::State LastDoorState  = DoorState::State::Unknown;
-	static bool				LastLightState = false;
+	static DoorState::State LastDoorState = DoorState::State::Unknown;
+	static bool LastLightState = false;
 
 	// set initial light state
 	if ( pGarageDoor != nullptr && ulLastDisplayTime == 0UL )
 	{
-		LastLightState = !pGarageDoor->IsLit ();
+		LastLightState = !pGarageDoor->IsLit();
 	}
 #endif
 	// set LED
-	SetLED ();
+	SetLED();
+
+	// Process onboarding if in AP mode
+	pMyUDPService->ProcessOnboarding();
 
 	// See if we have any udp requests to action
-	pMyUDPService->CheckUDP ();
+	pMyUDPService->CheckUDP();
 #ifdef BME280_SUPPORT
-	if ( millis () - ulLastSensorTime > 30 * 1000 )
+	if ( millis() - ulLastSensorTime > 30 * 1000 )
 	{
-		MyBME280.read ( EnvironmentResults.pressure, EnvironmentResults.temperature, EnvironmentResults.humidity, BME280::TempUnit::TempUnit_Celsius, BME280::PresUnit::PresUnit_hPa );
-		//Info ( "Temperature: " + String ( EnvironmentResults.temperature ) + "C" );
-		EnvironmentResults.pressure			 = EnvironmentCalculations::EquivalentSeaLevelPressure ( ALTITUDE_COMPENSATION, EnvironmentResults.temperature, EnvironmentResults.pressure );
-		EnvironmentResults.dewpoint			 = EnvironmentCalculations::DewPoint ( EnvironmentResults.temperature, EnvironmentResults.humidity );
-		EnvironmentResults.ulTimeOfReadingms = pMyUDPService->GetTime ();
+		MyBME280.read ( EnvironmentResults.pressure,
+		                EnvironmentResults.temperature,
+		                EnvironmentResults.humidity,
+		                BME280::TempUnit::TempUnit_Celsius,
+		                BME280::PresUnit::PresUnit_hPa );
+		// Info ( "Temperature: " + String ( EnvironmentResults.temperature ) + "C" );
+		EnvironmentResults.pressure =
+		    EnvironmentCalculations::EquivalentSeaLevelPressure ( ALTITUDE_COMPENSATION,
+		                                                          EnvironmentResults.temperature,
+		                                                          EnvironmentResults.pressure );
+		EnvironmentResults.dewpoint =
+		    EnvironmentCalculations::DewPoint ( EnvironmentResults.temperature, EnvironmentResults.humidity );
+		EnvironmentResults.ulTimeOfReadingms = pMyUDPService->GetTime();
 		MulticastMsg ( UDPWiFiService::ReqMsgType::TEMPDATA );
 		// reset time counter
-		ulLastSensorTime = millis ();
+		ulLastSensorTime = millis();
 	}
 #endif
 
 	// update debug stats every 1/2 second
-	if ( millis () - ulLastDisplayTime > 500 )
+	if ( millis() - ulLastDisplayTime > 500 )
 	{
-		ulLastDisplayTime = millis ();
-		DisplayStats ();
+		ulLastDisplayTime = millis();
+		DisplayStats();
 	}
 
 #ifdef UAP_SUPPORT
 	// if door state has changed, multicast news
 	if ( pGarageDoor != nullptr )
 	{
-		pGarageDoor->UpdateDoorState ();
-		if ( pGarageDoor->GetDoorState () != LastDoorState || LastLightState != pGarageDoor->IsLit () )
+		pGarageDoor->UpdateDoorState();
+		if ( pGarageDoor->GetDoorState() != LastDoorState || LastLightState != pGarageDoor->IsLit() )
 		{
-			LastDoorState  = pGarageDoor->GetDoorState ();
-			LastLightState = pGarageDoor->IsLit ();
+			LastDoorState = pGarageDoor->GetDoorState();
+			LastLightState = pGarageDoor->IsLit();
 			MulticastMsg ( UDPWiFiService::ReqMsgType::DOORDATA );
 		}
 	}
 	if ( pGarageDoor->IsSwitchConfigured() && pMyUDPService != nullptr )
 	{
-		static uint16_t SwitchPressedCount		 = 0;
-		uint16_t		LatestSwitchPressedCount = pGarageDoor->GetSwitchMatchCount ();
+		static uint16_t SwitchPressedCount = 0;
+		uint16_t LatestSwitchPressedCount = pGarageDoor->GetSwitchMatchCount();
 		if ( LatestSwitchPressedCount > SwitchPressedCount )
 		{
 			SwitchPressedCount = LatestSwitchPressedCount;
@@ -382,13 +430,13 @@ void loop ()
 
 // called to generate a response to a command
 // returns an empty string if no response required ie only do action
-void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
+void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String& sResponse )
 {
 	switch ( eReqType )
 	{
 		case UDPWiFiService::ReqMsgType::TEMPDATA:
 #ifdef BME280_SUPPORT
-			sResponse  = F ( "T=" );
+			sResponse = F ( "T=" );
 			sResponse += EnvironmentResults.temperature;
 			sResponse += F ( ",H=" );
 			sResponse += EnvironmentResults.humidity;
@@ -406,18 +454,18 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 		case UDPWiFiService::ReqMsgType::DOORDATA:
 			if ( pGarageDoor != nullptr )
 			{
-				sResponse  = F ( "S=" );
-				sResponse += pGarageDoor->GetDoorDisplayState (); // Door State
+				sResponse = F ( "S=" );
+				sResponse += pGarageDoor->GetDoorDisplayState();  // Door State
 				sResponse += F ( ",L=" );
-				sResponse += pGarageDoor->IsLit () ? F ( "On" ) : F ( "Off" ); // Light on or not
+				sResponse += pGarageDoor->IsLit() ? F ( "On" ) : F ( "Off" );  // Light on or not
 				sResponse += F ( ",C=" );
-				sResponse += pGarageDoor->IsClosed () ? F ( "Y" ) : F ( "N" ); // Closed or not
+				sResponse += pGarageDoor->IsClosed() ? F ( "Y" ) : F ( "N" );  // Closed or not
 				sResponse += F ( ",O=" );
-				sResponse += pGarageDoor->IsOpen () ? F ( "Y" ) : F ( "N" ); // Open or not
+				sResponse += pGarageDoor->IsOpen() ? F ( "Y" ) : F ( "N" );  // Open or not
 				sResponse += F ( ",M=" );
-				sResponse += pGarageDoor->IsMoving () ? F ( "Y" ) : F ( "N" ); // Moving or not
+				sResponse += pGarageDoor->IsMoving() ? F ( "Y" ) : F ( "N" );  // Moving or not
 				sResponse += F ( ",A=" );
-				sResponse += pMyUDPService->GetTime (); // current epoch time
+				sResponse += pMyUDPService->GetTime();  // current epoch time
 				sResponse += F ( "\r" );
 			}
 			else
@@ -463,4 +511,3 @@ void BuildMessage ( UDPWiFiService::ReqMsgType eReqType, String &sResponse )
 #endif
 	}
 }
-
