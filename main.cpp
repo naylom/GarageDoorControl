@@ -53,7 +53,8 @@ History:
     Ver 1.0.13		Improved encapsulation of InputPin
     Ver 1.0.15		Moved display code to own file
     Ver 1.0.16      Changed InputPin to use enum class for events and made action functions const
-	ver 1.0.17	    Added onboarding support and moved WiFi code to WiFiService files, added config storage, added web server for onboarding. Built with platformio 6.1.0
+    ver 1.0.17	    Added onboarding support and moved WiFi code to WiFiService files, added config storage, added web
+server for onboarding. Built with platformio 6.1.0
 */
 const char* VERSION = "1.0.17 Beta";
 
@@ -79,8 +80,7 @@ struct TEMP_STATS
 	uint32_t ulTimeOfReadingms;
 } EnvironmentResults = { NAN, NAN, NAN, 0UL };
 
-constexpr float ALTITUDE_COMPENSATION =
-    131.0;  // sensor is 135 metres aboves sea level, we need this to adjust pressure reading to sea level equivalent.
+// Altitude compensation is now loaded from config
 BME280I2C::Settings settings ( BME280::OSR_X2,
                                BME280::OSR_X2,
                                BME280::OSR_X2,
@@ -174,7 +174,7 @@ void setup ()
 
 	// Generate dynamic AP SSID based on MAC address
 	String apSSID;
-	byte mac[ 6 ];
+	byte mac [ 6 ];
 	WiFi.macAddress ( mac );
 
 #ifdef UAP_SUPPORT
@@ -183,8 +183,8 @@ void setup ()
 	apSSID = "TEMP_HUMID_";
 #endif
 	// Append last 3 bytes of MAC address
-	char macStr[ 9 ];
-	sprintf ( macStr, "%02X%02X%02X", mac[ 3 ], mac[ 4 ], mac[ 5 ] );
+	char macStr [ 9 ];
+	sprintf ( macStr, "%02X%02X%02X", mac [ 3 ], mac [ 4 ], mac [ 5 ] );
 	apSSID += macStr;
 
 	Info ( F ( "Starting WiFi with onboarding support" ) );
@@ -384,8 +384,10 @@ void loop ()
 		                BME280::TempUnit::TempUnit_Celsius,
 		                BME280::PresUnit::PresUnit_hPa );
 		// Info ( "Temperature: " + String ( EnvironmentResults.temperature ) + "C" );
+		// Use altitude compensation from config
+		float altitudeCompensation = pMyUDPService->GetAltitudeCompensation();
 		EnvironmentResults.pressure =
-		    EnvironmentCalculations::EquivalentSeaLevelPressure ( ALTITUDE_COMPENSATION,
+		    EnvironmentCalculations::EquivalentSeaLevelPressure ( altitudeCompensation,
 		                                                          EnvironmentResults.temperature,
 		                                                          EnvironmentResults.pressure );
 		EnvironmentResults.dewpoint =

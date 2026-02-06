@@ -79,7 +79,7 @@ void OnboardingServer::loop ()
 		memset ( &cfg, 0, sizeof ( cfg ) );
 		cfg.udpPort = DEFAULT_UDP_PORT;
 		cfg.multicastPort = DEFAULT_MULTICAST_PORT;
-		cfg.altitudeCompensation = 0.0f;
+		cfg.altitudeCompensation = 131.0f;
 		cfg.valid = true;
 
 		parseForm ( body, cfg );
@@ -181,7 +181,7 @@ void OnboardingServer::sendForm ( WiFiClient& client )
 
 #ifdef BME280_SUPPORT
 	client.println ( "<label for='altitude'>Altitude Compensation (meters):</label>" );
-	client.println ( "<input type='number' id='altitude' name='altitude' value='0' step='0.1' min='-500' max='9000'>" );
+	client.println ( "<input type='number' id='altitude' name='altitude' value='131' step='0.1' min='-500' max='9000'>" );
 	client.println ( "<div class='info'>Altitude above sea level for barometric pressure compensation</div>" );
 #endif
 

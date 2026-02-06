@@ -18,38 +18,36 @@ History:
 #include <time.h>
 #include <WiFiNINA.h>
 
-const char* WiFiStatus[] = { "WL_IDLE_STATUS",  // = 0,
-                             "WL_NO_SSID_AVAIL",
-                             "WL_SCAN_COMPLETED",
-                             "WL_CONNECTED",
-                             "WL_CONNECT_FAILED",
-                             "WL_CONNECTION_LOST",
-                             "WL_DISCONNECTED",
-                             "WL_AP_LISTENING",
-                             "WL_AP_CONNECTED",
-                             "WL_AP_FAILED",
-                             "WL_NO_MODULE" };  // = 255
+const char* WiFiStatus [] = { "WL_IDLE_STATUS",  // = 0,
+                              "WL_NO_SSID_AVAIL",
+                              "WL_SCAN_COMPLETED",
+                              "WL_CONNECTED",
+                              "WL_CONNECT_FAILED",
+                              "WL_CONNECTION_LOST",
+                              "WL_DISCONNECTED",
+                              "WL_AP_LISTENING",
+                              "WL_AP_CONNECTED",
+                              "WL_AP_FAILED",
+                              "WL_NO_MODULE" };  // = 255
 /*
     UDP config
 */
 constexpr auto WIFI_FLASHTIME = 10;  // every 1/2 second
 
 // Valid message parts
-constexpr char cMsgVersion1[] = "V001";        // message version
-constexpr char TempHumidityReqMsg[] = "M001";  // Req temp / humidity
-constexpr char RestartReqMsg[] = "M002";       // Req restart
-constexpr char DoorStatusReqMsg[] = "M003";    // Req Door status
-constexpr char DoorOpenReqMsg[] = "M004";      // Req Door Open
-constexpr char DoorCloseReqMsg[] = "M005";     // Req Door Close
-constexpr char DoorStopReqMsg[] = "M006";      // Req Door Stop
-constexpr char DoorLightOnReqMsg[] = "M007";   // Req Light On
-constexpr char DoorLightOffReqMsg[] = "M008";  // Req Light off
-constexpr char PartSeparator[] = ":";
+constexpr char cMsgVersion1 [] 			= "V001";       // message version
+constexpr char TempHumidityReqMsg [] 	= "M001";  		// Req temp / humidity
+constexpr char RestartReqMsg [] 		= "M002";       // Req restart
+constexpr char DoorStatusReqMsg [] 		= "M003";    	// Req Door status
+constexpr char DoorOpenReqMsg [] 		= "M004";      	// Req Door Open
+constexpr char DoorCloseReqMsg [] 		= "M005";     	// Req Door Close
+constexpr char DoorStopReqMsg [] 		= "M006";      	// Req Door Stop
+constexpr char DoorLightOnReqMsg [] 	= "M007";   	// Req Light On
+constexpr char DoorLightOffReqMsg [] 	= "M008";   	// Req Light off
+constexpr char PartSeparator [] = ":";
 
 constexpr auto MAX_INCOMING_UDP_MSG = 255;
 constexpr auto WIFI_CONNECT_TIMEOUT_MS = 10000;
-
-constexpr uint16_t MulticastSendPort = 0xCE5C;
 
 enum class eResponseMessage : uint8_t
 {
@@ -70,8 +68,8 @@ static void logWiFiError ( const String& context, int errorCode )
 // Helper function to convert IPAddress to String
 static String ipToString ( const IPAddress& address )
 {
-	return String ( address[ 0 ] ) + "." + String ( address[ 1 ] ) + "." + String ( address[ 2 ] ) + "." +
-	       String ( address[ 3 ] );
+	return String ( address [ 0 ] ) + "." + String ( address [ 1 ] ) + "." + String ( address [ 2 ] ) + "." +
+	       String ( address [ 3 ] );
 }
 
 void TerminateProgram ( const __FlashStringHelper* pErrMsg )
@@ -107,9 +105,9 @@ WiFiService::~WiFiService ()
 
 const char* WiFiService::WiFiStatusToString ( uint8_t iState ) const
 {
-	static constexpr size_t statusCount = sizeof ( WiFiStatus ) / sizeof ( WiFiStatus[ 0 ] );
+	static constexpr size_t statusCount = sizeof ( WiFiStatus ) / sizeof ( WiFiStatus [ 0 ] );
 
-	return ( iState < statusCount ) ? WiFiStatus[ iState ] : "UNKNOWN";
+	return ( iState < statusCount ) ? WiFiStatus [ iState ] : "UNKNOWN";
 }
 
 uint32_t WiFiService::GetBeginTimeOutCount () const
@@ -125,6 +123,11 @@ const char* WiFiService::GetHostName () const
 unsigned long WiFiService::GetTime () const
 {
 	return WiFi.getTime();
+}
+
+float WiFiService::GetAltitudeCompensation () const
+{
+	return m_config.altitudeCompensation;
 }
 
 WiFiService::Status WiFiService::GetState () const
@@ -502,7 +505,7 @@ void UDPWiFiService::GetLocalTime ( String& result, time_t timeError )
 	{
 		tm localtm;
 		localtime_r ( &timeError, &localtm );
-		char sTime[ 20 ];
+		char sTime [ 20 ];
 		// Format: DD/MM/YY HH:MM:SS
 		sprintf ( sTime,
 		          "%02d/%02d/%02d %02d:%02d:%02d",
@@ -533,7 +536,7 @@ bool UDPWiFiService::GetUDPMessage ( String& RecvMessage )
 bool UDPWiFiService::ReadUDPMessage ( String& sRecvMessage )
 {
 	bool bResult = false;
-	char sBuffer[ MAX_INCOMING_UDP_MSG ];
+	char sBuffer [ MAX_INCOMING_UDP_MSG ];
 
 	// if there's data available, read a packet
 	unsigned int packetSize = m_myUDP.parsePacket();
@@ -550,7 +553,7 @@ bool UDPWiFiService::ReadUDPMessage ( String& sRecvMessage )
 			int len = m_myUDP.read ( sBuffer, sizeof ( sBuffer ) - 1 );
 			if ( len >= 0 )
 			{
-				sBuffer[ len ] = 0;
+				sBuffer [ len ] = 0;
 				sRecvMessage = sBuffer;
 				bResult = true;
 				m_ulReqCount++;
@@ -659,7 +662,7 @@ bool UDPWiFiService::SendAll ( String sMsg )
 			while ( (long unsigned int)( nextIP = m_pMulticastDestList->GetNext ( iterator ) ) != 0UL )
 			{
 				delay ( 200 );
-				if ( m_myUDP.beginPacket ( nextIP, MulticastSendPort ) == 1 )
+				if ( m_myUDP.beginPacket ( nextIP, m_config.multicastPort ) == 1 )
 				{
 					m_myUDP.write ( sMsg.c_str() );
 					if ( m_myUDP.endPacket() == 0 )

@@ -1,6 +1,7 @@
 #include "OutputPin.h"
 
-OutputPin::OutputPin ( pin_size_t Pin, PinStatus OnStatus ) : m_Pin ( Pin ), m_OnStatus ( OnStatus ), m_pinStatus(LOW)
+OutputPin::OutputPin ( pin_size_t Pin, PinStatus OnStatus )
+    : m_Pin ( Pin ), m_OnStatus ( OnStatus ), m_pinStatus ( LOW )
 {
 	pinMode ( m_Pin, OUTPUT );
 	delay ( 10 );
@@ -10,17 +11,17 @@ OutputPin::OutputPin ( pin_size_t Pin, PinStatus OnStatus ) : m_Pin ( Pin ), m_O
 /// @brief Sets the pin to the ON value provided in the constructor
 void OutputPin::On ()
 {
-	Write ( m_OnStatus ==  HIGH ? HIGH : LOW );	// Set to ON
+	Write ( m_OnStatus == HIGH ? HIGH : LOW );  // Set to ON
 }
 
 /// @brief Sets the pin the logical NOT of the ON value provided in the constructor
 void OutputPin::Off ()
 {
-	Write ( m_OnStatus ==  HIGH ? LOW : HIGH );	// Set to OFF
+	Write ( m_OnStatus == HIGH ? LOW : HIGH );  // Set to OFF
 }
 
 /// @brief Turns the pin ON, waits the millisec provided and turns the pin OFF
-/// @param milliSec 
+/// @param milliSec
 void OutputPin::Pulse ( uint32_t milliSec )
 {
 	On();
@@ -45,7 +46,7 @@ void OutputPin::Write ( PinStatus status )
 	m_ulTimeWritten = millis();
 }
 
-uint32_t  OutputPin::GetTimeWritten() const
+uint32_t OutputPin::GetTimeWritten () const
 {
 	return m_ulTimeWritten;
 }

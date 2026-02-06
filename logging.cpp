@@ -14,33 +14,33 @@ The serial monitor needs to be able to support these ANSI sequences. A free exam
 Author: (c) M. Naylor 2022
 
 History:
-	Ver 1.0			Initial version
+    Ver 1.0			Initial version
 */
 #include "logging.h"
 
 namespace MN ::Utils
 {
 #ifdef ARDUINO_AVR_UNO
-	extern "C"
-	{
-		void ( *SWResetBoard ) ( void ) = 0; // declare reset function at address 0
-	}
+extern "C"
+{
+	void ( *SWResetBoard ) ( void ) = 0;  // declare reset function at address 0
+}
 
-	void ResetBoard ( const __FlashStringHelper *pErrMsg )
-	{
-		// Error ( pErrMsg );
-		// LogFlush;
-		SWResetBoard ();
-	}
+void ResetBoard ( const __FlashStringHelper* pErrMsg )
+{
+	// Error ( pErrMsg );
+	// LogFlush;
+	SWResetBoard();
+}
 #else
-	void ResetBoard ( const __FlashStringHelper *pErrMsg )
-	{
-		// Error ( pErrMsg );
-		// LogFlush();
-		NVIC_SystemReset (); // processor software reset for ARM SAMD processor
-	}
+void ResetBoard ( const __FlashStringHelper* pErrMsg )
+{
+	// Error ( pErrMsg );
+	// LogFlush();
+	NVIC_SystemReset();  // processor software reset for ARM SAMD processor
+}
 #endif
-} // namespace MN::Utils
+}  // namespace MN::Utils
 
 void ansiVT220Logger::ClearScreen ()
 {
@@ -49,8 +49,8 @@ void ansiVT220Logger::ClearScreen ()
 
 void ansiVT220Logger::AT ( uint8_t row, uint8_t col, String s )
 {
-	row		 = row == 0 ? 1 : row;
-	col		 = col == 0 ? 1 : col;
+	row = row == 0 ? 1 : row;
+	col = col == 0 ? 1 : col;
 	String m = String ( CSI ) + row + String ( ";" ) + col + String ( "H" ) + s;
 	m_logger.print ( m );
 }
@@ -77,33 +77,34 @@ void ansiVT220Logger::SaveCursor ( void )
 
 void ansiVT220Logger::ClearLine ( uint8_t row )
 {
-	SaveCursor ();
+	SaveCursor();
 	AT ( row, 1, String ( CLEAR_LINE ) );
-	RestoreCursor ();
+	RestoreCursor();
 }
 
 void ansiVT220Logger::ClearPartofLine ( uint8_t row, uint8_t start_col, uint8_t toclear )
 {
 	static char buf [ ansiVT220Logger::MAX_COLS + 1 ];
 	memset ( buf, ' ', sizeof ( buf ) - 1 );
-	buf [ ansiVT220Logger::MAX_COLS ]  = 0;
+	buf [ ansiVT220Logger::MAX_COLS ] = 0;
 
 	// build string of toclear spaces
-	toclear							  %= ansiVT220Logger::MAX_COLS + 1; // ensure toclear is <= MAX_COLS
+	toclear %= ansiVT220Logger::MAX_COLS + 1;  // ensure toclear is <= MAX_COLS
 	if ( start_col + toclear > ansiVT220Logger::MAX_COLS + 1 )
 	{
 		toclear = ansiVT220Logger::MAX_COLS - start_col + 1;
 	}
-	toclear = ( ansiVT220Logger::MAX_COLS - start_col + 1 ) % ( ansiVT220Logger::MAX_COLS + 1 ); // ensure toclear doesn't go past end of line
-	SaveCursor ();
+	toclear = ( ansiVT220Logger::MAX_COLS - start_col + 1 ) %
+	          ( ansiVT220Logger::MAX_COLS + 1 );  // ensure toclear doesn't go past end of line
+	SaveCursor();
 	buf [ toclear ] = 0;
 	AT ( row, start_col, buf );
-	RestoreCursor ();
+	RestoreCursor();
 }
 
-void ansiVT220Logger::OnClientConnect ( void *plog )
+void ansiVT220Logger::OnClientConnect ( void* plog )
 {
-	Logger *pLog = (Logger *)plog;
+	Logger* pLog = (Logger*)plog;
 	pLog->print ( SCREEN_SIZE132 );
 	pLog->print ( ansiVT220Logger::OSC + "2;GarageControl Debug\x1b\\" + STRING_TERMINATOR );
 	pLog->print ( F ( "\x1b[63;2\"p" ) );
@@ -111,31 +112,31 @@ void ansiVT220Logger::OnClientConnect ( void *plog )
 
 void ansiVT220Logger::LogStart ()
 {
-	m_logger.LogStart ();
-	if ( m_logger.CanDetectClientConnect () )
+	m_logger.LogStart();
+	if ( m_logger.CanDetectClientConnect() )
 	{
 		m_logger.SetConnectCallback ( &ansiVT220Logger::OnClientConnect );
 	}
 }
 
 String ansiVT220Logger::STRING_TERMINATOR = F ( "\x1b\\" );
-String ansiVT220Logger::OSC				  = F ( "\x1b]" );
-String ansiVT220Logger::SCREEN_SIZE132	  = F ( "\x1b[?3h" );
-String ansiVT220Logger::WINDOW_TITLE	  = F ( "Debug" );
+String ansiVT220Logger::OSC = F ( "\x1b]" );
+String ansiVT220Logger::SCREEN_SIZE132 = F ( "\x1b[?3h" );
+String ansiVT220Logger::WINDOW_TITLE = F ( "Debug" );
 
-int	   SerialLogger::available ()
+int SerialLogger::available ()
 {
-	return Serial.available ();
+	return Serial.available();
 }
 
 int SerialLogger::read ()
 {
-	return Serial.read ();
+	return Serial.read();
 }
 
 int SerialLogger::peek ()
 {
-	return Serial.peek ();
+	return Serial.peek();
 }
 
 size_t SerialLogger::write ( String Msg )
@@ -148,9 +149,9 @@ size_t SerialLogger::write ( uint8_t c )
 	return Serial.print ( c );
 }
 
-size_t SerialLogger::write ( const uint8_t *buffer, size_t size )
+size_t SerialLogger::write ( const uint8_t* buffer, size_t size )
 {
-	return Serial.write ( (char *)buffer, size );
+	return Serial.write ( (char*)buffer, size );
 }
 
 void SerialLogger::LogStart ()
@@ -165,33 +166,34 @@ bool SerialLogger::CanDetectClientConnect ()
 	return false;
 }
 
-/* ----------------------------------------------------------------------------------------------------------------------- */
+/* -----------------------------------------------------------------------------------------------------------------------
+ */
 bool CTelnet::isConnected ()
 {
-	return WiFi.status () == WL_CONNECTED ? true : false;
+	return WiFi.status() == WL_CONNECTED ? true : false;
 }
 
 CTelnet::operator bool ()
 {
-	return isConnected ();
+	return isConnected();
 }
 
 void CTelnet::begin ( uint32_t port )
 {
 	m_telnetPort = port & 0xffff;
-	m_pmyServer	 = new WiFiServer ( m_telnetPort );
-	m_pmyServer->begin ();
+	m_pmyServer = new WiFiServer ( m_telnetPort );
+	m_pmyServer->begin();
 }
 
 size_t CTelnet::write ( uint8_t c )
 {
 	size_t result = 0;
-	if ( m_myClient.connected () )
+	if ( m_myClient.connected() )
 	{
 		size_t result = m_myClient.write ( c );
 		if ( result <= 0 )
 		{
-			m_myClient.stop ();
+			m_myClient.stop();
 			m_bClientConnected = false;
 			// Serial.println ( "Client disconnected" );
 		}
@@ -200,7 +202,7 @@ size_t CTelnet::write ( uint8_t c )
 	{
 		if ( m_pmyServer != nullptr )
 		{
-			m_myClient = m_pmyServer->available ();
+			m_myClient = m_pmyServer->available();
 			if ( m_myClient )
 			{
 				// Serial.println ( "Client connected" );
@@ -224,15 +226,15 @@ void CTelnet::DoConnect ()
 	}
 }
 
-size_t CTelnet::write ( const uint8_t *buffer, size_t size )
+size_t CTelnet::write ( const uint8_t* buffer, size_t size )
 {
 	size_t result = 0;
-	if ( m_myClient.connected () && size > 0 )
+	if ( m_myClient.connected() && size > 0 )
 	{
-		size_t result = m_myClient.write ( (char* )buffer, size );
+		size_t result = m_myClient.write ( (char*)buffer, size );
 		if ( result <= 0 )
 		{
-			m_myClient.stop ();
+			m_myClient.stop();
 			m_bClientConnected = false;
 			// Serial.println ( "Client disconnected" );
 		}
@@ -241,12 +243,12 @@ size_t CTelnet::write ( const uint8_t *buffer, size_t size )
 	{
 		if ( m_pmyServer != nullptr )
 		{
-			m_myClient = m_pmyServer->available ();
+			m_myClient = m_pmyServer->available();
 			if ( m_myClient )
 			{
 				// Serial.println ( "Client connected" );
 				m_bClientConnected = true;
-				DoConnect ();
+				DoConnect();
 			}
 		}
 	}
@@ -256,12 +258,12 @@ size_t CTelnet::write ( const uint8_t *buffer, size_t size )
 size_t CTelnet::write ( String Msg )
 {
 	size_t Result = 0;
-	if ( m_myClient.connected () && Msg.length () > 0 )
+	if ( m_myClient.connected() && Msg.length() > 0 )
 	{
 		Result = m_myClient.print ( Msg );
 		if ( Result <= 0 )
 		{
-			m_myClient.stop ();
+			m_myClient.stop();
 			m_bClientConnected = false;
 			// Serial.println ( "Client disconnected" );
 		}
@@ -270,12 +272,12 @@ size_t CTelnet::write ( String Msg )
 	{
 		if ( m_pmyServer != nullptr )
 		{
-			m_myClient = m_pmyServer->available ();
+			m_myClient = m_pmyServer->available();
 			if ( m_myClient )
 			{
 				// Serial.println ( "Client connected" );
 				m_bClientConnected = true;
-				DoConnect ();
+				DoConnect();
 			}
 		}
 	}
@@ -284,22 +286,22 @@ size_t CTelnet::write ( String Msg )
 
 int CTelnet::available ()
 {
-	return m_myClient.available ();
+	return m_myClient.available();
 }
 
 int CTelnet::read ()
 {
-	return m_myClient.read ();
+	return m_myClient.read();
 }
 
 int CTelnet::peek ()
 {
-	return m_myClient.peek ();
+	return m_myClient.peek();
 }
 
 void CTelnet::LogStart ()
 {
-	begin ();
+	begin();
 }
 
 bool CTelnet::CanDetectClientConnect ()
