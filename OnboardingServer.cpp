@@ -181,7 +181,8 @@ void OnboardingServer::sendForm ( WiFiClient& client )
 
 #ifdef BME280_SUPPORT
 	client.println ( "<label for='altitude'>Altitude Compensation (meters):</label>" );
-	client.println ( "<input type='number' id='altitude' name='altitude' value='131' step='0.1' min='-500' max='9000'>" );
+	client.println (
+	    "<input type='number' id='altitude' name='altitude' value='131' step='0.1' min='-500' max='9000'>" );
 	client.println ( "<div class='info'>Altitude above sea level for barometric pressure compensation</div>" );
 #endif
 
@@ -208,13 +209,13 @@ void OnboardingServer::parseForm ( const String& body, GarageConfig& cfg )
 #endif
 
 	strncpy ( cfg.ssid, ssid.c_str(), sizeof ( cfg.ssid ) - 1 );
-	cfg.ssid[ sizeof ( cfg.ssid ) - 1 ] = '\0';
+	cfg.ssid [ sizeof ( cfg.ssid ) - 1 ] = '\0';
 
 	strncpy ( cfg.password, password.c_str(), sizeof ( cfg.password ) - 1 );
-	cfg.password[ sizeof ( cfg.password ) - 1 ] = '\0';
+	cfg.password [ sizeof ( cfg.password ) - 1 ] = '\0';
 
 	strncpy ( cfg.hostname, hostname.c_str(), sizeof ( cfg.hostname ) - 1 );
-	cfg.hostname[ sizeof ( cfg.hostname ) - 1 ] = '\0';
+	cfg.hostname [ sizeof ( cfg.hostname ) - 1 ] = '\0';
 
 	if ( udpPort.length() > 0 )
 	{

@@ -35,15 +35,15 @@ const char* WiFiStatus [] = { "WL_IDLE_STATUS",  // = 0,
 constexpr auto WIFI_FLASHTIME = 10;  // every 1/2 second
 
 // Valid message parts
-constexpr char cMsgVersion1 [] 			= "V001";       // message version
-constexpr char TempHumidityReqMsg [] 	= "M001";  		// Req temp / humidity
-constexpr char RestartReqMsg [] 		= "M002";       // Req restart
-constexpr char DoorStatusReqMsg [] 		= "M003";    	// Req Door status
-constexpr char DoorOpenReqMsg [] 		= "M004";      	// Req Door Open
-constexpr char DoorCloseReqMsg [] 		= "M005";     	// Req Door Close
-constexpr char DoorStopReqMsg [] 		= "M006";      	// Req Door Stop
-constexpr char DoorLightOnReqMsg [] 	= "M007";   	// Req Light On
-constexpr char DoorLightOffReqMsg [] 	= "M008";   	// Req Light off
+constexpr char cMsgVersion1 [] = "V001";        // message version
+constexpr char TempHumidityReqMsg [] = "M001";  // Req temp / humidity
+constexpr char RestartReqMsg [] = "M002";       // Req restart
+constexpr char DoorStatusReqMsg [] = "M003";    // Req Door status
+constexpr char DoorOpenReqMsg [] = "M004";      // Req Door Open
+constexpr char DoorCloseReqMsg [] = "M005";     // Req Door Close
+constexpr char DoorStopReqMsg [] = "M006";      // Req Door Stop
+constexpr char DoorLightOnReqMsg [] = "M007";   // Req Light On
+constexpr char DoorLightOffReqMsg [] = "M008";  // Req Light off
 constexpr char PartSeparator [] = ":";
 
 constexpr auto MAX_INCOMING_UDP_MSG = 255;
