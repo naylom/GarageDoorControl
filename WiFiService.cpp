@@ -95,10 +95,15 @@ WiFiService::WiFiService ()
 WiFiService::~WiFiService ()
 {
 	WiFiDisconnect();
-	if ( m_pOnboarding != nullptr )
+	if ( m_pOnboardingPortal != nullptr )
 	{
-		delete m_pOnboarding;
-		m_pOnboarding = nullptr;
+		delete m_pOnboardingPortal;
+		m_pOnboardingPortal = nullptr;
+	}
+	if ( m_pOnboardingServer != nullptr )
+	{
+		delete m_pOnboardingServer;
+		m_pOnboardingServer = nullptr;
 	}
 }
 
@@ -285,38 +290,25 @@ void WiFiService::LoadAndConnectFromStorage ()
  */
 void WiFiService::StartAP ()
 {
-	WiFi.disconnect();
-	WiFi.end();
-
 	Info ( "Starting AP mode: " + String ( m_apSSID ) );
 
-	// If password is null or empty, create an open AP
-	if ( m_apPassword == nullptr || strlen ( m_apPassword ) == 0 )
+	if ( m_pOnboardingServer == nullptr )
 	{
-		Info ( "Creating open AP (no password)" );
-		WiFi.beginAP ( m_apSSID );
-	}
-	else
-	{
-		Info ( "Creating secured AP" );
-		WiFi.beginAP ( m_apSSID, m_apPassword );
+		m_pOnboardingServer = new OnboardingServer();
 	}
 
-	// Wait for AP to be started
-	while ( WiFi.localIP() == IPAddress ( 0, 0, 0, 0 ) )
+	if ( m_pOnboardingPortal == nullptr )
 	{
-		delay ( 100 );
+		m_pOnboardingPortal = new OnboardingPortal ( *m_pOnboardingServer, m_apSSID, m_apPassword );
 	}
 
-	Info ( "AP started. IP: " + ToIPString ( WiFi.localIP() ) );
-
-	// Create and start onboarding server
-	if ( m_pOnboarding == nullptr )
+	if ( !m_pOnboardingPortal->begin() )
 	{
-		m_pOnboarding = new OnboardingServer();
+		Error ( F ( "Failed to start onboarding portal" ) );
+		return;
 	}
-	m_pOnboarding->begin();
 
+	Info ( "AP started. IP: " + ToIPString ( m_pOnboardingPortal->apIP() ) );
 	SetState ( Status::AP_MODE );
 }
 
@@ -479,9 +471,9 @@ bool UDPWiFiService::Begin ( UDPWiFiServiceCallback pHandleReqData,
  */
 void UDPWiFiService::ProcessOnboarding ()
 {
-	if ( GetState() == Status::AP_MODE && m_pOnboarding != nullptr )
+	if ( GetState() == Status::AP_MODE && m_pOnboardingPortal != nullptr )
 	{
-		m_pOnboarding->loop();
+		m_pOnboardingPortal->loop();
 	}
 }
 
