@@ -82,7 +82,7 @@ void TerminateProgram ( const __FlashStringHelper* pErrMsg )
 WiFiService::WiFiService ()
 {
 	// Set the timezone to GMT with daylight saving time adjustments
-	// bad - setenv ( "TZ", "GMTGMT-1,M3.4.0/01,M10.4.0/02", 1 );
+
 
 	// GMT0BST: base is UTC+0 (GMT), DST is UTC+1 (BST)
 	// M3.5.0/1  = last Sunday in March at 01:00, clocks go forward 1 hour
