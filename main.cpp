@@ -160,9 +160,12 @@ void ProcessUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
 // main setup routine
 void setup ()
 {
-	// Serial.begin ( 115200 );
-	// while ( !Serial )
-	;
+	// Drive external LED pins low immediately — before any other peripheral
+	// initialisation. SAMD21 pins default to floating inputs; without this,
+	// SPI/I2C/timer ISR activity induces noise on the pins causing visible
+	// colour glitching on the external LED during startup.
+	pMyLED->SetLEDColour ( MNRGBLEDBaseLib::eColour::BLACK, 0 );
+
 	MyLogger.LogStart();
 	MyLogger.ClearScreen();
 
@@ -186,7 +189,6 @@ void setup ()
 	char macStr [ 9 ];
 	sprintf ( macStr, "%02X%02X%02X", mac [ 3 ], mac [ 4 ], mac [ 5 ] );
 	apSSID += macStr;
-
 	Info ( F ( "Starting WiFi with onboarding support" ) );
 	Info ( "AP SSID will be: " + apSSID );
 	if ( !pMyUDPService->Begin ( ProcessUDPMsg, apSSID.c_str(), nullptr, &TheMKR_RGB_LED ) )
@@ -287,6 +289,12 @@ void SetLED ()
 // When not showing the door (UAP) status then show the humidity status
 void SetLED ()
 {
+	// In AP mode the WiFiService owns the LED colour — don't override it.
+	if ( pMyUDPService != nullptr && pMyUDPService->GetState() == WiFiService::Status::AP_MODE )
+	{
+		return;
+	}
+
 	uint8_t red, green, blue;
 	bool bOutsideRange = false;
 	uint8_t Flashtime = 0U;
@@ -298,6 +306,13 @@ void SetLED ()
 	constexpr float HUMIDITY_MIN = 40.0;
 	constexpr float HUMIDITY_MID = 50.0;
 	constexpr uint32_t OUTSIDE_RANGE_FLASHTIME = 10U;
+
+	// Guard against NaN (sensor not yet read or not present).
+	if ( isnan ( EnvironmentResults.humidity ) )
+	{
+		return;
+	}
+
 	if ( EnvironmentResults.humidity == OldHumidity )
 	{
 		return;
@@ -351,7 +366,6 @@ void SetLED ()
 void loop ()
 {
 #ifdef BME280_SUPPORT
-	// float				 pres ( NAN ), temp ( NAN ), hum ( NAN );
 	static unsigned long ulLastSensorTime = millis() - ( 30UL * 1000UL );
 #endif
 
@@ -367,8 +381,11 @@ void loop ()
 		LastLightState = !pGarageDoor->IsLit();
 	}
 #endif
-	// set LED
+	// set LED — noInterrupts() prevents Flash() ISR racing against analogWrite()
+	// on the external LED's PWM registers, causing visible intensity flicker.
+	noInterrupts();
 	SetLED();
+	interrupts();
 
 	// Process onboarding if in AP mode
 	pMyUDPService->ProcessOnboarding();
@@ -376,7 +393,7 @@ void loop ()
 	// See if we have any udp requests to action
 	pMyUDPService->CheckUDP();
 #ifdef BME280_SUPPORT
-	if ( millis() - ulLastSensorTime > 30 * 1000 )
+	if ( pMyUDPService->GetState() != WiFiService::Status::AP_MODE && millis() - ulLastSensorTime > 30 * 1000 )
 	{
 		MyBME280.read ( EnvironmentResults.pressure,
 		                EnvironmentResults.temperature,

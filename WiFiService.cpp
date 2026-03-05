@@ -82,8 +82,12 @@ void TerminateProgram ( const __FlashStringHelper* pErrMsg )
 WiFiService::WiFiService ()
 {
 	// Set the timezone to GMT with daylight saving time adjustments
-	setenv ( "TZ", "GMTGMT-1,M3.4.0/01,M10.4.0/02", 1 );
+	// bad - setenv ( "TZ", "GMTGMT-1,M3.4.0/01,M10.4.0/02", 1 );
 
+	// GMT0BST: base is UTC+0 (GMT), DST is UTC+1 (BST)
+	// M3.5.0/1  = last Sunday in March at 01:00, clocks go forward 1 hour
+	// M10.5.0/2 = last Sunday in October at 02:00, clocks go back 1 hour
+	setenv ( "TZ", "GMT0BST,M3.5.0/1,M10.5.0/2", 1 );
 	// Initialize configuration storage
 	if ( !ConfigStorage::begin() )
 	{
@@ -296,17 +300,20 @@ void WiFiService::StartAP ()
 	{
 		m_pOnboardingServer = new OnboardingServer();
 	}
-
 	if ( m_pOnboardingPortal == nullptr )
 	{
 		m_pOnboardingPortal = new OnboardingPortal ( *m_pOnboardingServer, m_apSSID, m_apPassword );
 	}
-
 	if ( !m_pOnboardingPortal->begin() )
 	{
 		Error ( F ( "Failed to start onboarding portal" ) );
 		return;
 	}
+
+	// Solid blue = client connected to AP; flashing blue = waiting for client
+	m_pOnboardingPortal->setOnClientConnected ( [ this ] () { SetLED ( MNRGBLEDBaseLib::eColour::DARK_BLUE, 0 ); } );
+	m_pOnboardingPortal->setOnClientDisconnected (
+	    [ this ] () { SetLED ( MNRGBLEDBaseLib::eColour::DARK_BLUE, WIFI_FLASHTIME ); } );
 
 	Info ( "AP started. IP: " + ToIPString ( m_pOnboardingPortal->apIP() ) );
 	SetState ( Status::AP_MODE );
@@ -348,6 +355,13 @@ bool WiFiService::WiFiConnect ()
 {
 	bool bResult = true;
 	static uint32_t iStartCount = 0UL;
+
+	// In AP/onboarding mode do not attempt STA connection — it would call WiFi.begin()
+	// which tears down the AP beacon and destroys AP mode state.
+	if ( GetState() == Status::AP_MODE )
+	{
+		return false;
+	}
 
 	if ( !IsConnected() )
 	{
@@ -442,7 +456,6 @@ bool UDPWiFiService::Begin ( UDPWiFiServiceCallback pHandleReqData,
                              MNRGBLEDBaseLib* pLED )
 {
 	bool bResult = false;
-
 	WiFiService::Begin ( apSSID, apPassword, pLED );
 	m_MsgHandlerCallback = pHandleReqData;
 
@@ -460,6 +473,16 @@ bool UDPWiFiService::Begin ( UDPWiFiServiceCallback pHandleReqData,
 			// In AP mode, onboarding will handle configuration
 			Info ( "In AP mode - waiting for configuration" );
 			bResult = true;  // Consider initialization successful even in AP mode
+		}
+		else
+		{
+			SetState ( Status::UNCONNECTED );
+			bResult = false;
+			// Consider starting AP mode here if not already started
+			if ( m_useOnboarding )
+			{
+				StartAP();
+			}
 		}
 	}
 	return bResult;
@@ -479,6 +502,11 @@ void UDPWiFiService::ProcessOnboarding ()
 
 void UDPWiFiService::CheckUDP ()
 {
+	// Never attempt UDP or WiFi reconnection while in AP/onboarding mode.
+	if ( GetState() == Status::AP_MODE )
+	{
+		return;
+	}
 	String Msg = "?";
 	if ( GetUDPMessage ( Msg ) )
 	{
@@ -489,6 +517,13 @@ void UDPWiFiService::CheckUDP ()
 /// Appends local time to provided String
 void UDPWiFiService::GetLocalTime ( String& result, time_t timeError )
 {
+	// WiFi.getTime() makes a blocking NTP call via NINA firmware.
+	// In AP mode there is no internet so it blocks for several seconds — skip it entirely.
+	if ( GetState() == Status::AP_MODE )
+	{
+		return;
+	}
+
 	if ( timeError == 0 )
 	{
 		timeError = GetTime();
