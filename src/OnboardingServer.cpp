@@ -38,11 +38,9 @@ String OnboardingServer::getAdditionalFields () const
 	fields += "Multicast Send Port: <input name=\"multicastPort\" value=\"";
 	fields += String ( _config.multicastPort );
 	fields += "\"><br>";
-#ifdef BME280_SUPPORT
 	fields += "Altitude Compensation (m): <input name=\"altitude\" value=\"";
 	fields += String ( _config.altitudeCompensation, 1 );
 	fields += "\" step=\"0.1\"><br>";
-#endif
 	return fields;
 }
 
@@ -69,9 +67,7 @@ bool OnboardingServer::parseAdditionalFields ( const String& body )
 	String hostname = extractField ( body, "hostname", "udpPort" );
 	String udpPort = extractField ( body, "udpPort", "multicastPort" );
 	String multicastPort = extractField ( body, "multicastPort" );
-#ifdef BME280_SUPPORT
 	String altitude = extractField ( body, "altitude" );
-#endif
 
 	if ( hostname.length() > 0 )
 	{
@@ -110,12 +106,10 @@ bool OnboardingServer::parseAdditionalFields ( const String& body )
 		}
 	}
 
-#ifdef BME280_SUPPORT
 	if ( altitude.length() > 0 )
 	{
 		_config.altitudeCompensation = altitude.toFloat();
 	}
-#endif
 
 	return true;
 }

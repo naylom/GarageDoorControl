@@ -10,18 +10,16 @@
 
 #include "Application.h"
 
+#include "BME280Sensor.h"
+#include "ConfigStorage.h"
 #include "Display.h"
 
-#include <BME280.h>
-#include <BME280I2C.h>
-#include <EnvironmentCalculations.h>
 #include <MNPCIHandler.h>
 #include <MNRGBLEDBaseLib.h>
 #include <MNTimerLib.h>
 #include <time.h>
 #include <WiFiNINA.h>
 #include <WiFiUdp.h>
-#include <Wire.h>
 
 // ─── Version string (extern'd by Display.cpp) ────────────────────────────────
 const char* VERSION = "1.0.17 Beta";
@@ -36,27 +34,9 @@ ansiVT220Logger MyLogger ( slog );
 #endif
 #endif
 
-// ─── BME280 sensor and environment data (EnvironmentResults extern'd by Display.cpp) ──
-#ifdef BME280_SUPPORT
-struct TEMP_STATS
-{
-	float temperature;
-	float pressure;  // at sea level
-	float humidity;
-	float dewpoint;
-	uint32_t ulTimeOfReadingms;
-} EnvironmentResults = { NAN, NAN, NAN, 0UL };
-
-BME280I2C::Settings settings ( BME280::OSR_X2,
-                               BME280::OSR_X2,
-                               BME280::OSR_X2,
-                               BME280::Mode_Normal,
-                               BME280::StandbyTime_250ms,
-                               BME280::Filter_Off,
-                               BME280::SpiEnable_False,
-                               BME280I2C::I2CAddr_0x76 );
-BME280I2C MyBME280 ( settings );
-#endif
+// ─── Environment sensor and latest reading (EnvironmentResults extern'd by Display.cpp) ──
+EnvironmentReading EnvironmentResults = { NAN, NAN, NAN, NAN, 0UL, false };
+IEnvironmentSensor* pBME280Sensor = nullptr;
 
 // ─── Garage door state (pGarageDoor extern'd by Display.cpp) ─────────────────
 #ifdef UAP_SUPPORT
@@ -119,29 +99,29 @@ void Application::begin ()
 		Error ( F ( "WiFi initialization failed" ) );
 	}
 
-#ifdef BME280_SUPPORT
-	Wire.begin();
-	if ( !MyBME280.begin() )
 	{
-		Error ( F ( "Could not find BME280 sensor!" ) );
-		delay ( 1000 );
-	}
-	else
-	{
-		switch ( MyBME280.chipModel() )
+		ConfigStorage::begin();
+		GarageConfig cfg = {};
+		cfg.altitudeCompensation = 131.0f;  // default matches OnboardingServer
+		ConfigStorage::load ( cfg );
+
+		pBME280Sensor = new BME280Sensor ( cfg.altitudeCompensation );
+		if ( pBME280Sensor->IsPresent() )
 		{
-			case BME280::ChipModel_BME280:
-				Info ( F ( "Found BME280 sensor! Success." ) );
-				break;
-			case BME280::ChipModel_BMP280:
-				Info ( F ( "Found BMP280 sensor! No Humidity available." ) );
-				break;
-			default:
-				Error ( F ( "Found UNKNOWN sensor! Error!" ) );
+			if ( !pBME280Sensor->Begin() )
+			{
+				delete pBME280Sensor;
+				pBME280Sensor = nullptr;
+			}
 		}
+		else
+		{
+			Info ( F ( "No BME280 sensor detected" ) );
+			delete pBME280Sensor;
+			pBME280Sensor = nullptr;
+		}
+		DisplaylastInfoErrorMsg();
 	}
-	DisplaylastInfoErrorMsg();
-#endif
 
 #ifdef UAP_SUPPORT
 	// Setup so we are called if the state of door changes
@@ -282,10 +262,7 @@ void Application::setLED ()
 // ─── loop ─────────────────────────────────────────────────────────────────────
 void Application::loop ()
 {
-#ifdef BME280_SUPPORT
 	static unsigned long ulLastSensorTime = millis() - SENSOR_READ_INTERVAL_MS;
-#endif
-
 	static unsigned long ulLastDisplayTime = 0UL;
 
 #ifdef UAP_SUPPORT
@@ -310,30 +287,15 @@ void Application::loop ()
 	// See if we have any udp requests to action
 	pMyUDPService->CheckUDP();
 
-#ifdef BME280_SUPPORT
-	if ( pMyUDPService->GetState() != WiFiService::Status::AP_MODE &&
+	if ( pBME280Sensor != nullptr && pMyUDPService->GetState() != WiFiService::Status::AP_MODE &&
 	     millis() - ulLastSensorTime > SENSOR_READ_INTERVAL_MS )
 	{
-		MyBME280.read ( EnvironmentResults.pressure,
-		                EnvironmentResults.temperature,
-		                EnvironmentResults.humidity,
-		                BME280::TempUnit::TempUnit_Celsius,
-		                BME280::PresUnit::PresUnit_hPa );
-		// Info ( "Temperature: " + String ( EnvironmentResults.temperature ) + "C" );
-		// Use altitude compensation from config
-		float altitudeCompensation = pMyUDPService->GetAltitudeCompensation();
-		EnvironmentResults.pressure =
-		    EnvironmentCalculations::EquivalentSeaLevelPressure ( altitudeCompensation,
-		                                                          EnvironmentResults.temperature,
-		                                                          EnvironmentResults.pressure );
-		EnvironmentResults.dewpoint =
-		    EnvironmentCalculations::DewPoint ( EnvironmentResults.temperature, EnvironmentResults.humidity );
-		EnvironmentResults.ulTimeOfReadingms = pMyUDPService->GetTime();
-		multicastMsg ( UDPWiFiService::ReqMsgType::TEMPDATA );
-		// reset time counter
+		if ( pBME280Sensor->Read ( EnvironmentResults ) )
+		{
+			multicastMsg ( UDPWiFiService::ReqMsgType::TEMPDATA );
+		}
 		ulLastSensorTime = millis();
 	}
-#endif
 
 	// update debug stats every 1/2 second
 	if ( millis() - ulLastDisplayTime > 500 )
@@ -396,19 +358,20 @@ void Application::buildMessage ( UDPWiFiService::ReqMsgType eReqType, String& sR
 	switch ( eReqType )
 	{
 		case UDPWiFiService::ReqMsgType::TEMPDATA:
-#ifdef BME280_SUPPORT
-			sResponse = F ( "T=" );
-			sResponse += EnvironmentResults.temperature;
-			sResponse += F ( ",H=" );
-			sResponse += EnvironmentResults.humidity;
-			sResponse += F ( ",D=" );
-			sResponse += EnvironmentResults.dewpoint;
-			sResponse += F ( ",P=" );
-			sResponse += EnvironmentResults.pressure;
-			sResponse += F ( ",A=" );
-			sResponse += EnvironmentResults.ulTimeOfReadingms;
-			sResponse += F ( "\r" );
-#endif
+			if ( pBME280Sensor != nullptr && EnvironmentResults.valid )
+			{
+				sResponse = F ( "T=" );
+				sResponse += EnvironmentResults.temperature;
+				sResponse += F ( ",H=" );
+				sResponse += EnvironmentResults.humidity;
+				sResponse += F ( ",D=" );
+				sResponse += EnvironmentResults.dewpoint;
+				sResponse += F ( ",P=" );
+				sResponse += EnvironmentResults.pressure;
+				sResponse += F ( ",A=" );
+				sResponse += EnvironmentResults.timestampMs;
+				sResponse += F ( "\r" );
+			}
 			break;
 
 #ifdef UAP_SUPPORT

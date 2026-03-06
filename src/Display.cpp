@@ -1,6 +1,7 @@
 #include "Display.h"
 
 #include "HormannUAP1WithSwitch.h"
+#include "IEnvironmentSensor.h"
 #include "logging.h"
 #include "WiFiService.h"
 
@@ -16,16 +17,7 @@ extern HormannUAP1WithSwitch* pGarageDoor;
 // extern DoorStatusPin		*pDoorSwitchPin;
 #endif
 
-#ifdef BME280_SUPPORT
-extern struct TEMP_STATS
-{
-	float temperature;
-	float pressure;  // at sea level
-	float humidity;
-	float dewpoint;
-	uint32_t ulTimeOfReadingms;
-} EnvironmentResults;
-#endif
+extern EnvironmentReading EnvironmentResults;
 
 extern const char* VERSION;
 // Error message process used when generating messages during interrupt
@@ -264,31 +256,32 @@ void DisplayStats ( void )
 	}
 #endif
 
-#ifdef BME280_SUPPORT
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 12, 0, F ( "Temperature is " ) );
-	MyLogger.ClearPartofLine ( 12, 16, 6 );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_RED,
-	                     ansiVT220Logger::BG_BLACK,
-	                     12,
-	                     16,
-	                     String ( EnvironmentResults.temperature ) );
+	if ( EnvironmentResults.valid )
+	{
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 12, 0, F ( "Temperature is " ) );
+		MyLogger.ClearPartofLine ( 12, 16, 6 );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_RED,
+		                     ansiVT220Logger::BG_BLACK,
+		                     12,
+		                     16,
+		                     String ( EnvironmentResults.temperature ) );
 
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 13, 0, F ( "Humidity is " ) );
-	MyLogger.ClearPartofLine ( 13, 16, 6 );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
-	                     ansiVT220Logger::BG_BLACK,
-	                     13,
-	                     16,
-	                     String ( EnvironmentResults.humidity ) );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 13, 0, F ( "Humidity is " ) );
+		MyLogger.ClearPartofLine ( 13, 16, 6 );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+		                     ansiVT220Logger::BG_BLACK,
+		                     13,
+		                     16,
+		                     String ( EnvironmentResults.humidity ) );
 
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 14, 0, F ( "Pressure is " ) );
-	MyLogger.ClearPartofLine ( 14, 16, 7 );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_YELLOW,
-	                     ansiVT220Logger::BG_BLACK,
-	                     14,
-	                     16,
-	                     String ( EnvironmentResults.pressure ) );
-#endif
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 14, 0, F ( "Pressure is " ) );
+		MyLogger.ClearPartofLine ( 14, 16, 7 );
+		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_YELLOW,
+		                     ansiVT220Logger::BG_BLACK,
+		                     14,
+		                     16,
+		                     String ( EnvironmentResults.pressure ) );
+	}
 
 	DisplayNWStatus ( MyLogger );
 	DisplaylastInfoErrorMsg();
