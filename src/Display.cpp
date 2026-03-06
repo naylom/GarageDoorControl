@@ -1,297 +1,448 @@
+﻿/*
+ * Display.cpp
+ *
+ * Phase 7 refactoring: Display class accesses door and sensor state only
+ * through IGarageDoor* and IEnvironmentSensor* — no extern globals for domain
+ * objects remain here.
+ *
+ * Error(), Info() and DisplaylastInfoErrorMsg() remain as free functions so
+ * that WiFiService and ISR callbacks can call them before the Display instance
+ * is constructed.  They use extern references only for infrastructure objects
+ * (MyLogger, pMyUDPService) which are not domain data.
+ */
+
+#include "Display.h"
+
+#include "Logging.h"
+#include "WiFiService.h"
+
 #include <WiFiNINA.h>
 #include <WiFiUdp.h>
-#include "logging.h"
-#include "WiFiService.h"
-#include "Display.h"
-#include "DoorState.h"
 
-bool	bInfoUseBestTime = false;
+// ─── Notification-bar module-scope state ─────────────────────────────────────
+// Written by Error() / Info().  Read by DisplaylastInfoErrorMsg().
+
+static bool s_bInfoUseBestTime = false;
+static String s_sInfoErrorMsg;
+static ansiVT220Logger::colours s_fgColour = ansiVT220Logger::FG_WHITE;
+static ansiVT220Logger::colours s_bgColour = ansiVT220Logger::BG_GREEN;
+
+// Infrastructure externs — not domain objects.
 extern ansiVT220Logger MyLogger;
-extern UDPWiFiService	 *pMyUDPService;
+extern UDPWiFiService* pMyUDPService;
 
-#ifdef UAP_SUPPORT
-extern DoorState			*pGarageDoor;
-//extern DoorStatusPin		*pDoorSwitchPin;
-#endif
+constexpr uint8_t ERROR_LINE = 25;
+constexpr uint8_t NWPrintStartLine = 15;
 
-#ifdef BME280_SUPPORT
-extern struct TEMP_STATS
-{
-		float	 temperature;
-		float	 pressure; // at sea level
-		float	 humidity;
-		float	 dewpoint;
-		uint32_t ulTimeOfReadingms;
-} EnvironmentResults;
-#endif
+// ─── Free function: Error ─────────────────────────────────────────────────────
 
-extern const char * VERSION;
-// Error message process used when generating messages during interrupt
-constexpr uint8_t ERROR_LINE	   = 25;
-constexpr uint8_t NWPrintStartLine = 15;  // Start line for network stats
-
-auto   	fgInfoErrorColour = ansiVT220Logger::FG_WHITE;
-auto   	bgInfoErrorColour = ansiVT220Logger::BG_GREEN;
-
-
-String	sInfoErrorMsg;
-time_t			  timeError;
-
-void			  GetLocalTime ( String &Result )
-{
-	if ( pMyUDPService != nullptr && pMyUDPService->IsConnected () )
-	{
-		timeError = 0;
-		pMyUDPService->GetLocalTime ( Result );
-		Result += " ";
-	}
-}
-
-/// @brief Logs error to error line the provided error message prepended with local date and time
-/// @param s message to be logged
-/// @param bInISR indicates if code being called from interrupt level code, defaults to false
-void   Error ( String s, bool bInISR )
+/// @brief Records an error message for the notification bar, prepended with the current time.
+/// @param s       Message text.
+/// @param bInISR  Pass true when called from interrupt context (skips time lookup).
+void Error ( String s, bool bInISR )
 {
 	String Result;
-	//Serial.println ( s );
-	// do not call when in ISR level code path
-	if ( !bInISR )
+	if ( !bInISR && pMyUDPService != nullptr )
 	{
 		pMyUDPService->GetLocalTime ( Result );
 	}
-	sInfoErrorMsg	  = Result + s;
-	fgInfoErrorColour = ansiVT220Logger::FG_BRIGHTWHITE;
-	bgInfoErrorColour = ansiVT220Logger::BG_BRIGHTRED;
+	s_sInfoErrorMsg = Result + s;
+	s_fgColour = ansiVT220Logger::FG_BRIGHTWHITE;
+	s_bgColour = ansiVT220Logger::BG_BRIGHTRED;
 }
 
-/// @brief Logs info to error line the provided error message prepended with local date and time
-/// @param s message to be logged
-/// @param bInISR indicates if code being called from interrupt level code, defaults to false
+// ─── Free function: Info ──────────────────────────────────────────────────────
+
+/// @brief Records an informational message for the notification bar, prepended with the current time.
+/// @param s       Message text.
+/// @param bInISR  Pass true when called from interrupt context (skips time lookup).
 void Info ( String s, bool bInISR )
 {
 	String Result;
-	//Serial.println ( s);
-	// do not call when in ISR level code path
 	if ( !bInISR )
 	{
-		bInfoUseBestTime = false;
-		GetLocalTime ( Result );
+		s_bInfoUseBestTime = false;
+		if ( pMyUDPService != nullptr && pMyUDPService->IsConnected() )
+		{
+			pMyUDPService->GetLocalTime ( Result );
+			Result += " ";
+		}
 	}
 	else
 	{
-		bInfoUseBestTime = true;
+		s_bInfoUseBestTime = true;
 	}
-	sInfoErrorMsg	  = Result + s;
-	fgInfoErrorColour = ansiVT220Logger::FG_WHITE;
-	bgInfoErrorColour = ansiVT220Logger::BG_BLUE;
+	s_sInfoErrorMsg = Result + s;
+	s_fgColour = ansiVT220Logger::FG_WHITE;
+	s_bgColour = ansiVT220Logger::BG_BLUE;
 }
 
+// ─── Free function: DisplaylastInfoErrorMsg ───────────────────────────────────
+/**
+ * @brief Renders the most recent Info()/Error() message in the terminal notification bar.
+ * @details When the message was recorded from ISR context, prepends the current
+ *          NTP time (best-effort). Only compiled when MNDEBUG is defined.
+ *          Safe to call frequently; does nothing in non-debug builds.
+ */
 void DisplaylastInfoErrorMsg ()
 {
 #ifdef MNDEBUG
 	String sTime;
-	if ( bInfoUseBestTime )
+	if ( s_bInfoUseBestTime )
 	{
-		pMyUDPService->GetLocalTime( sTime );
-		sInfoErrorMsg = sTime + sInfoErrorMsg;
-		bInfoUseBestTime = false;
+		if ( pMyUDPService != nullptr )
+		{
+			pMyUDPService->GetLocalTime ( sTime );
+		}
+		s_sInfoErrorMsg = sTime + s_sInfoErrorMsg;
+		s_bInfoUseBestTime = false;
 	}
-
 	MyLogger.ClearLine ( ERROR_LINE );
-	MyLogger.COLOUR_AT ( fgInfoErrorColour, bgInfoErrorColour, ERROR_LINE, 1, sInfoErrorMsg );
+	MyLogger.COLOUR_AT ( s_fgColour, s_bgColour, ERROR_LINE, 1, s_sInfoErrorMsg );
 #endif
 }
 
+// ─── Display constructor ──────────────────────────────────────────────────────
 /**
- * @brief Display the uptime on the screen
- * @param logger the logger to use
- * @param line the line to display the uptime
- * @param row the row to display the uptime
- * @param Foreground the colour of the text
- * @param Background the colour of the background
+ * @brief Constructs the Display, binding it to the logger and all data sources.
+ * @param logger    Reference to the ANSI VT220 terminal logger used for output.
+ * @param pUDPService Pointer to the WiFi/UDP service (used for time and network stats).
+ * @param version   Firmware version string displayed in the heading row.
+ * @param pDoor     Pointer to the garage door interface; may be nullptr if no door present.
+ * @param pSensor   Pointer to the environment sensor interface; may be nullptr if no sensor.
  */
-void DisplayUptime ( ansiVT220Logger logger, uint8_t line, uint8_t row, ansiVT220Logger::colours Foreground, ansiVT220Logger::colours Background )
+Display::Display ( ansiVT220Logger& logger,
+                   UDPWiFiService* pUDPService,
+                   const char* version,
+                   IGarageDoor* pDoor,
+                   IEnvironmentSensor* pSensor )
+    : m_logger ( logger ), m_pUDPService ( pUDPService ), m_version ( version ), m_pDoor ( pDoor ),
+      m_pSensor ( pSensor )
+{
+}
+
+// ─── Display::DisplayUptime (private helper) ──────────────────────────────────
+/**
+ * @brief Renders the elapsed run time as "DD:HH:MM:SS" at the specified terminal position.
+ * @details Records the first call time and computes relative elapsed time on
+ *          subsequent calls. Resets the origin when millis() wraps around at ~49 days.
+ * @param line Screen line (1-based) at which to print.
+ * @param row  Screen column (1-based) at which to print.
+ * @param fg   Foreground colour for the text.
+ * @param bg   Background colour for the text.
+ */
+void Display::DisplayUptime ( uint8_t line, uint8_t row, ansiVT220Logger::colours fg, ansiVT220Logger::colours bg )
 {
 	static uint32_t ulStartTime = 0UL;
-	uint32_t 		ulNow = millis ();
-	// set initial start time
+	uint32_t ulNow = millis();
+
 	if ( ulStartTime == 0 )
 	{
 		ulStartTime = ulNow;
 	}
 	else
 	{
-		// check for wrap around (when millis() overflows and resets to zero)
 		if ( ulNow > ulStartTime )
 		{
-			uint32_t ulTotalNumSeconds = ( ulNow-ulStartTime ) / 1000;
-			uint32_t ulDays			   = ulTotalNumSeconds / ( 60 * 60 * 24 );
-			uint32_t ulHours		   = ( ulTotalNumSeconds / ( 60 * 60 ) ) % 24;
-			uint32_t ulMinutes		   = ( ulTotalNumSeconds / 60 ) % 60;
-			uint32_t ulSecs			   = ulTotalNumSeconds % 60;
+			uint32_t ulTotal = ( ulNow - ulStartTime ) / 1000;
+			uint32_t ulDays = ulTotal / ( 60 * 60 * 24 );
+			uint32_t ulHours = ( ulTotal / ( 60 * 60 ) ) % 24;
+			uint32_t ulMinutes = ( ulTotal / 60 ) % 60;
+			uint32_t ulSecs = ulTotal % 60;
 
-			char	 sUpTime [ 20 ];
-			snprintf ( sUpTime, sizeof(sUpTime), "%02d:%02d:%02d:%02d", (int)ulDays, (int)ulHours, (int)ulMinutes, (int)ulSecs );
-			logger.COLOUR_AT ( Foreground, Background, line, row, sUpTime );
+			char sUpTime [ 20 ];
+			snprintf ( sUpTime,
+			           sizeof ( sUpTime ),
+			           "%02d:%02d:%02d:%02d",
+			           (int)ulDays,
+			           (int)ulHours,
+			           (int)ulMinutes,
+			           (int)ulSecs );
+			m_logger.COLOUR_AT ( fg, bg, line, row, sUpTime );
 		}
 		else
 		{
-			// wrapped around
+			// millis() wrapped around — reset origin
 			ulStartTime = ulNow;
 		}
 	}
 }
 
-// Debug information for ANSI screen with cursor control
-void DisplayStats ( void )
+// ─── Display::DisplayStats ────────────────────────────────────────────────────
+/**
+ * @brief Renders the full debug status screen: uptime, heading, sensor readings,
+ *        door state, network status, and the notification bar.
+ * @details Compiled only when MNDEBUG is defined. Calls DisplayNWStatus() and
+ *          DisplaylastInfoErrorMsg() as sub-steps. Intended to be called at
+ *          approximately 2 Hz from Application::loop().
+ */
+void Display::DisplayStats ()
 {
 #ifdef MNDEBUG
-	// display uptime
-	DisplayUptime ( MyLogger, 1, 1, ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK );
+	// Row 1: uptime | heading (with software version) | current time
+	DisplayUptime ( 1, 1, ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK );
 
-	#ifdef UAP_SUPPORT
-	String Heading = F ( "Garage Door Control -  ver " );
-	#else
-	String Heading = F ( "Temp Sensor - ver " );
-	#endif
-	Heading += String ( VERSION );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 1, 20, Heading );
+	String Heading = ( m_pDoor != nullptr ) ? F ( "Garage Door Control -  ver " ) : F ( "Temp Sensor - ver " );
+	Heading += String ( m_version );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 1, 20, Heading );
 
 	String sTime;
-	pMyUDPService->GetLocalTime ( sTime );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 1, 60, sTime );
-
-	#ifdef UAP_SUPPORT
-	String result;
-	if ( pGarageDoor != nullptr )
+	if ( m_pUDPService != nullptr )
 	{
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 4, 0, F ( "Light is " ) );
-		MyLogger.ClearPartofLine ( 4, 14, 3 );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 4, 14, pGarageDoor->IsLit () ? F ( "On" ) : F ( "Off" ) );
-
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 0, F ( "State is " ) );
-		MyLogger.ClearPartofLine ( 5, 14, 8 );
-		if ( pGarageDoor->GetDoorState() == DoorState::State::Closed )
-		{
-			MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 5, 14, pGarageDoor->GetDoorDisplayState () );
-		}
-		else
-		{
-			MyLogger.COLOUR_AT ( ansiVT220Logger::FG_RED, ansiVT220Logger::BG_BLACK, 5, 14, pGarageDoor->GetDoorDisplayState () );
-		}
-
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 6, 0, F ( "Direction is " ) );
-		MyLogger.ClearPartofLine ( 6, 14, 10 );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 6, 14, pGarageDoor->GetDoorDirectionName () );
-
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 4, 25, F ( "Light Off count     " ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 4, 43, String ( pGarageDoor->GetLightOffCount () ) );
-
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 25, F ( "Door Opened count   " ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 5, 43, String ( pGarageDoor->GetDoorOpenedCount () ) );
-
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 6, 25, F ( "Door Closed count   " ) );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 6, 43, String ( pGarageDoor->GetDoorClosedCount () ) );
+		m_pUDPService->GetLocalTime ( sTime );
 	}
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 9, 43, F ( "Count     Called Unchngd Matched UnMtchdSpurious Duration" ) );
-	
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 25, F ( "Switch Presssed " ) );
-	if ( pGarageDoor->IsSwitchConfigured() )
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 1, 60, sTime );
+
+	// ── Garage door section ───────────────────────────────────────────────────
+	if ( m_pDoor != nullptr )
 	{
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_GREEN, ansiVT220Logger::BG_BLACK, 10, 43, String ( pGarageDoor->GetSwitchMatchCount() ) );
-		pGarageDoor->SwitchDebugStats ( result );
-		MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 10, 50, result );
+		m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 4, 0, F ( "Light is " ) );
+		m_logger.ClearPartofLine ( 4, 14, 3 );
+		m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+		                     ansiVT220Logger::BG_BLACK,
+		                     4,
+		                     14,
+		                     m_pDoor->IsLit() ? F ( "On" ) : F ( "Off" ) );
+
+		m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 5, 0, F ( "State is " ) );
+		m_logger.ClearPartofLine ( 5, 14, 8 );
+		const char* stateStr = m_pDoor->GetStateDisplayString();
+		auto stateColour =
+		    ( m_pDoor->GetState() == IGarageDoor::State::Closed ) ? ansiVT220Logger::FG_CYAN : ansiVT220Logger::FG_RED;
+		m_logger.COLOUR_AT ( stateColour, ansiVT220Logger::BG_BLACK, 5, 14, stateStr );
 	}
-	#endif
+	else
+	{
+		m_logger.COLOUR_AT ( ansiVT220Logger::FG_YELLOW, ansiVT220Logger::BG_BLACK, 4, 0, F ( "No garage door" ) );
+	}
 
-	#ifdef BME280_SUPPORT
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 12, 0, F ( "Temperature is " ) );
-	MyLogger.ClearPartofLine ( 12, 16, 6 );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_RED, ansiVT220Logger::BG_BLACK, 12, 16, String ( EnvironmentResults.temperature ) );
-	
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 13, 0, F ( "Humidity is " ) );
-	MyLogger.ClearPartofLine ( 13, 16, 6 );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 13, 16, String ( EnvironmentResults.humidity ) );
+	// ── Environment sensor section ────────────────────────────────────────────
+	if ( m_pSensor != nullptr )
+	{
+		const EnvironmentReading& env = m_pSensor->GetLastReading();
+		if ( env.valid )
+		{
+			m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 12, 0, F ( "Temperature is " ) );
+			m_logger.ClearPartofLine ( 12, 16, 6 );
+			m_logger.COLOUR_AT ( ansiVT220Logger::FG_RED,
+			                     ansiVT220Logger::BG_BLACK,
+			                     12,
+			                     16,
+			                     String ( env.temperature ) );
 
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 14, 0, F ( "Pressure is " ) );
-	MyLogger.ClearPartofLine ( 14, 16, 7 );
-	MyLogger.COLOUR_AT ( ansiVT220Logger::FG_YELLOW, ansiVT220Logger::BG_BLACK, 14, 16, String ( EnvironmentResults.pressure ) );
-	#endif
+			m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 13, 0, F ( "Humidity is " ) );
+			m_logger.ClearPartofLine ( 13, 16, 6 );
+			m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, 13, 16, String ( env.humidity ) );
 
-	DisplayNWStatus ( MyLogger );
-	DisplaylastInfoErrorMsg ();
+			m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, 14, 0, F ( "Pressure is " ) );
+			m_logger.ClearPartofLine ( 14, 16, 7 );
+			m_logger.COLOUR_AT ( ansiVT220Logger::FG_YELLOW,
+			                     ansiVT220Logger::BG_BLACK,
+			                     14,
+			                     16,
+			                     String ( env.pressure ) );
+		}
+	}
+	else
+	{
+		m_logger.COLOUR_AT ( ansiVT220Logger::FG_YELLOW, ansiVT220Logger::BG_BLACK, 12, 0, F ( "No sensor" ) );
+	}
+
+	DisplayNWStatus();
+	DisplaylastInfoErrorMsg();
 #endif
 }
 
+// ─── Display::DisplayNWStatus ─────────────────────────────────────────────────
 /**
- * @brief Displays the network status on the screen
- * @param logger the logger to use for displaying the network status
+ * @brief Renders the network status panel: SSID, hostname, IP address, subnet mask,
+ *        multicast destination list, gateway, MAC address, signal strength,
+ *        WiFi connection counters, and message statistics.
+ * @details Does nothing if m_pUDPService is nullptr. Called by DisplayStats().
  */
-void DisplayNWStatus ( ansiVT220Logger logger )
+void Display::DisplayNWStatus ()
 {
-	// print the SSID of the network you're attached to:
-	logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 0, F ( "SSID: " ) );
-	logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 23, WiFi.SSID () );
-	if ( pMyUDPService != nullptr )
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 0, F ( "SSID: " ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 23, WiFi.SSID() );
+
+	if ( m_pUDPService == nullptr )
 	{
-		FixedIPList *m_pMulticastDestList = pMyUDPService->GetMulticastList ();
-		if ( m_pMulticastDestList != nullptr )
-		{
-			uint8_t	  iterator = m_pMulticastDestList->GetIterator ();
-			IPAddress mcastDest;
-			while ( (mcastDest = m_pMulticastDestList->GetNext ( iterator )) != IPAddress((uint32_t)0) )
-			{
-				logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + iterator - 1, 41, "Mcast #" + String ( iterator ) + ": " );
-				logger.ClearPartofLine ( NWPrintStartLine + iterator - 1, 61, 15 );
-				logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + iterator - 1, 61, pMyUDPService->ToIPString ( mcastDest ) );
-			}
-		}
-
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 1, 0, F ( "My Hostname: " ) );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 1, 23, pMyUDPService->GetHostName () );
-
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 2, 0, F ( "IP Address: " ) );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 2, 23, pMyUDPService->ToIPString ( WiFi.localIP () ) );
-
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 3, 0, F ( "Subnet Mask: " ) );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 3, 23, pMyUDPService->ToIPString ( WiFi.subnetMask () ) );
-
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 0, F ( "Local Multicast Addr: " ) );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 23, pMyUDPService->ToIPString ( pMyUDPService->GetMulticastAddress () ) );
-
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 41, F ( "WiFi connect/fail: " ) );
-		logger.ClearPartofLine ( NWPrintStartLine + 4, 61, 10 );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 4, 61, String ( pMyUDPService->GetBeginCount () ) + "/" + String ( pMyUDPService->GetBeginTimeOutCount () ) );
-
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 41, F ( "Multicasts sent: " ) );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 61, String ( pMyUDPService->GetMCastSentCount () ) );
-
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 6, 41, F ( "Requests recvd: " ) );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 6, 61, String ( pMyUDPService->GetRequestsReceivedCount () ) );
-
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 41, F ( "Replies sent: " ) );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 61, String ( pMyUDPService->GetReplySentCount () ) );
-
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 0, F ( "Mac address: " ) );
-		byte bMac [ 6 ] = {0};
-		WiFi.macAddress ( bMac );
-		char s [ 18 ];
-		snprintf ( s, sizeof(s), "%02X:%02X:%02X:%02X:%02X:%02X", bMac [ 5 ], bMac [ 4 ], bMac [ 3 ], bMac [ 2 ], bMac [ 1 ], bMac [ 0 ] );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 23, s );
-
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 6, 0, F ( "Gateway Address: " ) );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 6, 23, pMyUDPService->ToIPString ( WiFi.gatewayIP () ) );
-		// print the received signal strength:
-
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 0, F ( "Signal strength (RSSI):" ) );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 23, String ( WiFi.RSSI () ) );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 30, F ( " dBm" ) );
-
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 8, 0, F ( "WiFi Status: " ) );
-		logger.ClearPartofLine ( NWPrintStartLine + 8, 23, 15 );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 8, 23, pMyUDPService->WiFiStatusToString ( WiFi.status () ) );
-
-		logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 8, 41, F ( "WiFi Service State: " ) );
-		logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 8, 61, String ( pMyUDPService->GetState () ) );
+		return;
 	}
+
+	FixedIPList* pMulticastDestList = m_pUDPService->GetMulticastList();
+	if ( pMulticastDestList != nullptr )
+	{
+		uint8_t iterator = pMulticastDestList->GetIterator();
+		IPAddress mcastDest;
+		while ( ( mcastDest = pMulticastDestList->GetNext ( iterator ) ) != IPAddress ( (uint32_t)0 ) )
+		{
+			m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+			                     ansiVT220Logger::BG_BLACK,
+			                     NWPrintStartLine + iterator - 1,
+			                     41,
+			                     "Mcast #" + String ( iterator ) + ": " );
+			m_logger.ClearPartofLine ( NWPrintStartLine + iterator - 1, 61, 15 );
+			m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+			                     ansiVT220Logger::BG_BLACK,
+			                     NWPrintStartLine + iterator - 1,
+			                     61,
+			                     m_pUDPService->ToIPString ( mcastDest ) );
+		}
+	}
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 1,
+	                     0,
+	                     F ( "My Hostname: " ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 1,
+	                     23,
+	                     m_pUDPService->GetHostName() );
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 2,
+	                     0,
+	                     F ( "IP Address: " ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 2,
+	                     23,
+	                     m_pUDPService->ToIPString ( WiFi.localIP() ) );
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 3,
+	                     0,
+	                     F ( "Subnet Mask: " ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 3,
+	                     23,
+	                     m_pUDPService->ToIPString ( WiFi.subnetMask() ) );
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 4,
+	                     0,
+	                     F ( "Local Multicast Addr: " ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 4,
+	                     23,
+	                     m_pUDPService->ToIPString ( m_pUDPService->GetMulticastAddress() ) );
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 4,
+	                     41,
+	                     F ( "WiFi connect/fail: " ) );
+	m_logger.ClearPartofLine ( NWPrintStartLine + 4, 61, 10 );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 4,
+	                     61,
+	                     String ( m_pUDPService->GetBeginCount() ) + "/" +
+	                         String ( m_pUDPService->GetBeginTimeOutCount() ) );
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 5,
+	                     41,
+	                     F ( "Multicasts sent: " ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 5,
+	                     61,
+	                     String ( m_pUDPService->GetMCastSentCount() ) );
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 6,
+	                     41,
+	                     F ( "Requests recvd: " ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 6,
+	                     61,
+	                     String ( m_pUDPService->GetRequestsReceivedCount() ) );
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 7,
+	                     41,
+	                     F ( "Replies sent: " ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 7,
+	                     61,
+	                     String ( m_pUDPService->GetReplySentCount() ) );
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 5,
+	                     0,
+	                     F ( "Mac address: " ) );
+	byte bMac [ 6 ] = { 0 };
+	WiFi.macAddress ( bMac );
+	char s [ 18 ];
+	snprintf ( s,
+	           sizeof ( s ),
+	           "%02X:%02X:%02X:%02X:%02X:%02X",
+	           bMac [ 5 ],
+	           bMac [ 4 ],
+	           bMac [ 3 ],
+	           bMac [ 2 ],
+	           bMac [ 1 ],
+	           bMac [ 0 ] );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 23, s );
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 6,
+	                     0,
+	                     F ( "Gateway Address: " ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 6,
+	                     23,
+	                     m_pUDPService->ToIPString ( WiFi.gatewayIP() ) );
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 7,
+	                     0,
+	                     F ( "Signal strength (RSSI):" ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 7,
+	                     23,
+	                     String ( WiFi.RSSI() ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 30, F ( " dBm" ) );
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 8,
+	                     0,
+	                     F ( "WiFi Status: " ) );
+	m_logger.ClearPartofLine ( NWPrintStartLine + 8, 23, 15 );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 8,
+	                     23,
+	                     m_pUDPService->WiFiStatusToString ( WiFi.status() ) );
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 8,
+	                     41,
+	                     F ( "WiFi Service State: " ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
+	                     ansiVT220Logger::BG_BLACK,
+	                     NWPrintStartLine + 8,
+	                     61,
+	                     String ( m_pUDPService->GetState() ) );
 }

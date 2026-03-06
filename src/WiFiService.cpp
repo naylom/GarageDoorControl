@@ -13,7 +13,7 @@ History:
 #include "WiFiService.h"
 
 #include "ConfigStorage.h"
-#include "DoorState.h"
+#include "HormannUAP1.h"
 
 #include <time.h>
 #include <WiFiNINA.h>
@@ -47,7 +47,6 @@ constexpr char DoorLightOffReqMsg [] = "M008";  // Req Light off
 constexpr char PartSeparator [] = ":";
 
 constexpr auto MAX_INCOMING_UDP_MSG = 255;
-constexpr auto WIFI_CONNECT_TIMEOUT_MS = 10000;
 
 enum class eResponseMessage : uint8_t
 {
@@ -79,6 +78,10 @@ void TerminateProgram ( const __FlashStringHelper* pErrMsg )
 		;
 }
 
+/**
+ * @brief Default constructor. Configures the timezone for UK (GMT/BST) and initialises
+ *        the non-volatile configuration storage. Zeroes the configuration structure.
+ */
 WiFiService::WiFiService ()
 {
 	// Set the timezone to GMT with daylight saving time adjustments
@@ -112,6 +115,11 @@ WiFiService::~WiFiService ()
 }
 
 
+/**
+ * @brief Converts a numeric WiFi status code to a human-readable string.
+ * @param iState WiFi status code as returned by WiFi.status() (e.g. WL_CONNECTED == 3).
+ * @return Pointer to a static string describing the status, or "UNKNOWN" if out of range.
+ */
 const char* WiFiService::WiFiStatusToString ( uint8_t iState ) const
 {
 	static constexpr size_t statusCount = sizeof ( WiFiStatus ) / sizeof ( WiFiStatus [ 0 ] );
@@ -119,31 +127,56 @@ const char* WiFiService::WiFiStatusToString ( uint8_t iState ) const
 	return ( iState < statusCount ) ? WiFiStatus [ iState ] : "UNKNOWN";
 }
 
+/**
+ * @brief Returns the cumulative count of WiFi connection attempts that timed out.
+ * @return Number of WiFi.begin() calls that failed to connect within the timeout period.
+ */
 uint32_t WiFiService::GetBeginTimeOutCount () const
 {
 	return m_beginTimeouts;
 }
 
+/**
+ * @brief Returns the hostname assigned to this device on the WiFi network.
+ * @return Pointer to the hostname C-string, or nullptr if not yet configured.
+ */
 const char* WiFiService::GetHostName () const
 {
 	return m_HostName;
 }
 
+/**
+ * @brief Returns the current UTC epoch time obtained from the WiFi module via NTP.
+ * @return Seconds since 1 January 1970 (UTC), or 0 if the time is unavailable.
+ */
 unsigned long WiFiService::GetTime () const
 {
 	return WiFi.getTime();
 }
 
+/**
+ * @brief Returns the altitude compensation value used for barometric pressure correction.
+ * @return Altitude above sea level in metres, as loaded from stored configuration.
+ */
 float WiFiService::GetAltitudeCompensation () const
 {
 	return m_config.altitudeCompensation;
 }
 
+/**
+ * @brief Returns the current connection state of the WiFi service.
+ * @return One of UNCONNECTED, CONNECTED, or AP_MODE.
+ */
 WiFiService::Status WiFiService::GetState () const
 {
 	return m_State;
 }
 
+/**
+ * @brief Sets the status LED colour and optional flash rate.
+ * @param theColour RGB colour value to display.
+ * @param flashTime Flash interval in units of 100 ms; 0 means solid (no flash).
+ */
 void WiFiService::SetLED ( RGBType theColour, uint8_t flashTime )
 {
 	if ( m_pLED != nullptr )
@@ -152,6 +185,10 @@ void WiFiService::SetLED ( RGBType theColour, uint8_t flashTime )
 	}
 }
 
+/**
+ * @brief Updates the internal connection state and reflects the change on the status LED.
+ * @param state New state to apply: UNCONNECTED (flashing red), CONNECTED (green), or AP_MODE (flashing blue).
+ */
 void WiFiService::SetState ( WiFiService::Status state )
 {
 	m_State = state;
@@ -319,11 +356,22 @@ void WiFiService::StartAP ()
 	SetState ( Status::AP_MODE );
 }
 
+/**
+ * @brief Calculates the subnet broadcast address for the device's own IP address.
+ * @param result Output parameter that receives the calculated broadcast address.
+ */
 void WiFiService::CalcMyMulticastAddress ( IPAddress& result ) const
 {
 	CalcMulticastAddress ( WiFi.localIP(), result );
 }
 
+/**
+ * @brief Calculates the subnet broadcast address for a given IP using classful routing rules.
+ * @param ip         Source IP address used to determine the network class and prefix.
+ * @param subnetMask Output parameter that receives the broadcast address
+ *                   (network prefix OR'd with all host bits set to 1).
+ *                   Despite the parameter name this is a broadcast address, not a subnet mask.
+ */
 void WiFiService::CalcMulticastAddress ( IPAddress ip, IPAddress& subnetMask ) const
 {
 	subnetMask = IPAddress ( 0UL );  // WiFi.subnetMask();
@@ -346,16 +394,24 @@ void WiFiService::CalcMulticastAddress ( IPAddress ip, IPAddress& subnetMask ) c
 	subnetMask = ( ip & subnetMask ) | ( ~subnetMask );
 }
 
+/**
+ * @brief Returns the cached subnet broadcast address for outgoing multicast transmissions.
+ * @return The broadcast address calculated at the time of the last successful WiFi connection.
+ */
 IPAddress WiFiService::GetMulticastAddress () const
 {
 	return m_multicastAddr;
 }
 
+/**
+ * @brief Attempts to connect (or reconnect) to the configured WiFi network.
+ * @details No-ops if already in AP mode or already connected. Implements capped exponential
+ *          backoff between attempts. If WIFI_RECONNECT_MAX_ATTEMPTS consecutive failures occur
+ *          the board is hard-reset via MN::Utils::ResetBoard().
+ * @return true if the device is (or becomes) connected to the WiFi network; false otherwise.
+ */
 bool WiFiService::WiFiConnect ()
 {
-	bool bResult = true;
-	static uint32_t iStartCount = 0UL;
-
 	// In AP/onboarding mode do not attempt STA connection — it would call WiFi.begin()
 	// which tears down the AP beacon and destroys AP mode state.
 	if ( GetState() == Status::AP_MODE )
@@ -363,43 +419,77 @@ bool WiFiService::WiFiConnect ()
 		return false;
 	}
 
-	if ( !IsConnected() )
+	if ( IsConnected() )
 	{
-		Info ( "Starting WiFi, attempt " + String ( iStartCount ) );
-		uint8_t status;
-		uint32_t ulStart = millis();
-
-		WiFi.begin ( m_SSID, m_Pwd );
-		String msg = "connecting ";
-		do
-		{
-			status = WiFi.status();
-			delay ( 500 );
-			Info ( msg );
-			msg += ".";
-		} while ( status != WL_CONNECTED && ( millis() - ulStart ) < WIFI_CONNECT_TIMEOUT_MS );
-
-		if ( status != WL_CONNECTED )
-		{
-			bResult = false;
-			SetState ( WiFiService::Status::UNCONNECTED );
-			logWiFiError ( "Connect", status );
-			iStartCount++;
-			m_beginTimeouts++;
-		}
-		else
-		{
-			CalcMyMulticastAddress ( m_multicastAddr );
-			Info ( "Connected to " + String ( m_SSID ) );
-			SetState ( WiFiService::Status::CONNECTED );
-			iStartCount = 0UL;
-			m_beginConnects++;
-		}
+		// Already up — reset counters so a future drop starts fresh backoff
+		m_reconnectAttempts = 0;
+		m_nextReconnectMs = 0;
+		return true;
 	}
 
-	return bResult;
+	// Exponential backoff: skip this attempt if the backoff window hasn't expired
+	if ( m_nextReconnectMs != 0 && millis() < m_nextReconnectMs )
+	{
+		return false;
+	}
+
+	// Too many consecutive failures → trigger watchdog reset
+	if ( m_reconnectAttempts >= WIFI_RECONNECT_MAX_ATTEMPTS )
+	{
+		Error ( F ( "WiFi: too many reconnect failures — resetting board" ) );
+		delay ( 1000 );
+		MN::Utils::ResetBoard ( F ( "WiFi reconnect failed" ) );
+		return false;  // unreachable; silences compiler warning
+	}
+
+	Info ( "WiFi reconnect attempt " + String ( m_reconnectAttempts + 1 ) );
+
+	uint8_t status;
+	uint32_t ulStart = millis();
+
+	WiFi.begin ( m_SSID, m_Pwd );
+	do
+	{
+		status = WiFi.status();
+		delay ( 500 );
+	} while ( status != WL_CONNECTED && ( millis() - ulStart ) < WIFI_CONNECT_TIMEOUT_MS );
+
+	if ( status != WL_CONNECTED )
+	{
+		m_reconnectAttempts++;
+
+		// Compute capped exponential backoff: base * 2^(attempts-1)
+		uint32_t backoffMs = WIFI_RECONNECT_BASE_DELAY_MS;
+		for ( uint8_t i = 1; i < m_reconnectAttempts && backoffMs < WIFI_RECONNECT_MAX_DELAY_MS; i++ )
+		{
+			backoffMs *= 2;
+		}
+		if ( backoffMs > WIFI_RECONNECT_MAX_DELAY_MS )
+		{
+			backoffMs = WIFI_RECONNECT_MAX_DELAY_MS;
+		}
+		m_nextReconnectMs = millis() + backoffMs;
+
+		SetState ( WiFiService::Status::UNCONNECTED );
+		logWiFiError ( "WiFi connect attempt " + String ( m_reconnectAttempts ), status );
+		m_beginTimeouts++;
+		return false;
+	}
+	else
+	{
+		CalcMyMulticastAddress ( m_multicastAddr );
+		Info ( "Connected to " + String ( m_SSID ) );
+		SetState ( WiFiService::Status::CONNECTED );
+		m_reconnectAttempts = 0;
+		m_nextReconnectMs = 0;
+		m_beginConnects++;
+		return true;
+	}
 }
 
+/**
+ * @brief Disconnects from the WiFi network and sets the connection state to UNCONNECTED.
+ */
 void WiFiService::WiFiDisconnect ()
 {
 	WiFi.disconnect();
@@ -407,16 +497,29 @@ void WiFiService::WiFiDisconnect ()
 	SetState ( WiFiService::Status::UNCONNECTED );
 }
 
+/**
+ * @brief Converts an IPAddress to its dotted-decimal string representation.
+ * @param address The IP address to convert.
+ * @return String in "A.B.C.D" format.
+ */
 String WiFiService::ToIPString ( const IPAddress& address )
 {
 	return ipToString ( address );
 }
 
+/**
+ * @brief Checks whether the WiFi module currently reports a connected status.
+ * @return true if WiFi.status() == WL_CONNECTED, false otherwise.
+ */
 bool WiFiService::IsConnected () const
 {
 	return WiFi.status() == WL_CONNECTED;
 }
 
+/**
+ * @brief Returns the cumulative count of successful WiFi connections established.
+ * @return Number of times WiFi.begin() has completed with a successful connection.
+ */
 uint32_t WiFiService::GetBeginCount ()
 {
 	return m_beginConnects;
@@ -437,6 +540,9 @@ uint32_t WiFiService::GetBeginCount ()
  *
  */
 /***************************************************************************************************************************************/
+/**
+ * @brief Constructor. Allocates the multicast destination IP list with an initial capacity of 4 entries.
+ */
 UDPWiFiService::UDPWiFiService ()
 {
 	m_pMulticastDestList = new FixedIPList ( 4 );
@@ -500,6 +606,12 @@ void UDPWiFiService::ProcessOnboarding ()
 	}
 }
 
+/**
+ * @brief Polls for an incoming UDP message and, if one is available, dispatches it to the
+ *        registered message handler callback.
+ * @details Does nothing when in AP/onboarding mode. Attempts WiFi reconnection via GetUDPMessage()
+ *          if the connection has dropped.
+ */
 void UDPWiFiService::CheckUDP ()
 {
 	// Never attempt UDP or WiFi reconnection while in AP/onboarding mode.
@@ -514,7 +626,14 @@ void UDPWiFiService::CheckUDP ()
 	}
 }
 
-/// Appends local time to provided String
+/**
+ * @brief Appends the current local time formatted as "DD/MM/YY HH:MM:SS" to the provided string.
+ * @details Uses UK timezone (GMT/BST). Does nothing when in AP mode or when the time is unavailable.
+ *          Note: GetTime() makes a blocking NTP call; avoid calling this frequently.
+ * @param result    String to which the formatted timestamp is appended.
+ * @param timeError Optional pre-fetched epoch time in seconds since 1970 UTC. If 0 the NTP time
+ *                  is fetched internally via GetTime().
+ */
 void UDPWiFiService::GetLocalTime ( String& result, time_t timeError )
 {
 	// WiFi.getTime() makes a blocking NTP call via NINA firmware.
@@ -546,10 +665,25 @@ void UDPWiFiService::GetLocalTime ( String& result, time_t timeError )
 	}
 }
 
+/**
+ * @brief Attempts WiFi reconnection if needed, then reads the next available UDP packet.
+ * @details On reconnection after a drop the UDP listener is restarted automatically. Also
+ *          refreshes the multicast destination list with the current subnet broadcast address.
+ * @param RecvMessage Output: receives the content of the received UDP packet.
+ * @return true if a packet was read successfully; false if not connected or no packet is available.
+ */
 bool UDPWiFiService::GetUDPMessage ( String& RecvMessage )
 {
+	bool wasConnected = IsConnected();
 	if ( WiFiConnect() )
 	{
+		if ( !wasConnected )
+		{
+			// Just reconnected after a drop — restart the UDP listener on our port
+			Info ( F ( "WiFi reconnected \u2014 restarting UDP" ) );
+			m_myUDP.stop();
+			Start();
+		}
 		m_pMulticastDestList->Add ( GetMulticastAddress() );
 		return ReadUDPMessage ( RecvMessage );
 	}
@@ -560,6 +694,14 @@ bool UDPWiFiService::GetUDPMessage ( String& RecvMessage )
 	}
 }
 
+/**
+ * @brief Reads one pending UDP packet into the provided string.
+ * @details Packets larger than MAX_INCOMING_UDP_MSG bytes are silently discarded and counted
+ *          as bad requests. The sender's subnet broadcast address is added to the multicast
+ *          destination list so future broadcasts reach that subnet.
+ * @param sRecvMessage Output: receives the null-terminated content of the UDP packet.
+ * @return true if a packet was available and read successfully; false otherwise.
+ */
 bool UDPWiFiService::ReadUDPMessage ( String& sRecvMessage )
 {
 	bool bResult = false;
@@ -602,6 +744,12 @@ bool UDPWiFiService::ReadUDPMessage ( String& sRecvMessage )
 	return bResult;
 }
 
+/**
+ * @brief Starts the UDP listener on the configured port.
+ * @details Also adds the current subnet broadcast address to the multicast destination list.
+ *          Resets the board if the UDP port cannot be allocated.
+ * @return true if the UDP listener was started successfully.
+ */
 bool UDPWiFiService::Start ()
 {
 	bool bResult = false;
@@ -625,16 +773,29 @@ bool UDPWiFiService::Start ()
 	return bResult;
 }
 
+/**
+ * @brief Returns the cumulative count of multicast/broadcast packets sent.
+ * @return Number of UDP multicast packets successfully transmitted via SendAll().
+ */
 uint32_t UDPWiFiService::GetMCastSentCount ()
 {
 	return m_ulMCastSentCount;
 }
 
+/**
+ * @brief Returns the cumulative count of valid UDP request packets received.
+ * @return Number of incoming UDP packets successfully read by ReadUDPMessage().
+ */
 uint32_t UDPWiFiService::GetRequestsReceivedCount ()
 {
 	return m_ulReqCount;
 }
 
+/**
+ * @brief Sends a UDP reply to the IP address and port of the most recently received packet.
+ * @param sMsg The message string to send as the reply payload.
+ * @return true if the packet was sent successfully; false on connection loss or send failure.
+ */
 bool UDPWiFiService::SendReply ( String sMsg )
 {
 	bool bResult = false;
@@ -673,10 +834,11 @@ bool UDPWiFiService::SendReply ( String sMsg )
 	return bResult;
 }
 
-/// @brief Checks WiFi connected and attempts to connect if not. If connected then will look for a message and store in
-/// parameter
-/// @param paramPtr pointer to String to receive any available message
-/// @return
+/**
+ * @brief Broadcasts a UDP message to all known subnet multicast/broadcast addresses.
+ * @param sMsg The message string to send to every entry in the multicast destination list.
+ * @return true if at least one packet was sent successfully; false on connection loss or empty message.
+ */
 bool UDPWiFiService::SendAll ( String sMsg )
 {
 	bool bResult = false;
@@ -716,11 +878,20 @@ bool UDPWiFiService::SendAll ( String sMsg )
 	return bResult;
 }
 
+/**
+ * @brief Returns the cumulative count of unicast reply packets sent.
+ * @return Number of reply packets successfully transmitted via SendReply().
+ */
 uint32_t UDPWiFiService::GetReplySentCount ()
 {
 	return m_ulReplyCount;
 }
 
+/**
+ * @brief Returns a pointer to the list of known multicast/broadcast destination addresses.
+ * @return Pointer to the FixedIPList populated with subnet broadcast addresses discovered
+ *         from incoming UDP senders and the device's own subnet.
+ */
 FixedIPList* UDPWiFiService::GetMulticastList ()
 {
 	return m_pMulticastDestList;

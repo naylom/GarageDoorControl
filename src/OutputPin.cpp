@@ -1,5 +1,11 @@
 #include "OutputPin.h"
 
+/**
+ * @brief Constructs the output pin, configures it as an output, and drives it to the OFF state.
+ * @param Pin      Arduino pin number to control.
+ * @param OnStatus The PinStatus value (HIGH or LOW) that represents the logical ON state.
+ *                 The constructor sets the pin to the inverse (OFF) immediately.
+ */
 OutputPin::OutputPin ( pin_size_t Pin, PinStatus OnStatus )
     : m_Pin ( Pin ), m_OnStatus ( OnStatus ), m_pinStatus ( LOW )
 {
@@ -29,16 +35,28 @@ void OutputPin::Pulse ( uint32_t milliSec )
 	Off();
 }
 
+/**
+ * @brief Returns the last PinStatus written to the pin.
+ * @return HIGH or LOW as last set by On(), Off(), or Write().
+ */
 inline PinStatus OutputPin::Status () const
 {
 	return m_pinStatus;
 }
 
+/**
+ * @brief Returns the Arduino pin number managed by this object.
+ * @return The pin number supplied to the constructor.
+ */
 pin_size_t OutputPin::pinNumber () const
 {
 	return m_Pin;
 }
 
+/**
+ * @brief Writes a PinStatus directly to the hardware pin and records the time of the write.
+ * @param status The PinStatus value to apply (HIGH or LOW).
+ */
 void OutputPin::Write ( PinStatus status )
 {
 	m_pinStatus = status;
@@ -46,6 +64,10 @@ void OutputPin::Write ( PinStatus status )
 	m_ulTimeWritten = millis();
 }
 
+/**
+ * @brief Returns the millis() timestamp of the most recent Write() call.
+ * @return Time in milliseconds since boot at which the pin was last driven.
+ */
 uint32_t OutputPin::GetTimeWritten () const
 {
 	return m_ulTimeWritten;

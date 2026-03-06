@@ -11,6 +11,14 @@ constexpr float DEFAULT_ALTITUDE_COMP = 131.0f;
 constexpr char DEFAULT_HOSTNAME [] = "GarageControl";
 }  // namespace
 
+/**
+ * @brief Constructs the OnboardingServer and initialises the GarageConfig with
+ *        factory-default values.
+ * @details Sets default UDP port (0xFEED), multicast port (0xCE5C), altitude
+ *          compensation (131 m), and hostname ("GarageControl"). These defaults
+ *          are shown in the web form and are overwritten when the user submits.
+ * @param port HTTP server port number (passed to OnboardingServerBase).
+ */
 OnboardingServer::OnboardingServer ( uint16_t port ) : OnboardingServerBase ( port )
 {
 	memset ( &_config, 0, sizeof ( _config ) );
@@ -21,11 +29,22 @@ OnboardingServer::OnboardingServer ( uint16_t port ) : OnboardingServerBase ( po
 	_config.hostname [ sizeof ( _config.hostname ) - 1 ] = '\0';
 }
 
+/**
+ * @brief Returns the page title shown at the top of the onboarding web form.
+ * @return String "Garage Control Setup".
+ */
 String OnboardingServer::getFormTitle () const
 {
 	return "Garage Control Setup";
 }
 
+/**
+ * @brief Builds the HTML fragment containing the garage-specific form fields.
+ * @details Emits input elements for hostname, UDP receive port, multicast send
+ *          port, and altitude compensation. Values are pre-populated from the
+ *          current _config defaults.
+ * @return HTML string fragment to be injected into the onboarding form.
+ */
 String OnboardingServer::getAdditionalFields () const
 {
 	String fields;
@@ -38,14 +57,18 @@ String OnboardingServer::getAdditionalFields () const
 	fields += "Multicast Send Port: <input name=\"multicastPort\" value=\"";
 	fields += String ( _config.multicastPort );
 	fields += "\"><br>";
-#ifdef BME280_SUPPORT
 	fields += "Altitude Compensation (m): <input name=\"altitude\" value=\"";
 	fields += String ( _config.altitudeCompensation, 1 );
 	fields += "\" step=\"0.1\"><br>";
-#endif
 	return fields;
 }
 
+/**
+ * @brief Returns the JavaScript validation snippet for the garage-specific fields.
+ * @details Validates that the hostname is non-empty and at most 31 characters, and
+ *          that both port numbers are integers in the range 1024–65535.
+ * @return JavaScript string to be injected into the form's submit handler.
+ */
 String OnboardingServer::getAdditionalValidation () const
 {
 	String validation;
@@ -64,14 +87,22 @@ String OnboardingServer::getAdditionalValidation () const
 	return validation;
 }
 
+/**
+ * @brief Parses the garage-specific fields from the HTTP POST body and stores them
+ *        in the _config struct.
+ * @details Extracts hostname, udpPort, multicastPort, and altitude from the
+ *          URL-encoded form body. Falls back to defaults for any missing or
+ *          out-of-range values. Does not yet write to persistent storage —
+ *          that is done in saveConfiguration().
+ * @param body URL-encoded HTTP POST body string.
+ * @return Always returns true.
+ */
 bool OnboardingServer::parseAdditionalFields ( const String& body )
 {
 	String hostname = extractField ( body, "hostname", "udpPort" );
 	String udpPort = extractField ( body, "udpPort", "multicastPort" );
 	String multicastPort = extractField ( body, "multicastPort" );
-#ifdef BME280_SUPPORT
 	String altitude = extractField ( body, "altitude" );
-#endif
 
 	if ( hostname.length() > 0 )
 	{
@@ -110,16 +141,19 @@ bool OnboardingServer::parseAdditionalFields ( const String& body )
 		}
 	}
 
-#ifdef BME280_SUPPORT
 	if ( altitude.length() > 0 )
 	{
 		_config.altitudeCompensation = altitude.toFloat();
 	}
-#endif
 
 	return true;
 }
 
+/**
+ * @brief Copies WiFi credentials from the base class into _config, marks the
+ *        config valid, and writes it to persistent storage via ConfigStorage::save().
+ * @return true if the configuration was successfully saved; false on storage error.
+ */
 bool OnboardingServer::saveConfiguration ()
 {
 	strncpy ( _config.ssid, _wifiSsid, sizeof ( _config.ssid ) - 1 );
@@ -136,6 +170,10 @@ bool OnboardingServer::saveConfiguration ()
 	return ConfigStorage::save ( _config );
 }
 
+/**
+ * @brief Returns any additional HTML content to display in the page footer.
+ * @return An empty string (no footer content for this server).
+ */
 String OnboardingServer::getFooterContent () const
 {
 	return "";
