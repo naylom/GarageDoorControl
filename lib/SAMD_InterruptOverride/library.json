@@ -1,0 +1,6 @@
+{
+  "name": "SAMD_InterruptOverride",
+  "version": "1.0.0",
+  "platforms": ["atmelsam"],
+  "frameworks": ["arduino"]
+}
