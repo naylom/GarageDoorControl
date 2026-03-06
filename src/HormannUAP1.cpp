@@ -47,6 +47,20 @@ static String onOff ( bool state )
 // HormannUAP1 — constructor / destructor
 // ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @brief Constructs the Hormann UAP1 controller, binding it to the seven control/status pins.
+ * @details Creates DoorStatusPin interrupt-driven input objects for the open, closed, and
+ *          light status pins, and OutputPin objects for each relay control line.
+ *          All control pins are driven off after construction and the door state is
+ *          determined immediately from the current pin readings via DoorStatusCalc.
+ * @param OpenPin             Output pin number that pulses the open relay.
+ * @param ClosePin            Output pin number that pulses the close relay.
+ * @param StopPin             Output pin number that pulses the stop relay.
+ * @param LightPin            Output pin number that toggles the light relay.
+ * @param DoorOpenStatusPin   Input pin that goes HIGH when the door is fully open.
+ * @param DoorClosedStatusPin Input pin that goes HIGH when the door is fully closed.
+ * @param DoorLightStatusPin  Input pin that reflects the current light state.
+ */
 HormannUAP1::HormannUAP1 ( pin_size_t OpenPin,
                            pin_size_t ClosePin,
                            pin_size_t StopPin,
@@ -94,6 +108,9 @@ HormannUAP1::HormannUAP1 ( pin_size_t OpenPin,
 	m_pDoorStatus = new DoorStatusCalc ( *m_pDoorOpenStatusPin, *m_pDoorClosedStatusPin );
 }
 
+/**
+ * @brief Destructor. Releases the DoorStatusCalc instance.
+ */
 HormannUAP1::~HormannUAP1 ()
 {
 	delete m_pDoorStatus;
@@ -104,11 +121,22 @@ HormannUAP1::~HormannUAP1 ()
 // IGarageDoor implementation
 // ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @brief Returns whether a UAP1 door controller is physically connected.
+ * @details Presence is determined by checking whether at least one of the open
+ *          or closed status pins is wired (not NOT_A_PIN).
+ * @return true if the hardware is present.
+ */
 bool HormannUAP1::IsPresent () const
 {
-	return m_DoorOpenStatusPin != NOT_A_PIN || m_DoorClosedStatusPin != NOT_A_PIN;
+	return !(m_DoorOpenStatusPin == NOT_A_PIN || m_DoorClosedStatusPin == NOT_A_PIN);
 }
 
+/**
+ * @brief Polls the current hardware pin states and updates the door state machine.
+ * @details Must be called regularly from the main loop. Reads both open and closed
+ *          status pins and resolves any transition that the ISR may have missed.
+ */
 void HormannUAP1::Update ()
 {
 	if ( m_pDoorStatus != nullptr )
@@ -117,11 +145,19 @@ void HormannUAP1::Update ()
 	}
 }
 
+/**
+ * @brief Returns the current door state as determined by the state machine.
+ * @return One of IGarageDoor::State: Open, Closed, Opening, Closing, Stopped, Unknown, or Bad.
+ */
 IGarageDoor::State HormannUAP1::GetState () const
 {
 	return GetDoorStateInternal();
 }
 
+/**
+ * @brief Returns the current light state as reported by the light status pin.
+ * @return IGarageDoor::LightState::On, Off, or Unknown if the pin is not wired.
+ */
 IGarageDoor::LightState HormannUAP1::GetLightState () const
 {
 	if ( m_pDoorLightStatusPin == nullptr )
@@ -131,32 +167,57 @@ IGarageDoor::LightState HormannUAP1::GetLightState () const
 	return m_pDoorLightStatusPin->IsMatched() ? IGarageDoor::LightState::On : IGarageDoor::LightState::Off;
 }
 
+/**
+ * @brief Returns true when the door is fully open.
+ * @return true if current state == IGarageDoor::State::Open.
+ */
 bool HormannUAP1::IsOpen () const
 {
 	return GetState() == IGarageDoor::State::Open;
 }
 
+/**
+ * @brief Returns true when the door is fully closed.
+ * @return true if current state == IGarageDoor::State::Closed.
+ */
 bool HormannUAP1::IsClosed () const
 {
 	return GetState() == IGarageDoor::State::Closed;
 }
 
+/**
+ * @brief Returns true when the door is currently opening or closing.
+ * @return true if current state is Opening or Closing.
+ */
 bool HormannUAP1::IsMoving () const
 {
 	auto s = GetState();
 	return s == IGarageDoor::State::Opening || s == IGarageDoor::State::Closing;
 }
 
+/**
+ * @brief Returns true when the light status pin indicates the light is on.
+ * @return true if the light status InputPin is in the matched (HIGH) state.
+ */
 bool HormannUAP1::IsLit () const
 {
 	return m_pDoorLightStatusPin != nullptr && m_pDoorLightStatusPin->IsMatched();
 }
 
+/**
+ * @brief Returns a human-readable C-string for the current door state.
+ * @return One of: "Opened", "Opening", "Closed", "Closing", "Stopped", "Unknown", "Bad".
+ */
 const char* HormannUAP1::GetStateDisplayString () const
 {
 	return StateNames [ (uint8_t)GetState() % ( sizeof ( StateNames ) / sizeof ( StateNames [ 0 ] ) ) ];
 }
 
+/**
+ * @brief Issues an Open command by asserting the open relay for SIGNAL_PULSE duration.
+ * @details Calls ResetTimer() which first turns all control pins off and schedules
+ *          TurnOffControlPins() via the timer to deassert the relay after the pulse.
+ */
 void HormannUAP1::Open ()
 {
 	ResetTimer();
@@ -164,6 +225,9 @@ void HormannUAP1::Open ()
 	m_pDoorOpenCtrlPin->On();
 }
 
+/**
+ * @brief Issues a Close command by asserting the close relay for SIGNAL_PULSE duration.
+ */
 void HormannUAP1::Close ()
 {
 	ResetTimer();
@@ -171,6 +235,9 @@ void HormannUAP1::Close ()
 	m_pDoorCloseCtrlPin->On();
 }
 
+/**
+ * @brief Issues a Stop command by asserting the stop relay for SIGNAL_PULSE duration.
+ */
 void HormannUAP1::Stop ()
 {
 	ResetTimer();
@@ -178,6 +245,11 @@ void HormannUAP1::Stop ()
 	m_pDoorStopCtrlPin->On();
 }
 
+/**
+ * @brief Toggles the light on via the light relay for SIGNAL_PULSE duration.
+ * @details The UAP1 light pin is a toggle; the same physical pin is used for
+ *          both LightOn and LightOff.
+ */
 void HormannUAP1::LightOn ()
 {
 	ResetTimer();
@@ -185,6 +257,10 @@ void HormannUAP1::LightOn ()
 	m_pDoorLightCtrlPin->On();
 }
 
+/**
+ * @brief Toggles the light off via the light relay for SIGNAL_PULSE duration.
+ * @details Uses the same toggle pin as LightOn (UAP1 hardware behaviour).
+ */
 void HormannUAP1::LightOff ()
 {
 	ResetTimer();
@@ -192,6 +268,11 @@ void HormannUAP1::LightOff ()
 	m_pDoorLightCtrlPin->On();  // UAP toggle — same pin for on and off
 }
 
+/**
+ * @brief Registers a callback to be invoked whenever the door state changes.
+ * @param cb Function pointer called with the new IGarageDoor::State value.
+ *           Pass nullptr to deregister.
+ */
 void HormannUAP1::SetStateChangedCallback ( StateChangedCallback cb )
 {
 	m_stateChangedCallback = cb;
@@ -201,6 +282,13 @@ void HormannUAP1::SetStateChangedCallback ( StateChangedCallback cb )
 // ISR-called event dispatcher
 // ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @brief Dispatches an event through the door state-transition table.
+ * @details Called from ISR context by DoorStatusPin. Selects the handler
+ *          function for the current state and event combination and calls it.
+ *          Must be short and must not make SPI/WiFi calls.
+ * @param eEvent The event that occurred (DoorOpened, DoorClosed, SwitchPress, etc.).
+ */
 void HormannUAP1::DoEvent ( HormannUAP1::Event eEvent )
 {
 	( this->*StateTableFn [ (uint8_t)GetState() ][ (uint8_t)eEvent ] ) ( eEvent );
@@ -210,26 +298,48 @@ void HormannUAP1::DoEvent ( HormannUAP1::Event eEvent )
 // State table handlers (called from ISR — must be short, no SPI/WiFi calls)
 // ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @brief State-table handler: the door has reached the fully-open position.
+ * @details Updates state to Open and direction to Up. Called from ISR.
+ */
 void HormannUAP1::NowOpen ( Event )
 {
 	SetStateAndDirection ( IGarageDoor::State::Open, Direction::Up );
 }
 
+/**
+ * @brief State-table handler: the door has reached the fully-closed position.
+ * @details Updates state to Closed and direction to Down. Called from ISR.
+ */
 void HormannUAP1::NowClosed ( Event )
 {
 	SetStateAndDirection ( IGarageDoor::State::Closed, Direction::Down );
 }
 
+/**
+ * @brief State-table handler: the door has started moving toward the closed position.
+ * @details Updates state to Closing and direction to Down. Called from ISR.
+ */
 void HormannUAP1::NowClosing ( Event )
 {
 	SetStateAndDirection ( IGarageDoor::State::Closing, Direction::Down );
 }
 
+/**
+ * @brief State-table handler: the door has started moving toward the open position.
+ * @details Updates state to Opening and direction to Up. Called from ISR.
+ */
 void HormannUAP1::NowOpening ( Event )
 {
 	SetStateAndDirection ( IGarageDoor::State::Opening, Direction::Up );
 }
 
+/**
+ * @brief State-table handler: the physical wall switch has been pressed.
+ * @details Implements context-sensitive logic: opens a closed door, closes an open
+ *          door, stops a moving door, or resumes movement based on last direction
+ *          when the door is stopped. Called from ISR context.
+ */
 void HormannUAP1::SwitchPressed ( Event )
 {
 	uint32_t now = millis();
@@ -281,6 +391,12 @@ void HormannUAP1::SwitchPressed ( Event )
 // Internal helpers
 // ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @brief Atomically updates the door state and direction, sets the changed flag,
+ *        and fires the optional state-changed callback.
+ * @param state     New door state to store.
+ * @param direction New direction to store.
+ */
 void HormannUAP1::SetStateAndDirection ( IGarageDoor::State state, Direction direction )
 {
 	SetDoorState ( state );
@@ -292,6 +408,10 @@ void HormannUAP1::SetStateAndDirection ( IGarageDoor::State state, Direction dir
 	}
 }
 
+/**
+ * @brief Sets the door state in the DoorStatusCalc object.
+ * @param newState The state to store.
+ */
 void HormannUAP1::SetDoorState ( IGarageDoor::State newState )
 {
 	if ( m_pDoorStatus != nullptr )
@@ -300,6 +420,10 @@ void HormannUAP1::SetDoorState ( IGarageDoor::State newState )
 	}
 }
 
+/**
+ * @brief Sets the last-known door travel direction in the DoorStatusCalc object.
+ * @param direction The direction to store (Up, Down, or None).
+ */
 void HormannUAP1::SetDoorDirection ( Direction direction )
 {
 	if ( m_pDoorStatus != nullptr )
@@ -308,6 +432,10 @@ void HormannUAP1::SetDoorDirection ( Direction direction )
 	}
 }
 
+/**
+ * @brief Retrieves the current door state from the DoorStatusCalc object.
+ * @return The stored door state, or IGarageDoor::State::Unknown if not initialised.
+ */
 IGarageDoor::State HormannUAP1::GetDoorStateInternal () const
 {
 	if ( m_pDoorStatus != nullptr )
@@ -317,6 +445,10 @@ IGarageDoor::State HormannUAP1::GetDoorStateInternal () const
 	return IGarageDoor::State::Unknown;
 }
 
+/**
+ * @brief Returns the last known travel direction of the door.
+ * @return Direction::Up, Direction::Down, or Direction::None if unknown.
+ */
 HormannUAP1::Direction HormannUAP1::GetDoorDirection () const
 {
 	if ( m_pDoorStatus != nullptr )
@@ -326,6 +458,12 @@ HormannUAP1::Direction HormannUAP1::GetDoorDirection () const
 	return Direction::None;
 }
 
+/**
+ * @brief Deasserts all control relay pins immediately and schedules a timer callback
+ *        to deassert them again after SIGNAL_PULSE microseconds, producing a timed relay pulse.
+ * @details Turning all pins off before scheduling prevents a second simultaneous pulse
+ *          if the timer fires while a previous command is still asserting a pin.
+ */
 void HormannUAP1::ResetTimer ()
 {
 	TurnOffControlPins();
@@ -337,6 +475,12 @@ void HormannUAP1::ResetTimer ()
 	}
 }
 
+/**
+ * @brief Removes the pending timer callback and drives all four relay control
+ *        output pins to their OFF state.
+ * @details Called both at the start of a new command (via ResetTimer) and by the
+ *          MNTimerLib callback to end the relay pulse.
+ */
 void HormannUAP1::TurnOffControlPins ()
 {
 	TheTimer.RemoveCallBack ( (MNTimerClass*)this, (aMemberFunction)&HormannUAP1::TurnOffControlPins );
@@ -350,41 +494,74 @@ void HormannUAP1::TurnOffControlPins ()
 // Diagnostic helpers
 // ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @brief Returns a human-readable string for the last-known door travel direction.
+ * @return One of: "Up", "Down", "Stationary".
+ */
 const char* HormannUAP1::GetDoorDirectionName () const
 {
 	return m_pDoorStatus->GetDoorDirectionName();
 }
 
+/**
+ * @brief Returns the cumulative number of times the light status pin went HIGH (light turned on).
+ * @return Interrupt-driven matched-state counter for the light status pin.
+ */
 uint32_t HormannUAP1::GetLightOnCount () const
 {
 	return m_pDoorLightStatusPin->GetMatchedCount();
 }
 
+/**
+ * @brief Returns the cumulative number of times the light status pin went LOW (light turned off).
+ * @return Interrupt-driven unmatched-state counter for the light status pin.
+ */
 uint32_t HormannUAP1::GetLightOffCount () const
 {
 	return m_pDoorLightStatusPin->GetUnmatchedCount();
 }
 
+/**
+ * @brief Returns the cumulative number of times the door reached the fully-open position.
+ * @return Matched-state counter for the open status pin.
+ */
 uint32_t HormannUAP1::GetDoorOpenedCount () const
 {
 	return m_pDoorOpenStatusPin->GetMatchedCount();
 }
 
+/**
+ * @brief Returns the cumulative number of times the door left the closed position (started opening).
+ * @return Unmatched-state counter for the closed status pin.
+ */
 uint32_t HormannUAP1::GetDoorOpeningCount () const
 {
 	return m_pDoorClosedStatusPin->GetUnmatchedCount();
 }
 
+/**
+ * @brief Returns the cumulative number of times the door reached the fully-closed position.
+ * @return Matched-state counter for the closed status pin.
+ */
 uint32_t HormannUAP1::GetDoorClosedCount () const
 {
 	return m_pDoorClosedStatusPin->GetMatchedCount();
 }
 
+/**
+ * @brief Returns the cumulative number of times the door left the open position (started closing).
+ * @return Unmatched-state counter for the open status pin.
+ */
 uint32_t HormannUAP1::GetDoorClosingCount () const
 {
 	return m_pDoorOpenStatusPin->GetUnmatchedCount();
 }
 
+/**
+ * @brief Builds a diagnostic string showing the current and latched state of all three
+ *        status pins (light, open, closed).
+ * @param states Output String that receives the formatted pin state description.
+ */
 void HormannUAP1::GetPinStates ( String& states )
 {
 	states = String ( F ( "Light: " ) );
@@ -405,6 +582,22 @@ void HormannUAP1::GetPinStates ( String& states )
 // DoorStatusPin
 // ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @brief Constructs a door status input pin that forwards pin events to the HormannUAP1 state machine.
+ * @details Extends InputPin with match and unmatch events that are dispatched via
+ *          HormannUAP1::DoEvent() when the pin transitions. When pDoor is nullptr no
+ *          events are dispatched (used for the light status pin).
+ * @param pDoor           Pointer to the owning HormannUAP1 instance; may be nullptr.
+ * @param matchEvent      Event to fire when the pin reaches the matched (active) state.
+ * @param unmatchEvent    Event to fire when the pin leaves the matched state.
+ * @param pin             Arduino pin number to monitor.
+ * @param debouncems      Minimum time in ms between accepted interrupts.
+ * @param maxMatchedTimems Maximum time in ms the pin may remain in the matched state
+ *                         before the transition is rejected as spurious. 0 = unlimited.
+ * @param matchStatus     PinStatus value (HIGH/LOW) that constitutes a match.
+ * @param mode            Pin input mode (INPUT, INPUT_PULLUP, INPUT_PULLDOWN).
+ * @param status          Interrupt trigger type (CHANGE, RISING, FALLING).
+ */
 DoorStatusPin::DoorStatusPin ( HormannUAP1* pDoor,
                                HormannUAP1::Event matchEvent,
                                HormannUAP1::Event unmatchEvent,
@@ -419,6 +612,11 @@ DoorStatusPin::DoorStatusPin ( HormannUAP1* pDoor,
 {
 }
 
+/**
+ * @brief Called by InputPin when the pin reaches the match state.
+ * @details Fires the configured matchEvent on the owning HormannUAP1 door object.
+ *          Called from ISR context.
+ */
 void DoorStatusPin::MatchAction () const
 {
 	if ( m_pDoor != nullptr )
@@ -427,6 +625,11 @@ void DoorStatusPin::MatchAction () const
 	}
 }
 
+/**
+ * @brief Called by InputPin when the pin leaves the match state.
+ * @details Fires the configured unmatchEvent on the owning HormannUAP1 door object.
+ *          Called from ISR context.
+ */
 void DoorStatusPin::UnmatchAction () const
 {
 	if ( m_pDoor != nullptr )
@@ -439,6 +642,13 @@ void DoorStatusPin::UnmatchAction () const
 // DoorStatusCalc
 // ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @brief Constructs the door state calculator from the two status pin objects.
+ * @details Sets initial state to Unknown/None then immediately calls UpdateStatus()
+ *          to determine the true state from the current pin readings.
+ * @param openPin   Reference to the DoorStatusPin monitoring the open sensor.
+ * @param closePin  Reference to the DoorStatusPin monitoring the close sensor.
+ */
 DoorStatusCalc::DoorStatusCalc ( DoorStatusPin& openPin, DoorStatusPin& closePin )
     : m_openPin ( openPin ), m_closePin ( closePin )
 {
@@ -447,6 +657,13 @@ DoorStatusCalc::DoorStatusCalc ( DoorStatusPin& openPin, DoorStatusPin& closePin
 	UpdateStatus();
 }
 
+/**
+ * @brief Evaluates the current open/closed pin states and updates the door state accordingly.
+ * @details Uses a truth-table based on whether each pin currently reads in its matched
+ *          (active HIGH) state. When neither pin is active the direction of travel is
+ *          inferred from the previous state to determine Opening vs Closing.
+ *          Sets state to Bad when both pins read active simultaneously.
+ */
 void DoorStatusCalc::UpdateStatus ()
 {
 	bool bIsClosed = m_closePin.GetCurrentMatchedState();
@@ -493,32 +710,55 @@ void DoorStatusCalc::UpdateStatus ()
 	}
 }
 
+/**
+ * @brief Returns the current door state stored in this calculator.
+ * @return The last state set by UpdateStatus(), SetDoorState(), or SetStopped().
+ */
 IGarageDoor::State DoorStatusCalc::GetDoorState () const
 {
 	return m_currentState;
 }
 
+/**
+ * @brief Stores a new door state.
+ * @param state The state to persist in this calculator.
+ */
 void DoorStatusCalc::SetDoorState ( IGarageDoor::State state )
 {
 	m_currentState = state;
 }
 
+/**
+ * @brief Returns the last-known door travel direction stored in this calculator.
+ * @return Direction::Up, Direction::Down, or Direction::None.
+ */
 HormannUAP1::Direction DoorStatusCalc::GetDoorDirection () const
 {
 	return m_LastDirection;
 }
 
+/**
+ * @brief Stores a new door travel direction.
+ * @param direction The direction to persist.
+ */
 void DoorStatusCalc::SetDoorDirection ( HormannUAP1::Direction direction )
 {
 	m_LastDirection = direction;
 }
 
+/**
+ * @brief Returns a human-readable string for the last-known direction stored in this calculator.
+ * @return One of: "Up", "Down", "Stationary".
+ */
 const char* DoorStatusCalc::GetDoorDirectionName () const
 {
 	return DirectionNames [ (uint8_t)GetDoorDirection() %
 	                        ( sizeof ( DirectionNames ) / sizeof ( DirectionNames [ 0 ] ) ) ];
 }
 
+/**
+ * @brief Transitions the door state to Stopped.
+ */
 void DoorStatusCalc::SetStopped ()
 {
 	SetDoorState ( IGarageDoor::State::Stopped );
@@ -528,6 +768,20 @@ void DoorStatusCalc::SetStopped ()
 // HormannUAP1WithSwitch
 // ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @brief Constructs HormannUAP1 with an additional physical wall-switch input.
+ * @details Delegates all UAP1 pins to the HormannUAP1 base constructor and creates
+ *          an additional DoorStatusPin for the wall switch. The switch fires the
+ *          SwitchPress event on the unmatched transition (button release after debounce).
+ * @param OpenPin             UAP1 open relay output pin.
+ * @param ClosePin            UAP1 close relay output pin.
+ * @param StopPin             UAP1 stop relay output pin.
+ * @param LightPin            UAP1 light relay output pin.
+ * @param DoorOpenStatusPin   Door-open sensor input pin.
+ * @param DoorClosedStatusPin Door-closed sensor input pin.
+ * @param DoorLightStatusPin  Light-status sensor input pin.
+ * @param DoorSwitchStatusPin Wall-switch input pin (active-HIGH, INPUT_PULLDOWN).
+ */
 HormannUAP1WithSwitch::HormannUAP1WithSwitch ( pin_size_t OpenPin,
                                                pin_size_t ClosePin,
                                                pin_size_t StopPin,
@@ -550,21 +804,37 @@ HormannUAP1WithSwitch::HormannUAP1WithSwitch ( pin_size_t OpenPin,
 {
 }
 
+/**
+ * @brief Destructor. Releases the wall-switch DoorStatusPin object.
+ */
 HormannUAP1WithSwitch::~HormannUAP1WithSwitch ()
 {
 	// unique_ptr<DoorStatusPin> is destroyed here where DoorStatusPin is complete
 }
 
+/**
+ * @brief Returns whether a wall switch is wired and configured.
+ * @return true if the switch DoorStatusPin was successfully created.
+ */
 bool HormannUAP1WithSwitch::IsSwitchConfigured () const
 {
 	return m_pDoorSwitchStatusPin != nullptr;
 }
 
+/**
+ * @brief Returns the cumulative number of times the wall switch has been activated.
+ * @return Matched-count from the switch DoorStatusPin, or 0 if no switch is configured.
+ */
 uint32_t HormannUAP1WithSwitch::GetSwitchMatchCount () const
 {
 	return m_pDoorSwitchStatusPin ? m_pDoorSwitchStatusPin->GetMatchedCount() : 0;
 }
 
+/**
+ * @brief Appends the switch pin interrupt counters to the provided string for diagnostics.
+ * @param result Output String that receives the formatted counter values.
+ *               Does nothing if no switch is configured.
+ */
 void HormannUAP1WithSwitch::SwitchDebugStats ( String& result ) const
 {
 	if ( m_pDoorSwitchStatusPin )

@@ -14,7 +14,15 @@
 
 extern void Error ( String s, bool bInISR = false );
 
-// ─── Constructor ──────────────────────────────────────────────────────────────
+// ─── Constructor ─────────────────────────────────────────────────────────────
+/**
+ * @brief Constructs the protocol handler,
+ *    binding it to all runtime data sources.
+ * @param pDoor    Pointer to the garage door controller; may be nullptr if no door is fitted.
+ * @param pSensor  Pointer to the environment sensor; may be nullptr if no sensor is fitted.
+ * @param reading  Reference to the shared EnvironmentReading struct populated by the sensor.
+ * @param service  Reference to the UDPWiFiService used to query the current NTP timestamp.
+ */
 GarageMessageProtocol::GarageMessageProtocol ( IGarageDoor* pDoor,
                                                IEnvironmentSensor* pSensor,
                                                EnvironmentReading& reading,
@@ -23,7 +31,17 @@ GarageMessageProtocol::GarageMessageProtocol ( IGarageDoor* pDoor,
 {
 }
 
-// ─── BuildResponse ────────────────────────────────────────────────────────────
+// ─── BuildResponse ───────────────────────────────────────────────────────────
+/**
+ * @brief Builds the UDP response payload string for the given message type.
+ * @details TEMPDATA responses contain comma-separated key=value pairs for
+ *          temperature, humidity, dew-point, pressure, and timestamp.
+ *          DOORDATA responses contain door state, light state, open/closed/moving
+ *          flags, and timestamp. Command-only types (DOOROPEN etc.) produce an
+ *          empty string - no response is sent.
+ * @param msgType Numeric value of a UDPWiFiService::ReqMsgType enum.
+ * @return The formatted response string, or an empty String if no payload applies.
+ */
 String GarageMessageProtocol::BuildResponse ( uint8_t msgType )
 {
 	String sResponse;
@@ -79,7 +97,15 @@ String GarageMessageProtocol::BuildResponse ( uint8_t msgType )
 	return sResponse;
 }
 
-// ─── HandleCommand ────────────────────────────────────────────────────────────
+// ─── HandleCommand ───────────────────────────────────────────────────────────
+/**
+ * @brief Dispatches a command message to the appropriate garage door action.
+ * @details Handles DOOROPEN, DOORCLOSE, DOORSTOP, LIGHTON, and LIGHTOFF by
+ *          calling the corresponding IGarageDoor method. Data-request types
+ *          (TEMPDATA, DOORDATA) are silently ignored - they have no side-effect.
+ *          Guards against nullptr door pointer.
+ * @param msgType Numeric value of a UDPWiFiService::ReqMsgType enum.
+ */
 void GarageMessageProtocol::HandleCommand ( uint8_t msgType )
 {
 	switch ( static_cast<UDPWiFiService::ReqMsgType> ( msgType ) )

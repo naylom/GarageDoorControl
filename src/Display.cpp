@@ -78,7 +78,12 @@ void Info ( String s, bool bInISR )
 }
 
 // ─── Free function: DisplaylastInfoErrorMsg ───────────────────────────────────
-
+/**
+ * @brief Renders the most recent Info()/Error() message in the terminal notification bar.
+ * @details When the message was recorded from ISR context, prepends the current
+ *          NTP time (best-effort). Only compiled when MNDEBUG is defined.
+ *          Safe to call frequently; does nothing in non-debug builds.
+ */
 void DisplaylastInfoErrorMsg ()
 {
 #ifdef MNDEBUG
@@ -98,7 +103,14 @@ void DisplaylastInfoErrorMsg ()
 }
 
 // ─── Display constructor ──────────────────────────────────────────────────────
-
+/**
+ * @brief Constructs the Display, binding it to the logger and all data sources.
+ * @param logger    Reference to the ANSI VT220 terminal logger used for output.
+ * @param pUDPService Pointer to the WiFi/UDP service (used for time and network stats).
+ * @param version   Firmware version string displayed in the heading row.
+ * @param pDoor     Pointer to the garage door interface; may be nullptr if no door present.
+ * @param pSensor   Pointer to the environment sensor interface; may be nullptr if no sensor.
+ */
 Display::Display ( ansiVT220Logger& logger,
                    UDPWiFiService* pUDPService,
                    const char* version,
@@ -110,7 +122,15 @@ Display::Display ( ansiVT220Logger& logger,
 }
 
 // ─── Display::DisplayUptime (private helper) ──────────────────────────────────
-
+/**
+ * @brief Renders the elapsed run time as "DD:HH:MM:SS" at the specified terminal position.
+ * @details Records the first call time and computes relative elapsed time on
+ *          subsequent calls. Resets the origin when millis() wraps around at ~49 days.
+ * @param line Screen line (1-based) at which to print.
+ * @param row  Screen column (1-based) at which to print.
+ * @param fg   Foreground colour for the text.
+ * @param bg   Background colour for the text.
+ */
 void Display::DisplayUptime ( uint8_t line, uint8_t row, ansiVT220Logger::colours fg, ansiVT220Logger::colours bg )
 {
 	static uint32_t ulStartTime = 0UL;
@@ -149,7 +169,13 @@ void Display::DisplayUptime ( uint8_t line, uint8_t row, ansiVT220Logger::colour
 }
 
 // ─── Display::DisplayStats ────────────────────────────────────────────────────
-
+/**
+ * @brief Renders the full debug status screen: uptime, heading, sensor readings,
+ *        door state, network status, and the notification bar.
+ * @details Compiled only when MNDEBUG is defined. Calls DisplayNWStatus() and
+ *          DisplaylastInfoErrorMsg() as sub-steps. Intended to be called at
+ *          approximately 2 Hz from Application::loop().
+ */
 void Display::DisplayStats ()
 {
 #ifdef MNDEBUG
@@ -228,7 +254,12 @@ void Display::DisplayStats ()
 }
 
 // ─── Display::DisplayNWStatus ─────────────────────────────────────────────────
-
+/**
+ * @brief Renders the network status panel: SSID, hostname, IP address, subnet mask,
+ *        multicast destination list, gateway, MAC address, signal strength,
+ *        WiFi connection counters, and message statistics.
+ * @details Does nothing if m_pUDPService is nullptr. Called by DisplayStats().
+ */
 void Display::DisplayNWStatus ()
 {
 	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 0, F ( "SSID: " ) );

@@ -23,7 +23,7 @@
 #include <WiFiUdp.h>
 
 // ─── Version string (extern'd by Display.cpp) ────────────────────────────────
-const char* VERSION = "1.0.17 Beta";
+const char* VERSION = "2.0.0";
 
 // ─── Logger (extern'd by Display.cpp) ────────────────────────────────────────
 #ifdef MNDEBUG
@@ -59,6 +59,10 @@ unsigned long ulLastClientReq = 0UL;
 
 // ─── Application implementation ───────────────────────────────────────────────
 
+/**
+ * @brief Constructor. Creates the external RGB LED object so it is available
+ *        before begin() initialises other peripherals.
+ */
 Application::Application ()
 {
 	// Initialise the external LED object during global init so it exists before
@@ -66,6 +70,13 @@ Application::Application ()
 	pMyLED = new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 180, 120 );
 }
 
+/**
+ * @brief One-time setup performed in the Arduino setup() function.
+ * @details Initialises all peripherals in order: LED, logger, WiFi/UDP service,
+ *          BME280 sensor, Hormann UAP1 door controller, and display. Creates the
+ *          GarageMessageProtocol instance that wires them together. Enters AP
+ *          onboarding mode if no stored WiFi credentials are present.
+ */
 void Application::begin ()
 {
 	// Drive external LED pins low immediately — before any other peripheral
@@ -151,8 +162,14 @@ void Application::begin ()
 	pMyDisplay = new Display ( MyLogger, pMyUDPService, VERSION, pGarageDoor, pBME280Sensor );
 }
 
-// Set the colour of the inbuilt MKR WiFi 1010 RGB LED.
-// If the garage door is present, shows door state; otherwise shows humidity.
+/**
+ * @brief Updates the inbuilt MKR WiFi 1010 RGB LED to reflect current system state.
+ * @details If the Hormann UAP1 is present the LED colour reflects door state
+ *          (green=closed, red=open, etc.). If no door is present the LED reflects
+ *          the current relative humidity reading using a blue/green/red gradient.
+ *          Does nothing when WiFiService is in AP/onboarding mode, as the service
+ *          owns the LED colour in that state.
+ */
 void Application::setLED ()
 {
 	// In AP mode the WiFiService owns the LED colour — don't override it.
@@ -254,18 +271,26 @@ void Application::setLED ()
 	    255.0 - ( ( abs ( constrainedHumidity - HUMIDITY_MID ) * 255.0 ) / ( ( HUMIDITY_MAX - HUMIDITY_MIN ) / 2.0 ) );
 	pMyLED->SetLEDColour ( RGB ( red, green, blue ), Flashtime );
 
-	MyLogger.AT ( 3, 1, "Red   :" );
-	MyLogger.AT ( 4, 1, "Green :" );
-	MyLogger.AT ( 5, 1, "Blue  :" );
-	MyLogger.ClearPartofLine ( 3, 8, 3 );
-	MyLogger.ClearPartofLine ( 4, 8, 3 );
-	MyLogger.ClearPartofLine ( 5, 8, 3 );
-	MyLogger.AT ( 3, 8, String ( red ) );
-	MyLogger.AT ( 4, 8, String ( green ) );
-	MyLogger.AT ( 5, 8, String ( blue ) );
+	MyLogger.AT ( 3, 41, "Red   :" );
+	MyLogger.AT ( 4, 41, "Green :" );
+	MyLogger.AT ( 5, 41, "Blue  :" );
+	MyLogger.ClearPartofLine ( 3, 48, 3 );
+	MyLogger.ClearPartofLine ( 4, 48, 3 );
+	MyLogger.ClearPartofLine ( 5, 48, 3 );
+	MyLogger.AT ( 3, 48, String ( red ) );
+	MyLogger.AT ( 4, 48, String ( green ) );
+	MyLogger.AT ( 5, 48, String ( blue ) );
 }
 
 // ─── loop ─────────────────────────────────────────────────────────────────────
+/**
+ * @brief Main execution loop called repeatedly from the Arduino loop() function.
+ * @details Each call: updates the LED, processes onboarding if in AP mode,
+ *          checks for incoming UDP commands, reads the BME280 sensor at
+ *          SENSOR_READ_INTERVAL_MS intervals (multicasting the result), refreshes
+ *          the debug display every 500 ms, and polls the garage door state machine
+ *          multicasting whenever door or light state changes.
+ */
 void Application::loop ()
 {
 	static unsigned long ulLastSensorTime = millis() - SENSOR_READ_INTERVAL_MS;
@@ -334,6 +359,12 @@ void Application::loop ()
 }
 
 // ─── processUDPMsg (static — satisfies UDPWiFiServiceCallback signature) ──────
+/**
+ * @brief Static UDP message callback invoked by UDPWiFiService when a request packet arrives.
+ * @details Dispatches the command to the protocol handler, builds the response
+ *          string, and sends a unicast reply to the requesting client.
+ * @param eReqType The decoded request type (TEMPDATA, DOORDATA, DOOROPEN, etc.).
+ */
 void Application::processUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
 {
 	if ( pMyProtocol != nullptr )
@@ -348,6 +379,12 @@ void Application::processUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
 }
 
 // ─── multicastMsg ─────────────────────────────────────────────────────────────
+/**
+ * @brief Builds and broadcasts an unsolicited UDP message to all known subnets.
+ * @details Used to proactively push sensor readings or door-state changes to all
+ *          listeners without waiting for a polling request.
+ * @param eReqType The message type to build and broadcast (TEMPDATA or DOORDATA).
+ */
 void Application::multicastMsg ( UDPWiFiService::ReqMsgType eReqType )
 {
 	if ( pMyProtocol != nullptr )
