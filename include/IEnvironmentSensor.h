@@ -40,6 +40,10 @@ public:
 	// Populates result; returns false if sensor not ready
 	virtual bool Read ( EnvironmentReading& result ) = 0;
 
+	// Returns the most recent reading cached by the last successful Read() call.
+	// Returns a default-constructed (invalid) EnvironmentReading before the first read.
+	virtual const EnvironmentReading& GetLastReading () const = 0;
+
 protected:
 	float m_altitude;  // metres above sea level, loaded from ConfigStore
 };

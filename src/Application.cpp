@@ -50,6 +50,9 @@ UDPWiFiService* pMyUDPService = nullptr;
 // ─── Message protocol ─────────────────────────────────────────────────────────
 IMessageProtocol* pMyProtocol = nullptr;
 
+// ─── Display (extern'd nowhere — owned here) ──────────────────────────────────
+Display* pMyDisplay = nullptr;
+
 // ─── External RGB LED ────────────────────────────────────────────────────────
 MNRGBLEDBaseLib* pMyLED = nullptr;
 
@@ -146,6 +149,14 @@ void Application::begin ()
 		pDoorForProtocol = pGarageDoor;
 #endif
 		pMyProtocol = new GarageMessageProtocol ( pDoorForProtocol, pBME280Sensor, EnvironmentResults, *pMyUDPService );
+	}
+
+	{
+		IGarageDoor* pDoorForDisplay = nullptr;
+#ifdef UAP_SUPPORT
+		pDoorForDisplay = pGarageDoor;
+#endif
+		pMyDisplay = new Display ( MyLogger, pMyUDPService, VERSION, pDoorForDisplay, pBME280Sensor );
 	}
 }
 
@@ -313,7 +324,10 @@ void Application::loop ()
 	if ( millis() - ulLastDisplayTime > 500 )
 	{
 		ulLastDisplayTime = millis();
-		DisplayStats();
+		if ( pMyDisplay != nullptr )
+		{
+			pMyDisplay->DisplayStats();
+		}
 	}
 
 #ifdef UAP_SUPPORT

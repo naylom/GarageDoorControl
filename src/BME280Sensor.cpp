@@ -88,5 +88,13 @@ bool BME280Sensor::Read ( EnvironmentReading& result )
 	result.dewpoint = EnvironmentCalculations::DewPoint ( temp, hum );
 	result.timestampMs = millis();
 	result.valid = true;
+	m_lastReading = result;
 	return true;
+}
+
+// ─── GetLastReading ───────────────────────────────────────────────────────────
+
+const EnvironmentReading& BME280Sensor::GetLastReading () const
+{
+	return m_lastReading;
 }

@@ -36,7 +36,11 @@ public:
 	// never called successfully.
 	bool Read ( EnvironmentReading& result ) override;
 
+	// Returns the most recent reading cached by the last successful Read() call.
+	const EnvironmentReading& GetLastReading () const override;
+
 private:
 	BME280I2C m_bme;
 	bool m_initialized = false;
+	EnvironmentReading m_lastReading = {};
 };
