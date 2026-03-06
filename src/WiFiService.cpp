@@ -13,7 +13,7 @@ History:
 #include "WiFiService.h"
 
 #include "ConfigStorage.h"
-#include "DoorState.h"
+#include "HormannUAP1.h"
 
 #include <time.h>
 #include <WiFiNINA.h>
@@ -47,7 +47,6 @@ constexpr char DoorLightOffReqMsg [] = "M008";  // Req Light off
 constexpr char PartSeparator [] = ":";
 
 constexpr auto MAX_INCOMING_UDP_MSG = 255;
-constexpr auto WIFI_CONNECT_TIMEOUT_MS = 10000;
 
 enum class eResponseMessage : uint8_t
 {

@@ -60,7 +60,7 @@ BME280I2C MyBME280 ( settings );
 
 // ─── Garage door state (pGarageDoor extern'd by Display.cpp) ─────────────────
 #ifdef UAP_SUPPORT
-DoorState* pGarageDoor = nullptr;
+HormannUAP1WithSwitch* pGarageDoor = nullptr;
 #endif
 
 // ─── UDP WiFi service (extern'd by Display.cpp and DoorState.cpp) ────────────
@@ -145,14 +145,14 @@ void Application::begin ()
 
 #ifdef UAP_SUPPORT
 	// Setup so we are called if the state of door changes
-	pGarageDoor = new DoorState ( OPEN_DOOR_OUTPUT_PIN,
-	                              CLOSE_DOOR_OUTPUT_PIN,
-	                              STOP_DOOR_OUTPUT_PIN,
-	                              TURN_LIGHT_ON_OUTPUT_PIN,
-	                              DOOR_IS_OPEN_STATUS_PIN,
-	                              DOOR_IS_CLOSED_STATUS_PIN,
-	                              LIGHT_IS_ON_STATUS_PIN,
-	                              DOOR_SWITCH_INPUT_PIN );
+	pGarageDoor = new HormannUAP1WithSwitch ( OPEN_DOOR_OUTPUT_PIN,
+	                                          CLOSE_DOOR_OUTPUT_PIN,
+	                                          STOP_DOOR_OUTPUT_PIN,
+	                                          TURN_LIGHT_ON_OUTPUT_PIN,
+	                                          DOOR_IS_OPEN_STATUS_PIN,
+	                                          DOOR_IS_CLOSED_STATUS_PIN,
+	                                          LIGHT_IS_ON_STATUS_PIN,
+	                                          DOOR_SWITCH_INPUT_PIN );
 	setLED();
 #endif
 }
@@ -162,11 +162,11 @@ void Application::begin ()
 // set the colour of the inbuilt MKR WiFi 1010 RGB LED based on the current door state
 void Application::setLED ()
 {
-	static DoorState::State OldState = DoorState::State::Opening;
-	DoorState::State currentState = DoorState::State::Unknown;
+	static IGarageDoor::State OldState = IGarageDoor::State::Opening;
+	IGarageDoor::State currentState = IGarageDoor::State::Unknown;
 	if ( pGarageDoor != nullptr )
 	{
-		currentState = pGarageDoor->GetDoorState();
+		currentState = pGarageDoor->GetState();
 	}
 
 	if ( currentState != OldState )
@@ -175,31 +175,31 @@ void Application::setLED ()
 
 		switch ( currentState )
 		{
-			case DoorState::State::Closed:
+			case IGarageDoor::State::Closed:
 				pMyLED->SetLEDColour ( DOOR_CLOSED_COLOUR, DOOR_STATIONARY_FLASHTIME );
 				break;
 
-			case DoorState::State::Closing:
+			case IGarageDoor::State::Closing:
 				pMyLED->SetLEDColour ( DOOR_CLOSED_COLOUR, DOOR_MOVING_FLASHTIME );
 				break;
 
-			case DoorState::State::Open:
+			case IGarageDoor::State::Open:
 				pMyLED->SetLEDColour ( DOOR_OPEN_COLOUR, DOOR_STATIONARY_FLASHTIME );
 				break;
 
-			case DoorState::State::Opening:
+			case IGarageDoor::State::Opening:
 				pMyLED->SetLEDColour ( DOOR_OPEN_COLOUR, DOOR_MOVING_FLASHTIME );
 				break;
 
-			case DoorState::State::Stopped:
+			case IGarageDoor::State::Stopped:
 				pMyLED->SetLEDColour ( DOOR_STOPPED_COLOUR, DOOR_STATIONARY_FLASHTIME );
 				break;
 
-			case DoorState::State::Bad:
+			case IGarageDoor::State::Bad:
 				pMyLED->SetLEDColour ( DOOR_BAD_COLOUR, DOOR_MOVING_FLASHTIME );
 				break;
 
-			case DoorState::State::Unknown:
+			case IGarageDoor::State::Unknown:
 				pMyLED->SetLEDColour ( DOOR_UNKNOWN_COLOUR, DOOR_MOVING_FLASHTIME );
 				break;
 		}
@@ -289,7 +289,7 @@ void Application::loop ()
 	static unsigned long ulLastDisplayTime = 0UL;
 
 #ifdef UAP_SUPPORT
-	static DoorState::State LastDoorState = DoorState::State::Unknown;
+	static IGarageDoor::State LastDoorState = IGarageDoor::State::Unknown;
 	static bool LastLightState = false;
 
 	// set initial light state
@@ -346,10 +346,10 @@ void Application::loop ()
 	// if door state has changed, multicast news
 	if ( pGarageDoor != nullptr )
 	{
-		pGarageDoor->UpdateDoorState();
-		if ( pGarageDoor->GetDoorState() != LastDoorState || LastLightState != pGarageDoor->IsLit() )
+		pGarageDoor->Update();
+		if ( pGarageDoor->GetState() != LastDoorState || LastLightState != pGarageDoor->IsLit() )
 		{
-			LastDoorState = pGarageDoor->GetDoorState();
+			LastDoorState = pGarageDoor->GetState();
 			LastLightState = pGarageDoor->IsLit();
 			multicastMsg ( UDPWiFiService::ReqMsgType::DOORDATA );
 		}
@@ -416,7 +416,7 @@ void Application::buildMessage ( UDPWiFiService::ReqMsgType eReqType, String& sR
 			if ( pGarageDoor != nullptr )
 			{
 				sResponse = F ( "S=" );
-				sResponse += pGarageDoor->GetDoorDisplayState();  // Door State
+				sResponse += pGarageDoor->GetStateDisplayString();  // Door State
 				sResponse += F ( ",L=" );
 				sResponse += pGarageDoor->IsLit() ? F ( "On" ) : F ( "Off" );  // Light on or not
 				sResponse += F ( ",C=" );
@@ -438,35 +438,35 @@ void Application::buildMessage ( UDPWiFiService::ReqMsgType eReqType, String& sR
 		case UDPWiFiService::ReqMsgType::DOOROPEN:
 			if ( pGarageDoor != nullptr )
 			{
-				pGarageDoor->DoRequest ( DoorState::Request::OpenDoor );
+				pGarageDoor->Open();
 			}
 			break;
 
 		case UDPWiFiService::ReqMsgType::DOORCLOSE:
 			if ( pGarageDoor != nullptr )
 			{
-				pGarageDoor->DoRequest ( DoorState::Request::CloseDoor );
+				pGarageDoor->Close();
 			}
 			break;
 
 		case UDPWiFiService::ReqMsgType::DOORSTOP:
 			if ( pGarageDoor != nullptr )
 			{
-				pGarageDoor->DoRequest ( DoorState::Request::StopDoor );
+				pGarageDoor->Stop();
 			}
 			break;
 
 		case UDPWiFiService::ReqMsgType::LIGHTON:
 			if ( pGarageDoor != nullptr )
 			{
-				pGarageDoor->DoRequest ( DoorState::Request::LightOn );
+				pGarageDoor->LightOn();
 			}
 			break;
 
 		case UDPWiFiService::ReqMsgType::LIGHTOFF:
 			if ( pGarageDoor != nullptr )
 			{
-				pGarageDoor->DoRequest ( DoorState::Request::LightOff );
+				pGarageDoor->LightOff();
 			}
 			break;
 #endif

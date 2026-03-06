@@ -156,7 +156,7 @@ size_t SerialLogger::write ( const uint8_t* buffer, size_t size )
 
 void SerialLogger::LogStart ()
 {
-	Serial.begin ( SerialLogger::BAUD_RATE );
+	Serial.begin ( BAUD_RATE );
 	while ( !Serial )
 		;
 }

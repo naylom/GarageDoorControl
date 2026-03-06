@@ -13,7 +13,7 @@
 #include "WiFiService.h"
 
 #ifdef UAP_SUPPORT
-#include "DoorState.h"
+#include "HormannUAP1WithSwitch.h"
 #endif
 
 class Application
