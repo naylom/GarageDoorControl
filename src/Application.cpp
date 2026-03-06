@@ -13,6 +13,7 @@
 #include "BME280Sensor.h"
 #include "ConfigStorage.h"
 #include "Display.h"
+#include "GarageMessageProtocol.h"
 
 #include <MNPCIHandler.h>
 #include <MNRGBLEDBaseLib.h>
@@ -45,6 +46,9 @@ HormannUAP1WithSwitch* pGarageDoor = nullptr;
 
 // ─── UDP WiFi service (extern'd by Display.cpp and DoorState.cpp) ────────────
 UDPWiFiService* pMyUDPService = nullptr;
+
+// ─── Message protocol ─────────────────────────────────────────────────────────
+IMessageProtocol* pMyProtocol = nullptr;
 
 // ─── External RGB LED ────────────────────────────────────────────────────────
 MNRGBLEDBaseLib* pMyLED = nullptr;
@@ -135,6 +139,14 @@ void Application::begin ()
 	                                          DOOR_SWITCH_INPUT_PIN );
 	setLED();
 #endif
+
+	{
+		IGarageDoor* pDoorForProtocol = nullptr;
+#ifdef UAP_SUPPORT
+		pDoorForProtocol = pGarageDoor;
+#endif
+		pMyProtocol = new GarageMessageProtocol ( pDoorForProtocol, pBME280Sensor, EnvironmentResults, *pMyUDPService );
+	}
 }
 
 // ─── setLED ───────────────────────────────────────────────────────────────────
@@ -331,107 +343,26 @@ void Application::loop ()
 // ─── processUDPMsg (static — satisfies UDPWiFiServiceCallback signature) ──────
 void Application::processUDPMsg ( UDPWiFiService::ReqMsgType eReqType )
 {
-	String sResponse;
-	buildMessage ( eReqType, sResponse );
-	if ( sResponse.length() > 0 )
+	if ( pMyProtocol != nullptr )
 	{
-		pMyUDPService->SendReply ( sResponse );
+		pMyProtocol->HandleCommand ( static_cast<uint8_t> ( eReqType ) );
+		String sResponse = pMyProtocol->BuildResponse ( static_cast<uint8_t> ( eReqType ) );
+		if ( sResponse.length() > 0 )
+		{
+			pMyUDPService->SendReply ( sResponse );
+		}
 	}
 }
 
 // ─── multicastMsg ─────────────────────────────────────────────────────────────
 void Application::multicastMsg ( UDPWiFiService::ReqMsgType eReqType )
 {
-	String sResponse;
-	buildMessage ( eReqType, sResponse );
-	if ( sResponse.length() > 0 )
+	if ( pMyProtocol != nullptr )
 	{
-		pMyUDPService->SendAll ( sResponse );
-	}
-}
-
-// ─── buildMessage ─────────────────────────────────────────────────────────────
-// Called to generate a response to a command.
-// Returns an empty string if no response is required (i.e. action-only command).
-void Application::buildMessage ( UDPWiFiService::ReqMsgType eReqType, String& sResponse )
-{
-	switch ( eReqType )
-	{
-		case UDPWiFiService::ReqMsgType::TEMPDATA:
-			if ( pBME280Sensor != nullptr && EnvironmentResults.valid )
-			{
-				sResponse = F ( "T=" );
-				sResponse += EnvironmentResults.temperature;
-				sResponse += F ( ",H=" );
-				sResponse += EnvironmentResults.humidity;
-				sResponse += F ( ",D=" );
-				sResponse += EnvironmentResults.dewpoint;
-				sResponse += F ( ",P=" );
-				sResponse += EnvironmentResults.pressure;
-				sResponse += F ( ",A=" );
-				sResponse += EnvironmentResults.timestampMs;
-				sResponse += F ( "\r" );
-			}
-			break;
-
-#ifdef UAP_SUPPORT
-		case UDPWiFiService::ReqMsgType::DOORDATA:
-			if ( pGarageDoor != nullptr )
-			{
-				sResponse = F ( "S=" );
-				sResponse += pGarageDoor->GetStateDisplayString();  // Door State
-				sResponse += F ( ",L=" );
-				sResponse += pGarageDoor->IsLit() ? F ( "On" ) : F ( "Off" );  // Light on or not
-				sResponse += F ( ",C=" );
-				sResponse += pGarageDoor->IsClosed() ? F ( "Y" ) : F ( "N" );  // Closed or not
-				sResponse += F ( ",O=" );
-				sResponse += pGarageDoor->IsOpen() ? F ( "Y" ) : F ( "N" );  // Open or not
-				sResponse += F ( ",M=" );
-				sResponse += pGarageDoor->IsMoving() ? F ( "Y" ) : F ( "N" );  // Moving or not
-				sResponse += F ( ",A=" );
-				sResponse += pMyUDPService->GetTime();  // current epoch time
-				sResponse += F ( "\r" );
-			}
-			else
-			{
-				Error ( F ( "Door data unavailable: pGarageDoor is null" ) );
-			}
-			break;
-
-		case UDPWiFiService::ReqMsgType::DOOROPEN:
-			if ( pGarageDoor != nullptr )
-			{
-				pGarageDoor->Open();
-			}
-			break;
-
-		case UDPWiFiService::ReqMsgType::DOORCLOSE:
-			if ( pGarageDoor != nullptr )
-			{
-				pGarageDoor->Close();
-			}
-			break;
-
-		case UDPWiFiService::ReqMsgType::DOORSTOP:
-			if ( pGarageDoor != nullptr )
-			{
-				pGarageDoor->Stop();
-			}
-			break;
-
-		case UDPWiFiService::ReqMsgType::LIGHTON:
-			if ( pGarageDoor != nullptr )
-			{
-				pGarageDoor->LightOn();
-			}
-			break;
-
-		case UDPWiFiService::ReqMsgType::LIGHTOFF:
-			if ( pGarageDoor != nullptr )
-			{
-				pGarageDoor->LightOff();
-			}
-			break;
-#endif
+		String sResponse = pMyProtocol->BuildResponse ( static_cast<uint8_t> ( eReqType ) );
+		if ( sResponse.length() > 0 )
+		{
+			pMyUDPService->SendAll ( sResponse );
+		}
 	}
 }

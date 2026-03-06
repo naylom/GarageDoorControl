@@ -290,7 +290,7 @@ Each phase must: (a) compile cleanly, (b) produce identical runtime behaviour to
 - Exit criteria: Builds; sensor detected at runtime without `#ifdef`; `BME280_SUPPORT` removed
 - Branch: `refactor/phase5-environment-sensor`
 
-### Phase 6 — Messaging Layer
+### Phase 6 — Messaging Layer ✅
 **Goal:** Pull `BuildMessage()` and command routing out of `Application` into a dedicated class.
 - Scope:
   - Implement `GarageMessageProtocol : public IMessageProtocol`

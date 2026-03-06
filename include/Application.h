@@ -28,7 +28,6 @@ private:
 	// Application.cpp, so no implicit 'this' pointer is required.
 	// processUDPMsg must be static to satisfy the UDPWiFiServiceCallback signature.
 	static void setLED ();
-	static void buildMessage ( UDPWiFiService::ReqMsgType eReqType, String& sResponse );
 	static void multicastMsg ( UDPWiFiService::ReqMsgType eReqType );
 	static void processUDPMsg ( UDPWiFiService::ReqMsgType eReqType );
 };
