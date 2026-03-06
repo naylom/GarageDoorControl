@@ -39,10 +39,8 @@ ansiVT220Logger MyLogger ( slog );
 EnvironmentReading EnvironmentResults = { NAN, NAN, NAN, NAN, 0UL, false };
 IEnvironmentSensor* pBME280Sensor = nullptr;
 
-// ─── Garage door state (pGarageDoor extern'd by Display.cpp) ─────────────────
-#ifdef UAP_SUPPORT
+// ─── Garage door state ────────────────────────────────────────────────────────
 HormannUAP1WithSwitch* pGarageDoor = nullptr;
-#endif
 
 // ─── UDP WiFi service (extern'd by Display.cpp and DoorState.cpp) ────────────
 UDPWiFiService* pMyUDPService = nullptr;
@@ -90,11 +88,8 @@ void Application::begin ()
 	byte mac [ 6 ];
 	WiFi.macAddress ( mac );
 
-#ifdef UAP_SUPPORT
-	apSSID = "GARAGE_CONTROL_";
-#else
-	apSSID = "TEMP_HUMID_";
-#endif
+	// Runtime detection: use a "GARAGE_CONTROL_" prefix when UAP pins are wired
+	apSSID = ( DOOR_IS_OPEN_STATUS_PIN != NOT_A_PIN ) ? "GARAGE_CONTROL_" : "TEMP_HUMID_";
 	// Append last 3 bytes of MAC address
 	char macStr [ 9 ];
 	sprintf ( macStr, "%02X%02X%02X", mac [ 3 ], mac [ 4 ], mac [ 5 ] );
@@ -130,86 +125,34 @@ void Application::begin ()
 		DisplaylastInfoErrorMsg();
 	}
 
-#ifdef UAP_SUPPORT
-	// Setup so we are called if the state of door changes
-	pGarageDoor = new HormannUAP1WithSwitch ( OPEN_DOOR_OUTPUT_PIN,
-	                                          CLOSE_DOOR_OUTPUT_PIN,
-	                                          STOP_DOOR_OUTPUT_PIN,
-	                                          TURN_LIGHT_ON_OUTPUT_PIN,
-	                                          DOOR_IS_OPEN_STATUS_PIN,
-	                                          DOOR_IS_CLOSED_STATUS_PIN,
-	                                          LIGHT_IS_ON_STATUS_PIN,
-	                                          DOOR_SWITCH_INPUT_PIN );
-	setLED();
-#endif
-
 	{
-		IGarageDoor* pDoorForProtocol = nullptr;
-#ifdef UAP_SUPPORT
-		pDoorForProtocol = pGarageDoor;
-#endif
-		pMyProtocol = new GarageMessageProtocol ( pDoorForProtocol, pBME280Sensor, EnvironmentResults, *pMyUDPService );
-	}
-
-	{
-		IGarageDoor* pDoorForDisplay = nullptr;
-#ifdef UAP_SUPPORT
-		pDoorForDisplay = pGarageDoor;
-#endif
-		pMyDisplay = new Display ( MyLogger, pMyUDPService, VERSION, pDoorForDisplay, pBME280Sensor );
-	}
-}
-
-// ─── setLED ───────────────────────────────────────────────────────────────────
-#ifdef UAP_SUPPORT
-// set the colour of the inbuilt MKR WiFi 1010 RGB LED based on the current door state
-void Application::setLED ()
-{
-	static IGarageDoor::State OldState = IGarageDoor::State::Opening;
-	IGarageDoor::State currentState = IGarageDoor::State::Unknown;
-	if ( pGarageDoor != nullptr )
-	{
-		currentState = pGarageDoor->GetState();
-	}
-
-	if ( currentState != OldState )
-	{
-		OldState = currentState;
-
-		switch ( currentState )
+		auto* pDoor = new HormannUAP1WithSwitch ( OPEN_DOOR_OUTPUT_PIN,
+		                                          CLOSE_DOOR_OUTPUT_PIN,
+		                                          STOP_DOOR_OUTPUT_PIN,
+		                                          TURN_LIGHT_ON_OUTPUT_PIN,
+		                                          DOOR_IS_OPEN_STATUS_PIN,
+		                                          DOOR_IS_CLOSED_STATUS_PIN,
+		                                          LIGHT_IS_ON_STATUS_PIN,
+		                                          DOOR_SWITCH_INPUT_PIN );
+		if ( pDoor->IsPresent() )
 		{
-			case IGarageDoor::State::Closed:
-				pMyLED->SetLEDColour ( DOOR_CLOSED_COLOUR, DOOR_STATIONARY_FLASHTIME );
-				break;
-
-			case IGarageDoor::State::Closing:
-				pMyLED->SetLEDColour ( DOOR_CLOSED_COLOUR, DOOR_MOVING_FLASHTIME );
-				break;
-
-			case IGarageDoor::State::Open:
-				pMyLED->SetLEDColour ( DOOR_OPEN_COLOUR, DOOR_STATIONARY_FLASHTIME );
-				break;
-
-			case IGarageDoor::State::Opening:
-				pMyLED->SetLEDColour ( DOOR_OPEN_COLOUR, DOOR_MOVING_FLASHTIME );
-				break;
-
-			case IGarageDoor::State::Stopped:
-				pMyLED->SetLEDColour ( DOOR_STOPPED_COLOUR, DOOR_STATIONARY_FLASHTIME );
-				break;
-
-			case IGarageDoor::State::Bad:
-				pMyLED->SetLEDColour ( DOOR_BAD_COLOUR, DOOR_MOVING_FLASHTIME );
-				break;
-
-			case IGarageDoor::State::Unknown:
-				pMyLED->SetLEDColour ( DOOR_UNKNOWN_COLOUR, DOOR_MOVING_FLASHTIME );
-				break;
+			pGarageDoor = pDoor;
+			setLED();
+		}
+		else
+		{
+			Info ( F ( "No Hormann UAP1 garage door detected" ) );
+			delete pDoor;
 		}
 	}
+
+	pMyProtocol = new GarageMessageProtocol ( pGarageDoor, pBME280Sensor, EnvironmentResults, *pMyUDPService );
+
+	pMyDisplay = new Display ( MyLogger, pMyUDPService, VERSION, pGarageDoor, pBME280Sensor );
 }
-#else
-// When not showing the door (UAP) status then show the humidity status
+
+// Set the colour of the inbuilt MKR WiFi 1010 RGB LED.
+// If the garage door is present, shows door state; otherwise shows humidity.
 void Application::setLED ()
 {
 	// In AP mode the WiFiService owns the LED colour — don't override it.
@@ -218,13 +161,54 @@ void Application::setLED ()
 		return;
 	}
 
+	if ( pGarageDoor != nullptr )
+	{
+		static IGarageDoor::State OldState = IGarageDoor::State::Opening;
+		IGarageDoor::State currentState = pGarageDoor->GetState();
+
+		if ( currentState != OldState )
+		{
+			OldState = currentState;
+
+			switch ( currentState )
+			{
+				case IGarageDoor::State::Closed:
+					pMyLED->SetLEDColour ( DOOR_CLOSED_COLOUR, DOOR_STATIONARY_FLASHTIME );
+					break;
+
+				case IGarageDoor::State::Closing:
+					pMyLED->SetLEDColour ( DOOR_CLOSED_COLOUR, DOOR_MOVING_FLASHTIME );
+					break;
+
+				case IGarageDoor::State::Open:
+					pMyLED->SetLEDColour ( DOOR_OPEN_COLOUR, DOOR_STATIONARY_FLASHTIME );
+					break;
+
+				case IGarageDoor::State::Opening:
+					pMyLED->SetLEDColour ( DOOR_OPEN_COLOUR, DOOR_MOVING_FLASHTIME );
+					break;
+
+				case IGarageDoor::State::Stopped:
+					pMyLED->SetLEDColour ( DOOR_STOPPED_COLOUR, DOOR_STATIONARY_FLASHTIME );
+					break;
+
+				case IGarageDoor::State::Bad:
+					pMyLED->SetLEDColour ( DOOR_BAD_COLOUR, DOOR_MOVING_FLASHTIME );
+					break;
+
+				case IGarageDoor::State::Unknown:
+					pMyLED->SetLEDColour ( DOOR_UNKNOWN_COLOUR, DOOR_MOVING_FLASHTIME );
+					break;
+			}
+		}
+		return;
+	}
+
+	// No garage door present — show humidity status on LED instead
 	uint8_t red, green, blue;
-	bool bOutsideRange = false;
 	uint8_t Flashtime = 0U;
 	float constrainedHumidity;
 	static float OldHumidity = NAN;
-
-	// calculate color component — thresholds are in config.h
 
 	// Guard against NaN (sensor not yet read or not present).
 	if ( isnan ( EnvironmentResults.humidity ) )
@@ -280,7 +264,6 @@ void Application::setLED ()
 	MyLogger.AT ( 4, 8, String ( green ) );
 	MyLogger.AT ( 5, 8, String ( blue ) );
 }
-#endif
 
 // ─── loop ─────────────────────────────────────────────────────────────────────
 void Application::loop ()
@@ -288,7 +271,6 @@ void Application::loop ()
 	static unsigned long ulLastSensorTime = millis() - SENSOR_READ_INTERVAL_MS;
 	static unsigned long ulLastDisplayTime = 0UL;
 
-#ifdef UAP_SUPPORT
 	static IGarageDoor::State LastDoorState = IGarageDoor::State::Unknown;
 	static bool LastLightState = false;
 
@@ -297,7 +279,6 @@ void Application::loop ()
 	{
 		LastLightState = !pGarageDoor->IsLit();
 	}
-#endif
 	// set LED — noInterrupts() prevents Flash() ISR racing against analogWrite()
 	// on the external LED's PWM registers, causing visible intensity flicker.
 	noInterrupts();
@@ -330,7 +311,6 @@ void Application::loop ()
 		}
 	}
 
-#ifdef UAP_SUPPORT
 	// if door state has changed, multicast news
 	if ( pGarageDoor != nullptr )
 	{
@@ -341,17 +321,16 @@ void Application::loop ()
 			LastLightState = pGarageDoor->IsLit();
 			multicastMsg ( UDPWiFiService::ReqMsgType::DOORDATA );
 		}
-	}
-	if ( pGarageDoor->IsSwitchConfigured() && pMyUDPService != nullptr )
-	{
-		static uint16_t SwitchPressedCount = 0;
-		uint16_t LatestSwitchPressedCount = pGarageDoor->GetSwitchMatchCount();
-		if ( LatestSwitchPressedCount > SwitchPressedCount )
+		if ( pGarageDoor->IsSwitchConfigured() && pMyUDPService != nullptr )
 		{
-			SwitchPressedCount = LatestSwitchPressedCount;
+			static uint16_t SwitchPressedCount = 0;
+			uint16_t LatestSwitchPressedCount = pGarageDoor->GetSwitchMatchCount();
+			if ( LatestSwitchPressedCount > SwitchPressedCount )
+			{
+				SwitchPressedCount = LatestSwitchPressedCount;
+			}
 		}
 	}
-#endif
 }
 
 // ─── processUDPMsg (static — satisfies UDPWiFiServiceCallback signature) ──────

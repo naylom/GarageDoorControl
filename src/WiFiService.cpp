@@ -352,9 +352,6 @@ IPAddress WiFiService::GetMulticastAddress () const
 
 bool WiFiService::WiFiConnect ()
 {
-	bool bResult = true;
-	static uint32_t iStartCount = 0UL;
-
 	// In AP/onboarding mode do not attempt STA connection — it would call WiFi.begin()
 	// which tears down the AP beacon and destroys AP mode state.
 	if ( GetState() == Status::AP_MODE )
@@ -362,41 +359,72 @@ bool WiFiService::WiFiConnect ()
 		return false;
 	}
 
-	if ( !IsConnected() )
+	if ( IsConnected() )
 	{
-		Info ( "Starting WiFi, attempt " + String ( iStartCount ) );
-		uint8_t status;
-		uint32_t ulStart = millis();
-
-		WiFi.begin ( m_SSID, m_Pwd );
-		String msg = "connecting ";
-		do
-		{
-			status = WiFi.status();
-			delay ( 500 );
-			Info ( msg );
-			msg += ".";
-		} while ( status != WL_CONNECTED && ( millis() - ulStart ) < WIFI_CONNECT_TIMEOUT_MS );
-
-		if ( status != WL_CONNECTED )
-		{
-			bResult = false;
-			SetState ( WiFiService::Status::UNCONNECTED );
-			logWiFiError ( "Connect", status );
-			iStartCount++;
-			m_beginTimeouts++;
-		}
-		else
-		{
-			CalcMyMulticastAddress ( m_multicastAddr );
-			Info ( "Connected to " + String ( m_SSID ) );
-			SetState ( WiFiService::Status::CONNECTED );
-			iStartCount = 0UL;
-			m_beginConnects++;
-		}
+		// Already up — reset counters so a future drop starts fresh backoff
+		m_reconnectAttempts = 0;
+		m_nextReconnectMs = 0;
+		return true;
 	}
 
-	return bResult;
+	// Exponential backoff: skip this attempt if the backoff window hasn't expired
+	if ( m_nextReconnectMs != 0 && millis() < m_nextReconnectMs )
+	{
+		return false;
+	}
+
+	// Too many consecutive failures → trigger watchdog reset
+	if ( m_reconnectAttempts >= WIFI_RECONNECT_MAX_ATTEMPTS )
+	{
+		Error ( F ( "WiFi: too many reconnect failures — resetting board" ) );
+		delay ( 1000 );
+		MN::Utils::ResetBoard ( F ( "WiFi reconnect failed" ) );
+		return false;  // unreachable; silences compiler warning
+	}
+
+	Info ( "WiFi reconnect attempt " + String ( m_reconnectAttempts + 1 ) );
+
+	uint8_t status;
+	uint32_t ulStart = millis();
+
+	WiFi.begin ( m_SSID, m_Pwd );
+	do
+	{
+		status = WiFi.status();
+		delay ( 500 );
+	} while ( status != WL_CONNECTED && ( millis() - ulStart ) < WIFI_CONNECT_TIMEOUT_MS );
+
+	if ( status != WL_CONNECTED )
+	{
+		m_reconnectAttempts++;
+
+		// Compute capped exponential backoff: base * 2^(attempts-1)
+		uint32_t backoffMs = WIFI_RECONNECT_BASE_DELAY_MS;
+		for ( uint8_t i = 1; i < m_reconnectAttempts && backoffMs < WIFI_RECONNECT_MAX_DELAY_MS; i++ )
+		{
+			backoffMs *= 2;
+		}
+		if ( backoffMs > WIFI_RECONNECT_MAX_DELAY_MS )
+		{
+			backoffMs = WIFI_RECONNECT_MAX_DELAY_MS;
+		}
+		m_nextReconnectMs = millis() + backoffMs;
+
+		SetState ( WiFiService::Status::UNCONNECTED );
+		logWiFiError ( "WiFi connect attempt " + String ( m_reconnectAttempts ), status );
+		m_beginTimeouts++;
+		return false;
+	}
+	else
+	{
+		CalcMyMulticastAddress ( m_multicastAddr );
+		Info ( "Connected to " + String ( m_SSID ) );
+		SetState ( WiFiService::Status::CONNECTED );
+		m_reconnectAttempts = 0;
+		m_nextReconnectMs = 0;
+		m_beginConnects++;
+		return true;
+	}
 }
 
 void WiFiService::WiFiDisconnect ()
@@ -547,8 +575,16 @@ void UDPWiFiService::GetLocalTime ( String& result, time_t timeError )
 
 bool UDPWiFiService::GetUDPMessage ( String& RecvMessage )
 {
+	bool wasConnected = IsConnected();
 	if ( WiFiConnect() )
 	{
+		if ( !wasConnected )
+		{
+			// Just reconnected after a drop — restart the UDP listener on our port
+			Info ( F ( "WiFi reconnected \u2014 restarting UDP" ) );
+			m_myUDP.stop();
+			Start();
+		}
 		m_pMulticastDestList->Add ( GetMulticastAddress() );
 		return ReadUDPMessage ( RecvMessage );
 	}

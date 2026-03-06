@@ -311,7 +311,7 @@ Each phase must: (a) compile cleanly, (b) produce identical runtime behaviour to
 - Exit criteria: Display behaviour identical or improved; no global data access from Display
 - Branch: `refactor/phase7-display`
 
-### Phase 8 — WiFi Robustness & Final Cleanup
+### Phase 8 — WiFi Robustness & Final Cleanup ✅
 **Goal:** Robust WiFi reconnection; remove any remaining `#ifdef` usage; final review.
 - Scope:
   - Implement reconnection strategy in `WiFiService` (exponential backoff, watchdog reset if stuck)
@@ -320,6 +320,7 @@ Each phase must: (a) compile cleanly, (b) produce identical runtime behaviour to
 - Entry criteria: Phase 7 merged; hardware soak-tested
 - Exit criteria: Unit survives WiFi drop/reconnect without manual restart; zero `#ifdef UAP_SUPPORT` / `#ifdef BME280_SUPPORT` remaining
 - Branch: `refactor/phase8-wifi-robustness`
+- **Completed 6/3/26** — All exit criteria met; build clean at 0 errors
 
 ## 6. Decisions Log
 
@@ -333,6 +334,9 @@ _Record of significant architectural decisions with rationale. Add an entry for 
 | 4 | Abstract GarageDoor and Environment sensors so others can be used in the future 	| extensibility 														| 6/3/26 |
 | 5 | Hormann UAP1 presence detection by pin configuration (NOT_A_PIN means not wired) 	| GPIO has no bus discovery; NOT_A_PIN is idiomatic Arduino sentinel 	| 6/3/26 |
 | 6 | Altitude compensation passed to `IEnvironmentSensor` constructor from `ConfigStore` | Keeps sensor self-contained; ignored by sensors that don't need it; single config load point in `Application` | 6/3/26 |
+| 7 | WiFi reconnection uses exponential backoff (5 s → 60 s) with watchdog reset after 10 consecutive failures | Prevents rapid retry flood while ensuring the unit eventually self-recovers without manual restart | 6/3/26 |
+| 8 | Runtime detection of `HormannUAP1WithSwitch` replaces `#ifdef UAP_SUPPORT` | `HormannUAP1::IsPresent()` returns false when all pins are `NOT_A_PIN`; no compile-time flag needed; single `setLED()` implementation handles both door-present and humidity-only modes | 6/3/26 |
+| 9 | UDP listener restarted via `m_myUDP.stop() / Start()` immediately after WiFi reconnection in `GetUDPMessage()` | After NINA module reconnects, the previous `WiFiUDP::begin()` socket is invalid; restarting ensures incoming packets are received after any drop/reconnect cycle | 6/3/26 |
 
 ---
 
@@ -348,7 +352,29 @@ _Things explicitly decided NOT to change during this refactoring._
 
 ## 8. Open Questions
 
-None currently open.
+None — all phases complete.
+
+---
+
+## 10. Lessons Learned
+
+_Recorded at end of refactoring (6/3/26). Useful context for future maintainers._
+
+### What worked well
+- **Phase-by-phase approach** — Each phase compiled and ran identically before moving on; made regression detection trivial.
+- **Interface-first design (Phase 3)** — Writing `IGarageDoor` / `IEnvironmentSensor` / `IMessageProtocol` headers before any implementation clarified the contracts and made later phases mechanical.
+- **`IsPresent()` as the runtime detection idiom** — Consistent use of `IsPresent()` on both `HormannUAP1` and `BME280Sensor` removed all compile-time feature flags without adding complexity.
+- **`Application` class extraction (Phase 2)** — Moving globals into Application.cpp early made later phases much easier; `main.cpp` stayed a 10-line shell throughout.
+
+### What was tricky
+- **NINA module WiFi.begin() re-initialises the radio** — On reconnect after a drop, the UDP socket must be restarted (`WiFiUDP::begin()`) because the NINA firmware resets socket state. Without this, no UDP packets are received after a reconnect.
+- **`#ifdef UAP_SUPPORT` created two `setLED()` implementations** — Merging them required careful reading of both branches; the key insight was that checking `pGarageDoor != nullptr` at runtime replaces the compile-time branch cleanly.
+- **`IsSwitchConfigured()` / `GetSwitchMatchCount()` are not on `IGarageDoor`** — These Hormann-specific methods live on `HormannUAP1`. Keeping `pGarageDoor` typed as `HormannUAP1WithSwitch*` in Application.cpp avoids a cast while still passing `IGarageDoor*` to Display and Protocol via implicit upcast.
+
+### Things to be aware of if revisiting this code
+- `WiFiConnect()` is called on every `CheckUDP()` call; the backoff guard (`m_nextReconnectMs`) keeps it cheap when WiFi is down.
+- The `EnvironmentResults` global in Application.cpp is still a shared mutable struct; a future phase could replace it with a properly owned value inside `Application`.
+- `MNTimerLib` uses pin A3 — verify this does not conflict before adding new timer usages (A3 = `GREEN_PIN` in config.h; the library uses the pin for internal timing, not GPIO, but worth verifying on hardware).
 
 ---
 

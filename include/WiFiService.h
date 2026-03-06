@@ -72,6 +72,8 @@ protected:
 	OnboardingServer* m_pOnboardingServer = nullptr;
 	OnboardingPortal* m_pOnboardingPortal = nullptr;
 	GarageConfig m_config;
+	uint8_t m_reconnectAttempts = 0;   // consecutive failed STA reconnect attempts
+	uint32_t m_nextReconnectMs = 0UL;  // millis() threshold for next allowed attempt
 
 private:
 	const char* m_SSID = nullptr;

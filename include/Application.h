@@ -9,12 +9,9 @@
  */
 
 #include "GarageControl.h"
+#include "HormannUAP1WithSwitch.h"
 #include "logging.h"
 #include "WiFiService.h"
-
-#ifdef UAP_SUPPORT
-#include "HormannUAP1WithSwitch.h"
-#endif
 
 class Application
 {

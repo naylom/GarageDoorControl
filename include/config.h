@@ -35,6 +35,11 @@ constexpr uint16_t TELNET_PORT = 0xFEEE;
 // ─── WiFi ─────────────────────────────────────────────────────────────────────
 constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 10000;
 
+// ─── WiFi reconnection backoff ────────────────────────────────────────────────
+constexpr uint32_t WIFI_RECONNECT_BASE_DELAY_MS = 5000UL;  // 5 s initial backoff
+constexpr uint32_t WIFI_RECONNECT_MAX_DELAY_MS = 60000UL;  // 60 s maximum backoff
+constexpr uint8_t WIFI_RECONNECT_MAX_ATTEMPTS = 10;        // reset after this many consecutive failures
+
 // ─── Sensor polling ───────────────────────────────────────────────────────────
 constexpr uint32_t SENSOR_READ_INTERVAL_MS = 30000;
 
