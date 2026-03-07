@@ -60,7 +60,7 @@ String GarageMessageProtocol::BuildResponse ( uint8_t msgType )
 				sResponse += F ( ",P=" );
 				sResponse += m_reading.pressure;
 				sResponse += F ( ",A=" );
-				sResponse += m_reading.timestampMs;
+				sResponse += m_service.GetTime();
 				sResponse += F ( "\r" );
 			}
 			break;

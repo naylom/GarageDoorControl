@@ -23,7 +23,7 @@
 #include <WiFiUdp.h>
 
 // ─── Version string (extern'd by Display.cpp) ────────────────────────────────
-const char* VERSION = "2.0.0";
+const char* VERSION = "2.0.1";
 
 // ─── Logger (extern'd by Display.cpp) ────────────────────────────────────────
 #ifdef MNDEBUG
@@ -92,7 +92,7 @@ void Application::begin ()
 
 	// now we have state table set up and temp sensor configured, allow users to query state
 
-	TheMKR_RGB_LED.Invert();  // Only if required!
+	//TheMKR_RGB_LED.Invert();  // Only if required!
 
 	// Generate dynamic AP SSID based on MAC address
 	String apSSID;
