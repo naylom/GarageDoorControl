@@ -88,11 +88,11 @@ void Application::begin ()
 	MyLogger.LogStart();
 	MyLogger.ClearScreen();
 
+	TheMKR_RGB_LED.Invert();  // Only if required!
+
 	pMyUDPService = new UDPWiFiService();
 
 	// now we have state table set up and temp sensor configured, allow users to query state
-
-	//TheMKR_RGB_LED.Invert();  // Only if required!
 
 	// Generate dynamic AP SSID based on MAC address
 	String apSSID;
