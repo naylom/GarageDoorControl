@@ -23,7 +23,7 @@
 #include <WiFiUdp.h>
 
 // ─── Version string (extern'd by Display.cpp) ────────────────────────────────
-const char* VERSION = "2.0.1";
+const char* VERSION = "2.0.2";
 
 // ─── Logger (extern'd by Display.cpp) ────────────────────────────────────────
 #ifdef MNDEBUG

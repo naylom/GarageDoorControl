@@ -65,6 +65,9 @@ protected:
 	void CalcMulticastAddress ( IPAddress ip, IPAddress& result ) const;
 	void StartAP ();
 	void LoadAndConnectFromStorage ();
+	void ResetStaFailureTracking ();
+	void NoteConnectFailure ( uint8_t status );
+	bool ShouldEnterAPMode () const;
 
 	uint32_t m_beginTimeouts = 0UL;  // count of times WiFi.begin fails to connect within 10 secs
 	uint32_t m_beginConnects = 0UL;  // count of times WiFi.begin has connected successfully
@@ -74,6 +77,14 @@ protected:
 	GarageConfig m_config;
 	uint8_t m_reconnectAttempts = 0;   // consecutive failed STA reconnect attempts
 	uint32_t m_nextReconnectMs = 0UL;  // millis() threshold for next allowed attempt
+	bool m_hasStoredConfig = false;
+	uint8_t m_lastConnectStatus = WL_IDLE_STATUS;
+	uint8_t m_consecutiveCredentialFailures = 0;
+	uint32_t m_firstStaFailureMs = 0UL;
+	bool m_staConnectInProgress = false;
+	uint32_t m_staConnectStartMs = 0UL;
+	bool m_apClientConnected = false;
+	uint32_t m_apModeEnteredMs = 0UL;
 
 private:
 	const char* m_SSID = nullptr;

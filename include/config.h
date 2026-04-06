@@ -11,9 +11,9 @@
 
 #include <Arduino.h>
 // V4 board - outside double garage uses different external RGB pins
-//constexpr pin_size_t RED_PIN = PIN_A4;
-//constexpr pin_size_t GREEN_PIN = PIN_A5;
-//constexpr pin_size_t BLUE_PIN = PIN_A6;
+// constexpr pin_size_t RED_PIN = PIN_A4;
+// constexpr pin_size_t GREEN_PIN = PIN_A5;
+// constexpr pin_size_t BLUE_PIN = PIN_A6;
 // ─── External RGB LED pins ────────────────────────────────────────────────────
 constexpr pin_size_t RED_PIN = PIN_A4;
 constexpr pin_size_t GREEN_PIN = PIN_A3;
@@ -23,7 +23,7 @@ constexpr pin_size_t BLUE_PIN = 10;
 #ifndef NOT_A_PIN
 #define NOT_A_PIN 255
 #endif
-constexpr pin_size_t DOOR_IS_OPEN_STATUS_PIN = 9; // NOT_A_PIN;  // 9;
+constexpr pin_size_t DOOR_IS_OPEN_STATUS_PIN = 9;  // NOT_A_PIN;  // 9;
 constexpr pin_size_t DOOR_IS_CLOSED_STATUS_PIN = 8;
 constexpr pin_size_t LIGHT_IS_ON_STATUS_PIN = 7;
 constexpr pin_size_t DOOR_SWITCH_INPUT_PIN = 0;
@@ -44,7 +44,13 @@ constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 10000;
 // ─── WiFi reconnection backoff ────────────────────────────────────────────────
 constexpr uint32_t WIFI_RECONNECT_BASE_DELAY_MS = 5000UL;  // 5 s initial backoff
 constexpr uint32_t WIFI_RECONNECT_MAX_DELAY_MS = 60000UL;  // 60 s maximum backoff
-constexpr uint8_t WIFI_RECONNECT_MAX_ATTEMPTS = 10;        // reset after this many consecutive failures
+constexpr uint8_t WIFI_RECONNECT_MAX_ATTEMPTS = 10;        // cap reconnect backoff after this many failures
+
+// ─── WiFi onboarding policy ───────────────────────────────────────────────────
+constexpr uint32_t WIFI_AP_ENTRY_GRACE_MS = 10UL * 60UL * 1000UL;
+constexpr uint8_t WIFI_AP_CREDENTIAL_FAILURE_THRESHOLD = 3U;
+constexpr uint32_t WIFI_RADIO_RESET_SETTLE_MS = 200UL;
+constexpr uint32_t WIFI_AP_IDLE_REBOOT_MS = 5UL * 60UL * 1000UL;
 
 // ─── Sensor polling ───────────────────────────────────────────────────────────
 constexpr uint32_t SENSOR_READ_INTERVAL_MS = 30000;

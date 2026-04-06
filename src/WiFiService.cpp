@@ -283,6 +283,8 @@ void WiFiService::LoadAndConnectFromStorage ()
 {
 	if ( ConfigStorage::load ( m_config ) )
 	{
+		m_hasStoredConfig = true;
+		ResetStaFailureTracking();
 		Info ( "Loaded configuration from storage" );
 		Info ( "SSID: " + String ( m_config.ssid ) );
 		Info ( "Hostname: " + String ( m_config.hostname ) );
@@ -296,12 +298,9 @@ void WiFiService::LoadAndConnectFromStorage ()
 		// Try to connect
 		if ( !WiFiConnect() )
 		{
-			Error ( "Failed to connect with stored credentials" );
-			if ( m_useOnboarding )
-			{
-				Info ( "Entering AP mode for reconfiguration" );
-				StartAP();
-			}
+			Error ( "Failed initial WiFi connect with stored credentials" );
+			SetState ( Status::UNCONNECTED );
+			Info ( "Will keep retrying STA with backoff before entering AP mode" );
 		}
 		else
 		{
@@ -311,6 +310,8 @@ void WiFiService::LoadAndConnectFromStorage ()
 	}
 	else
 	{
+		m_hasStoredConfig = false;
+		ResetStaFailureTracking();
 		Info ( "No valid configuration found" );
 		if ( m_useOnboarding )
 		{
@@ -331,6 +332,11 @@ void WiFiService::LoadAndConnectFromStorage ()
  */
 void WiFiService::StartAP ()
 {
+	if ( GetState() == Status::AP_MODE )
+	{
+		return;
+	}
+
 	Info ( "Starting AP mode: " + String ( m_apSSID ) );
 
 	if ( m_pOnboardingServer == nullptr )
@@ -348,12 +354,74 @@ void WiFiService::StartAP ()
 	}
 
 	// Solid blue = client connected to AP; flashing blue = waiting for client
-	m_pOnboardingPortal->setOnClientConnected ( [ this ] () { SetLED ( MNRGBLEDBaseLib::eColour::DARK_BLUE, 0 ); } );
+	m_pOnboardingPortal->setOnClientConnected (
+	    [ this ] ()
+	    {
+		    m_apClientConnected = true;
+		    SetLED ( MNRGBLEDBaseLib::eColour::DARK_BLUE, 0 );
+	    } );
 	m_pOnboardingPortal->setOnClientDisconnected (
-	    [ this ] () { SetLED ( MNRGBLEDBaseLib::eColour::DARK_BLUE, WIFI_FLASHTIME ); } );
+	    [ this ] ()
+	    {
+		    m_apClientConnected = false;
+		    SetLED ( MNRGBLEDBaseLib::eColour::DARK_BLUE, WIFI_FLASHTIME );
+	    } );
 
 	Info ( "AP started. IP: " + ToIPString ( m_pOnboardingPortal->apIP() ) );
+	m_apModeEnteredMs = millis();
+	m_apClientConnected = false;
 	SetState ( Status::AP_MODE );
+}
+
+void WiFiService::ResetStaFailureTracking ()
+{
+	m_lastConnectStatus = WL_IDLE_STATUS;
+	m_consecutiveCredentialFailures = 0;
+	m_firstStaFailureMs = 0UL;
+	m_staConnectInProgress = false;
+	m_staConnectStartMs = 0UL;
+}
+
+void WiFiService::NoteConnectFailure ( uint8_t status )
+{
+	m_lastConnectStatus = status;
+	if ( m_firstStaFailureMs == 0UL )
+	{
+		m_firstStaFailureMs = millis();
+	}
+
+	if ( status == WL_CONNECT_FAILED )
+	{
+		if ( m_consecutiveCredentialFailures < 0xFF )
+		{
+			m_consecutiveCredentialFailures++;
+		}
+	}
+	else
+	{
+		// Only count explicit connect failures as credential evidence.
+		m_consecutiveCredentialFailures = 0;
+	}
+}
+
+bool WiFiService::ShouldEnterAPMode () const
+{
+	if ( !m_useOnboarding || !m_hasStoredConfig )
+	{
+		return false;
+	}
+
+	if ( m_firstStaFailureMs == 0UL )
+	{
+		return false;
+	}
+
+	if ( ( millis() - m_firstStaFailureMs ) < WIFI_AP_ENTRY_GRACE_MS )
+	{
+		return false;
+	}
+
+	return m_consecutiveCredentialFailures >= WIFI_AP_CREDENTIAL_FAILURE_THRESHOLD;
 }
 
 /**
@@ -405,9 +473,10 @@ IPAddress WiFiService::GetMulticastAddress () const
 
 /**
  * @brief Attempts to connect (or reconnect) to the configured WiFi network.
- * @details No-ops if already in AP mode or already connected. Implements capped exponential
- *          backoff between attempts. If WIFI_RECONNECT_MAX_ATTEMPTS consecutive failures occur
- *          the board is hard-reset via MN::Utils::ResetBoard().
+ * @details No-ops if already in AP mode or already connected. Uses non-blocking
+ *          connect polling and capped exponential backoff between attempts.
+ *          Optionally enters AP mode only after grace period and repeated
+ *          credential-failure evidence.
  * @return true if the device is (or becomes) connected to the WiFi network; false otherwise.
  */
 bool WiFiService::WiFiConnect ()
@@ -424,39 +493,63 @@ bool WiFiService::WiFiConnect ()
 		// Already up — reset counters so a future drop starts fresh backoff
 		m_reconnectAttempts = 0;
 		m_nextReconnectMs = 0;
+		ResetStaFailureTracking();
 		return true;
 	}
 
-	// Exponential backoff: skip this attempt if the backoff window hasn't expired
-	if ( m_nextReconnectMs != 0 && millis() < m_nextReconnectMs )
+	// Start a new reconnect attempt once the backoff window allows it.
+	if ( !m_staConnectInProgress )
+	{
+		if ( m_nextReconnectMs != 0 && millis() < m_nextReconnectMs )
+		{
+			return false;
+		}
+
+		if ( m_reconnectAttempts >= WIFI_RECONNECT_MAX_ATTEMPTS )
+		{
+			m_reconnectAttempts = WIFI_RECONNECT_MAX_ATTEMPTS;
+		}
+
+		Info ( "WiFi reconnect attempt " + String ( m_reconnectAttempts + 1 ) );
+
+		WiFi.disconnect();
+		WiFi.end();
+		delay ( WIFI_RADIO_RESET_SETTLE_MS );
+		WiFi.begin ( m_SSID, m_Pwd );
+		m_staConnectInProgress = true;
+		m_staConnectStartMs = millis();
+		return false;
+	}
+
+	uint8_t status = WiFi.status();
+	if ( status == WL_CONNECTED )
+	{
+		CalcMyMulticastAddress ( m_multicastAddr );
+		Info ( "Connected to " + String ( m_SSID ) );
+		SetState ( WiFiService::Status::CONNECTED );
+		m_reconnectAttempts = 0;
+		m_nextReconnectMs = 0;
+		ResetStaFailureTracking();
+		m_beginConnects++;
+		return true;
+	}
+
+	if ( ( millis() - m_staConnectStartMs ) < WIFI_CONNECT_TIMEOUT_MS )
 	{
 		return false;
 	}
 
-	// Too many consecutive failures → trigger watchdog reset
-	if ( m_reconnectAttempts >= WIFI_RECONNECT_MAX_ATTEMPTS )
-	{
-		Error ( F ( "WiFi: too many reconnect failures — resetting board" ) );
-		delay ( 1000 );
-		MN::Utils::ResetBoard ( F ( "WiFi reconnect failed" ) );
-		return false;  // unreachable; silences compiler warning
-	}
-
-	Info ( "WiFi reconnect attempt " + String ( m_reconnectAttempts + 1 ) );
-
-	uint8_t status;
-	uint32_t ulStart = millis();
-
-	WiFi.begin ( m_SSID, m_Pwd );
-	do
-	{
-		status = WiFi.status();
-		delay ( 500 );
-	} while ( status != WL_CONNECTED && ( millis() - ulStart ) < WIFI_CONNECT_TIMEOUT_MS );
+	m_staConnectInProgress = false;
+	m_staConnectStartMs = 0UL;
 
 	if ( status != WL_CONNECTED )
 	{
 		m_reconnectAttempts++;
+		if ( m_reconnectAttempts > WIFI_RECONNECT_MAX_ATTEMPTS )
+		{
+			m_reconnectAttempts = WIFI_RECONNECT_MAX_ATTEMPTS;
+		}
+		NoteConnectFailure ( status );
 
 		// Compute capped exponential backoff: base * 2^(attempts-1)
 		uint32_t backoffMs = WIFI_RECONNECT_BASE_DELAY_MS;
@@ -470,21 +563,25 @@ bool WiFiService::WiFiConnect ()
 		}
 		m_nextReconnectMs = millis() + backoffMs;
 
+		if ( status == WL_NO_SSID_AVAIL )
+		{
+			Info ( F ( "WiFi SSID not visible; keeping STA retry mode" ) );
+		}
+
+		if ( ShouldEnterAPMode() )
+		{
+			Info ( F ( "Repeated credential failures detected; entering AP onboarding mode" ) );
+			StartAP();
+			return false;
+		}
+
 		SetState ( WiFiService::Status::UNCONNECTED );
 		logWiFiError ( "WiFi connect attempt " + String ( m_reconnectAttempts ), status );
 		m_beginTimeouts++;
 		return false;
 	}
-	else
-	{
-		CalcMyMulticastAddress ( m_multicastAddr );
-		Info ( "Connected to " + String ( m_SSID ) );
-		SetState ( WiFiService::Status::CONNECTED );
-		m_reconnectAttempts = 0;
-		m_nextReconnectMs = 0;
-		m_beginConnects++;
-		return true;
-	}
+
+	return false;
 }
 
 /**
@@ -583,12 +680,8 @@ bool UDPWiFiService::Begin ( UDPWiFiServiceCallback pHandleReqData,
 		else
 		{
 			SetState ( Status::UNCONNECTED );
-			bResult = false;
-			// Consider starting AP mode here if not already started
-			if ( m_useOnboarding )
-			{
-				StartAP();
-			}
+			// Stored credentials may still succeed after retries; don't force AP mode here.
+			bResult = true;
 		}
 	}
 	return bResult;
@@ -603,6 +696,14 @@ void UDPWiFiService::ProcessOnboarding ()
 	if ( GetState() == Status::AP_MODE && m_pOnboardingPortal != nullptr )
 	{
 		m_pOnboardingPortal->loop();
+
+		if ( m_hasStoredConfig && !m_apClientConnected && m_apModeEnteredMs != 0UL &&
+		     ( millis() - m_apModeEnteredMs ) >= WIFI_AP_IDLE_REBOOT_MS )
+		{
+			Info ( F ( "AP idle timeout reached; rebooting to retry stored WiFi credentials" ) );
+			delay ( 1000 );
+			MN::Utils::ResetBoard ( F ( "AP idle timeout" ) );
+		}
 	}
 }
 
@@ -712,7 +813,6 @@ bool UDPWiFiService::ReadUDPMessage ( String& sRecvMessage )
 	if ( packetSize > 0 )
 	{
 		SetLED ( PROCESSING_MSG_COLOUR );
-		delay ( 500 );
 		String logMessage = "Received packet of size " + String ( packetSize ) + " From " +
 		                    ToIPString ( m_myUDP.remoteIP() ) + ", port " + String ( m_myUDP.remotePort() );
 		// Info ( logMessage ) ;
@@ -747,7 +847,8 @@ bool UDPWiFiService::ReadUDPMessage ( String& sRecvMessage )
 /**
  * @brief Starts the UDP listener on the configured port.
  * @details Also adds the current subnet broadcast address to the multicast destination list.
- *          Resets the board if the UDP port cannot be allocated.
+ *          Leaves WiFi in UNCONNECTED state if the UDP port cannot be allocated,
+ *          allowing normal reconnect retry logic to recover without hard reset.
  * @return true if the UDP listener was started successfully.
  */
 bool UDPWiFiService::Start ()
@@ -766,9 +867,9 @@ bool UDPWiFiService::Start ()
 	}
 	else
 	{
-		Error ( "Unable to allocate UDP Port, restarting" );
-		delay ( 1000 * 20 );
-		MN::Utils::ResetBoard ( F ( "" ) );
+		Error ( "Unable to allocate UDP Port; will retry" );
+		SetState ( WiFiService::Status::UNCONNECTED );
+		m_nextReconnectMs = millis() + WIFI_RECONNECT_BASE_DELAY_MS;
 	}
 	return bResult;
 }
@@ -850,7 +951,6 @@ bool UDPWiFiService::SendAll ( String sMsg )
 			IPAddress nextIP;
 			while ( (long unsigned int)( nextIP = m_pMulticastDestList->GetNext ( iterator ) ) != 0UL )
 			{
-				delay ( 200 );
 				if ( m_myUDP.beginPacket ( nextIP, m_config.multicastPort ) == 1 )
 				{
 					m_myUDP.write ( sMsg.c_str() );
@@ -862,7 +962,6 @@ bool UDPWiFiService::SendAll ( String sMsg )
 					else
 					{
 						SetLED ( PROCESSING_MSG_COLOUR );
-						delay ( 500 );
 						SetState ( WiFiService::Status::CONNECTED );
 						bResult = true;
 						m_ulMCastSentCount++;
