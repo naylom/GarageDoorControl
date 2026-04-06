@@ -23,7 +23,7 @@ constexpr pin_size_t BLUE_PIN = 10;
 #ifndef NOT_A_PIN
 #define NOT_A_PIN 255
 #endif
-constexpr pin_size_t DOOR_IS_OPEN_STATUS_PIN = 9;  // NOT_A_PIN;  // 9;
+constexpr pin_size_t DOOR_IS_OPEN_STATUS_PIN = NOT_A_PIN;  // 9;		// set to NOT_A_PIN to disable door support
 constexpr pin_size_t DOOR_IS_CLOSED_STATUS_PIN = 8;
 constexpr pin_size_t LIGHT_IS_ON_STATUS_PIN = 7;
 constexpr pin_size_t DOOR_SWITCH_INPUT_PIN = 0;

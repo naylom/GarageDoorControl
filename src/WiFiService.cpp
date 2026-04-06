@@ -210,8 +210,10 @@ void WiFiService::SetState ( WiFiService::Status state )
 
 /**
  * @brief Initializes the WiFi service with onboarding support.
- * @details Attempts to load stored credentials and connect. If no valid credentials
- *          are found or connection fails, enters AP mode for onboarding.
+ * @details Attempts to load stored credentials and connect. If no valid
+ *          configuration is found, enters AP mode for onboarding. If stored
+ *          credentials exist, STA retry/backoff policy determines whether AP
+ *          mode is entered later.
  *
  * @param apSSID The SSID to use for the onboarding AP.
  * @param apPassword The password to use for the onboarding AP (nullptr for open AP).
@@ -277,7 +279,9 @@ void WiFiService::BeginWithConfig ( const char* HostName,
 
 /**
  * @brief Loads configuration from storage and attempts to connect.
- * @details Falls back to AP mode if no valid configuration exists.
+ * @details If valid configuration exists, initializes STA credentials and
+ *          starts non-blocking connect/retry flow. If no valid configuration
+ *          exists, enters AP mode for onboarding.
  */
 void WiFiService::LoadAndConnectFromStorage ()
 {
@@ -490,6 +494,20 @@ bool WiFiService::WiFiConnect ()
 
 	if ( IsConnected() )
 	{
+		const bool wasServiceConnected = ( GetState() == Status::CONNECTED );
+		const bool wasAttemptInProgress = m_staConnectInProgress;
+
+		if ( !wasServiceConnected )
+		{
+			CalcMyMulticastAddress ( m_multicastAddr );
+			SetState ( WiFiService::Status::CONNECTED );
+		}
+
+		if ( wasAttemptInProgress || !wasServiceConnected )
+		{
+			m_beginConnects++;
+		}
+
 		// Already up — reset counters so a future drop starts fresh backoff
 		m_reconnectAttempts = 0;
 		m_nextReconnectMs = 0;
@@ -518,10 +536,15 @@ bool WiFiService::WiFiConnect ()
 		WiFi.begin ( m_SSID, m_Pwd );
 		m_staConnectInProgress = true;
 		m_staConnectStartMs = millis();
+		m_lastConnectStatus = WL_IDLE_STATUS;
 		return false;
 	}
 
 	uint8_t status = WiFi.status();
+	if ( status != m_lastConnectStatus )
+	{
+		m_lastConnectStatus = status;
+	}
 	if ( status == WL_CONNECTED )
 	{
 		CalcMyMulticastAddress ( m_multicastAddr );
@@ -665,10 +688,13 @@ bool UDPWiFiService::Begin ( UDPWiFiServiceCallback pHandleReqData,
 	if ( m_sUDPReceivedMsg.reserve ( MAX_INCOMING_UDP_MSG ) )
 	{
 		// Check if we have valid configuration loaded
-		if ( m_config.valid && GetState() == Status::CONNECTED )
+		if ( m_config.valid )
 		{
 			m_Port = m_config.udpPort;
-			Start();
+			if ( GetState() == Status::CONNECTED )
+			{
+				Start();
+			}
 			bResult = true;
 		}
 		else if ( GetState() == Status::AP_MODE )
@@ -769,7 +795,9 @@ void UDPWiFiService::GetLocalTime ( String& result, time_t timeError )
 /**
  * @brief Attempts WiFi reconnection if needed, then reads the next available UDP packet.
  * @details On reconnection after a drop the UDP listener is restarted automatically. Also
- *          refreshes the multicast destination list with the current subnet broadcast address.
+ *          handles delayed-start cases where WiFi is up but the UDP listener is
+ *          not active yet, and refreshes the multicast destination list with the
+ *          current subnet broadcast address.
  * @param RecvMessage Output: receives the content of the received UDP packet.
  * @return true if a packet was read successfully; false if not connected or no packet is available.
  */
@@ -778,10 +806,13 @@ bool UDPWiFiService::GetUDPMessage ( String& RecvMessage )
 	bool wasConnected = IsConnected();
 	if ( WiFiConnect() )
 	{
-		if ( !wasConnected )
+		if ( m_WiFiState == WiFiState::DISCONNECTED )
 		{
-			// Just reconnected after a drop — restart the UDP listener on our port
-			Info ( F ( "WiFi reconnected \u2014 restarting UDP" ) );
+			// Connection became active (or was missed during async startup) — ensure UDP listener is active.
+			if ( !wasConnected )
+			{
+				Info ( F ( "WiFi reconnected — restarting UDP" ) );
+			}
 			m_myUDP.stop();
 			Start();
 		}
@@ -790,6 +821,7 @@ bool UDPWiFiService::GetUDPMessage ( String& RecvMessage )
 	}
 	else
 	{
+		m_WiFiState = WiFiState::DISCONNECTED;
 		SetState ( WiFiService::Status::UNCONNECTED );
 		return false;
 	}
@@ -858,6 +890,7 @@ bool UDPWiFiService::Start ()
 	if ( m_myUDP.begin ( m_Port ) == 1 )
 	{
 		bResult = true;
+		m_WiFiState = WiFiState::ISCONNECTED;
 		// Error ( "Started UDP" );
 		IPAddress localSubnet = GetMulticastAddress();
 		if ( (long unsigned int)localSubnet != 0UL )
@@ -867,6 +900,7 @@ bool UDPWiFiService::Start ()
 	}
 	else
 	{
+		m_WiFiState = WiFiState::DISCONNECTED;
 		Error ( "Unable to allocate UDP Port; will retry" );
 		SetState ( WiFiService::Status::UNCONNECTED );
 		m_nextReconnectMs = millis() + WIFI_RECONNECT_BASE_DELAY_MS;

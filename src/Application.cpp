@@ -88,7 +88,7 @@ void Application::begin ()
 	MyLogger.LogStart();
 	MyLogger.ClearScreen();
 
-	TheMKR_RGB_LED.Invert();  // Only if required!
+	//TheMKR_RGB_LED.Invert();  // Only if required!
 
 	pMyUDPService = new UDPWiFiService();
 
