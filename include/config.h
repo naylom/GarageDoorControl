@@ -49,8 +49,20 @@ constexpr uint8_t WIFI_RECONNECT_MAX_ATTEMPTS = 10;        // cap reconnect back
 // ─── WiFi onboarding policy ───────────────────────────────────────────────────
 constexpr uint32_t WIFI_AP_ENTRY_GRACE_MS = 10UL * 60UL * 1000UL;
 constexpr uint8_t WIFI_AP_CREDENTIAL_FAILURE_THRESHOLD = 3U;
-constexpr uint32_t WIFI_RADIO_RESET_SETTLE_MS = 200UL;
 constexpr uint32_t WIFI_AP_IDLE_REBOOT_MS = 5UL * 60UL * 1000UL;
+
+// ─── WiFi disconnect confirmation ─────────────────────────────────────────────
+// The NINA SPI co-processor can return a transient non-WL_CONNECTED status for
+// several seconds after a UDP receive burst.  Require both CONFIRM_COUNT missed
+// polls AND at least MIN_WINDOW_MS elapsed before treating the drop as real.
+constexpr uint8_t WIFI_DISCONNECT_CONFIRM_COUNT = 3U;
+constexpr uint32_t WIFI_DISCONNECT_MIN_WINDOW_MS = 10000UL;  // 10 s — covers observed 3.5 s transient
+
+// ─── WiFi NINA hard reset ─────────────────────────────────────────────────────
+// WiFi.end() is a no-op on the MKR WiFi 1010 (wifiDriverDeinit() has empty body).
+// SpiDrv::end() is the real hardware reset.  Limit hard resets to every Nth attempt
+// to avoid over-cycling the NINA module and triggering the stuck NO_SHIELD state.
+constexpr uint8_t WIFI_HARD_RESET_EVERY = 5U;
 
 // ─── Sensor polling ───────────────────────────────────────────────────────────
 constexpr uint32_t SENSOR_READ_INTERVAL_MS = 30000;

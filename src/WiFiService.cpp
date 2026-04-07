@@ -15,6 +15,7 @@ History:
 #include "ConfigStorage.h"
 #include "HormannUAP1.h"
 
+#include <Arduino_SpiNINA.h>
 #include <time.h>
 #include <WiFiNINA.h>
 
@@ -122,6 +123,10 @@ WiFiService::~WiFiService ()
  */
 const char* WiFiService::WiFiStatusToString ( uint8_t iState ) const
 {
+	if ( iState == WL_NO_SHIELD )  // 255 — NINA SPI unresponsive; its numeric value exceeds the array bounds
+	{
+		return "NO_SHIELD";
+	}
 	static constexpr size_t statusCount = sizeof ( WiFiStatus ) / sizeof ( WiFiStatus [ 0 ] );
 
 	return ( iState < statusCount ) ? WiFiStatus [ iState ] : "UNKNOWN";
@@ -511,8 +516,28 @@ bool WiFiService::WiFiConnect ()
 		// Already up — reset counters so a future drop starts fresh backoff
 		m_reconnectAttempts = 0;
 		m_nextReconnectMs = 0;
+		m_disconnectMissCount = 0;
 		ResetStaFailureTracking();
 		return true;
+	}
+
+	// Not connected — apply confirmation window before tearing down.
+	// The NINA SPI co-processor can return a transient non-WL_CONNECTED status for
+	// several seconds after a UDP receive burst.  Returning true during this window
+	// suppresses a false reconnect cycle and avoids restarting the UDP listener.
+	if ( GetState() == Status::CONNECTED && !m_staConnectInProgress )
+	{
+		if ( m_disconnectMissCount == 0 )
+		{
+			m_disconnectFirstMissTime = millis();
+		}
+		if ( ++m_disconnectMissCount < WIFI_DISCONNECT_CONFIRM_COUNT ||
+		     millis() - m_disconnectFirstMissTime < WIFI_DISCONNECT_MIN_WINDOW_MS )
+		{
+			return true;  // pretend connected — drop not yet confirmed
+		}
+		m_disconnectMissCount = 0;
+		// Confirmation window elapsed; fall through to start reconnect.
 	}
 
 	// Start a new reconnect attempt once the backoff window allows it.
@@ -531,8 +556,17 @@ bool WiFiService::WiFiConnect ()
 		Info ( "WiFi reconnect attempt " + String ( m_reconnectAttempts + 1 ) );
 
 		WiFi.disconnect();
-		WiFi.end();
-		delay ( WIFI_RADIO_RESET_SETTLE_MS );
+		// Perform a full hardware NINA reset every WIFI_HARD_RESET_EVERY attempts.
+		// WiFi.end() is a no-op on MKR WiFi 1010 — SpiDrv::end() asserts SLAVERESET
+		// and clears the SPI initialised flag so the next WiFi.begin() runs the full
+		// SpiDrv::begin() hardware reset sequence (750 ms boot delay included).
+		// Plain WiFi.disconnect()/WiFi.begin() is used for other attempts to avoid
+		// over-cycling the NINA module and triggering the stuck NO_SHIELD state.
+		if ( m_reconnectAttempts > 0 && ( m_reconnectAttempts % WIFI_HARD_RESET_EVERY == 0 ) )
+		{
+			Info ( "Hard resetting NINA module via SpiDrv::end()" );
+			SpiDrv::end();
+		}
 		WiFi.begin ( m_SSID, m_Pwd );
 		m_staConnectInProgress = true;
 		m_staConnectStartMs = millis();
