@@ -32,7 +32,7 @@ value when you want to initiate an action. Since the MKR WiFi is a 3.3V device i
 manipulate 24V signals. Either an external relay board can be used or as in my case I use EL815
 optocouplers.
 
-I also wanted to add a manual momentary switch in the garage to opwn and shut the door. This was
+I also wanted to add a manual momentary switch in the garage to open and shut the door. This was
 unexpectedly one of the more troublesome parts of the project. I found that using a MKR WiFI 1010
 3.3V pin to detect the switch being pressed suffered from a lot of noise and even with debounce
 logic gave false positives. After trying many things including using cat6 shielded FTP cable, 
