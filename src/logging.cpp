@@ -18,6 +18,8 @@ History:
 */
 #include "logging.h"
 
+#include <Arduino_SpiNINA.h>
+
 namespace MN ::Utils
 {
 #ifdef ARDUINO_AVR_UNO
@@ -35,15 +37,18 @@ void ResetBoard ( const __FlashStringHelper* pErrMsg )
 #else
 /**
  * @brief Performs a hardware reset of the microcontroller.
- * @details On SAMD21/ARM targets calls NVIC_SystemReset(). On AVR targets jumps to
- *          address 0. The pErrMsg parameter is accepted for API compatibility but
- *          is not currently logged (callers should log before calling if needed).
+ * @details On SAMD21/ARM targets resets the NINA WiFi module first via SpiDrv::end(),
+ *          then calls NVIC_SystemReset(). On AVR targets jumps to address 0.
+ *          The pErrMsg parameter is accepted for API compatibility but is not
+ *          currently logged (callers should log before calling if needed).
  * @param pErrMsg Flash-string error message describing the reset reason.
  */
 void ResetBoard ( const __FlashStringHelper* pErrMsg )
 {
 	// Error ( pErrMsg );
 	// LogFlush();
+	SpiDrv::end();       // Reset NINA module explicitly before SAMD reset
+	delay ( 100 );       // Give NINA time to shut down
 	NVIC_SystemReset();  // processor software reset for ARM SAMD processor
 }
 #endif

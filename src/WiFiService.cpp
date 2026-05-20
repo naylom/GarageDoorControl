@@ -625,6 +625,14 @@ bool WiFiService::WiFiConnect ()
 			Info ( F ( "WiFi SSID not visible; keeping STA retry mode" ) );
 		}
 
+		// Check if WiFi has been unavailable for too long — trigger full system reset
+		// This prevents indefinite accumulation of firmware state corruption when WiFi is permanently unavailable
+		if ( ( millis() - m_firstStaFailureMs ) >= WIFI_FULL_RESET_TIMEOUT_MS )
+		{
+			Error ( F ( "WiFi unavailable for 15 minutes; performing full system reset" ) );
+			MN::Utils::ResetBoard ( F ( "WiFi unavailable timeout" ) );
+		}
+
 		if ( ShouldEnterAPMode() )
 		{
 			Info ( F ( "Repeated credential failures detected; entering AP onboarding mode" ) );

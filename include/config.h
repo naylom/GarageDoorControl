@@ -64,6 +64,12 @@ constexpr uint32_t WIFI_DISCONNECT_MIN_WINDOW_MS = 10000UL;  // 10 s — covers 
 // to avoid over-cycling the NINA module and triggering the stuck NO_SHIELD state.
 constexpr uint8_t WIFI_HARD_RESET_EVERY = 5U;
 
+// ─── WiFi full system reset timeout ────────────────────────────────────────────
+// If WiFi fails to connect for this duration, trigger a full SAMD+NINA reset.
+// This prevents indefinite accumulation of firmware state corruption when WiFi
+// is permanently unavailable.
+constexpr uint32_t WIFI_FULL_RESET_TIMEOUT_MS = 15UL * 60UL * 1000UL;  // 15 minutes
+
 // ─── Sensor polling ───────────────────────────────────────────────────────────
 constexpr uint32_t SENSOR_READ_INTERVAL_MS = 30000;
 
