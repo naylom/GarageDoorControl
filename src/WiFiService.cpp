@@ -707,6 +707,7 @@ uint32_t WiFiService::GetBeginCount ()
  */
 UDPWiFiService::UDPWiFiService ()
 {
+	delay ( 2000 );  // Allow time for WiFi module to initialize
 	m_pMulticastDestList = new FixedIPList ( 4 );
 }
 
