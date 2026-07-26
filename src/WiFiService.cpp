@@ -59,6 +59,55 @@ enum class eResponseMessage : uint8_t
 extern void Error ( String s, bool bInISR = false );
 extern void Info ( String s, bool bInISR = false );
 
+// TEMP_WIFI_DIAG_REMOVE_ME_BEGIN
+// Temporary serial diagnostics for reboot WiFi troubleshooting.
+// Remove this block after root cause is identified.
+namespace
+{
+constexpr unsigned long WIFI_DIAG_SERIAL_WAIT_MS = 1500UL;
+bool s_wifiDiagSerialReady = false;
+constexpr bool WIFI_ENABLE_TEMP_SERIAL_DIAGNOSTICS = false;
+
+void WiFiDiagEnsureSerial ()
+{
+	if ( !WIFI_ENABLE_TEMP_SERIAL_DIAGNOSTICS )
+	{
+		return;
+	}
+
+	if ( s_wifiDiagSerialReady )
+	{
+		return;
+	}
+
+	Serial.begin ( BAUD_RATE );
+	unsigned long startMs = millis();
+	while ( !Serial && ( millis() - startMs ) < WIFI_DIAG_SERIAL_WAIT_MS )
+	{
+		delay ( 10 );
+	}
+	Serial.println ( F ( "[TEMP_WIFI_DIAG] Serial diagnostics online" ) );
+	s_wifiDiagSerialReady = true;
+}
+
+void WiFiDiagLog ( const String& msg )
+{
+	if ( !WIFI_ENABLE_TEMP_SERIAL_DIAGNOSTICS )
+	{
+		return;
+	}
+
+	WiFiDiagEnsureSerial();
+	Serial.println ( "[TEMP_WIFI_DIAG] " + msg );
+}
+
+void WiFiDiagLogCritical ( const String& msg )
+{
+	WiFiDiagLog ( msg );
+}
+}  // namespace
+// TEMP_WIFI_DIAG_REMOVE_ME_END
+
 // Helper function to log WiFi/UDP errors with context
 static void logWiFiError ( const String& context, int errorCode )
 {
@@ -184,31 +233,62 @@ WiFiService::Status WiFiService::GetState () const
  */
 void WiFiService::SetLED ( RGBType theColour, uint8_t flashTime )
 {
-	if ( m_pLED != nullptr )
+	if ( m_pLED == nullptr )
 	{
-		m_pLED->SetLEDColour ( theColour, flashTime );
+		return;
 	}
+
+	if ( theColour == PROCESSING_MSG_COLOUR )
+	{
+		m_processingLedHoldUntilMs = millis() + WIFI_PROCESSING_LED_HOLD_MS;
+		m_connectedLedDeferred = true;
+	}
+
+	if ( m_lastLedValid && m_lastLedColour == theColour && m_lastLedFlashTime == flashTime )
+	{
+		return;
+	}
+
+	m_pLED->SetLEDColour ( theColour, flashTime );
+	m_lastLedColour = theColour;
+	m_lastLedFlashTime = flashTime;
+	m_lastLedValid = true;
 }
 
 /**
  * @brief Updates the internal connection state and reflects the change on the status LED.
- * @param state New state to apply: UNCONNECTED (flashing red), CONNECTED (green), or AP_MODE (flashing blue).
+ * @param state New state to apply: UNCONNECTED (flashing red), CONNECTED (green), or AP_MODE (solid blue).
  */
 void WiFiService::SetState ( WiFiService::Status state )
 {
-	m_State = state;
+	const uint32_t nowMs = millis();
+	const bool processingHoldActive =
+	    m_connectedLedDeferred && ( static_cast<int32_t> ( nowMs - m_processingLedHoldUntilMs ) < 0 );
+
+	if ( m_State != state )
+	{
+		m_State = state;
+	}
 	switch ( state )
 	{
 		case WiFiService::Status::CONNECTED:
-			SetLED ( CONNECTED_COLOUR );
+			if ( !processingHoldActive )
+			{
+				SetLED ( CONNECTED_COLOUR );
+				m_connectedLedDeferred = false;
+			}
 			break;
 
 		case WiFiService::Status::UNCONNECTED:
+			m_connectedLedDeferred = false;
+			m_processingLedHoldUntilMs = 0UL;
 			SetLED ( UNCONNECTED_COLOUR, WIFI_FLASHTIME );
 			break;
 
 		case WiFiService::Status::AP_MODE:
-			SetLED ( MNRGBLEDBaseLib::eColour::DARK_BLUE, WIFI_FLASHTIME );
+			m_connectedLedDeferred = false;
+			m_processingLedHoldUntilMs = 0UL;
+			SetLED ( MNRGBLEDBaseLib::eColour::DARK_BLUE, 0 );
 			break;
 	}
 }
@@ -226,23 +306,29 @@ void WiFiService::SetState ( WiFiService::Status state )
  */
 void WiFiService::Begin ( const char* apSSID, const char* apPassword, MNRGBLEDBaseLib* pLED )
 {
+	WiFiDiagLog ( String ( "Begin() called. WiFi.status=" ) + WiFi.status() + " (" +
+	              WiFiStatusToString ( WiFi.status() ) + ")" );
 	m_apSSID = apSSID;
 	m_apPassword = apPassword;
 	m_pLED = pLED;
+	m_lastLedValid = false;
 	m_useOnboarding = true;
 
 	WiFi.setHostname ( "GarageControl" );
 
 	String fv = WiFi.firmwareVersion();
+	WiFiDiagLog ( "NINA firmware=" + fv + ", required=" + String ( WIFI_FIRMWARE_LATEST_VERSION ) );
 	if ( fv < WIFI_FIRMWARE_LATEST_VERSION )
 	{
 		SetLED ( OLD_WIFI_FIRMWARE_COLOUR );
 		Error ( "Please upgrade the firmware. Latest is " + String ( WIFI_FIRMWARE_LATEST_VERSION ) + ", board has " +
 		        String ( fv ) );
+		WiFiDiagLog ( "Firmware too old, WiFi startup blocked" );
 	}
 	else
 	{
 		// Try to load configuration and connect
+		WiFiDiagLog ( "Calling LoadAndConnectFromStorage()" );
 		LoadAndConnectFromStorage();
 	}
 }
@@ -265,6 +351,7 @@ void WiFiService::BeginWithConfig ( const char* HostName,
 	m_Pwd = WiFipwd;
 	m_HostName = HostName;
 	m_pLED = pLED;
+	m_lastLedValid = false;
 
 	WiFi.setHostname ( m_HostName );
 
@@ -290,10 +377,13 @@ void WiFiService::BeginWithConfig ( const char* HostName,
  */
 void WiFiService::LoadAndConnectFromStorage ()
 {
+	WiFiDiagLog ( "LoadAndConnectFromStorage() entered" );
 	if ( ConfigStorage::load ( m_config ) )
 	{
 		m_hasStoredConfig = true;
 		ResetStaFailureTracking();
+		WiFiDiagLog ( "Config load success: valid=true, ssid='" + String ( m_config.ssid ) + "', host='" +
+		              String ( m_config.hostname ) + "'" );
 		Info ( "Loaded configuration from storage" );
 		Info ( "SSID: " + String ( m_config.ssid ) );
 		Info ( "Hostname: " + String ( m_config.hostname ) );
@@ -301,18 +391,32 @@ void WiFiService::LoadAndConnectFromStorage ()
 		m_SSID = m_config.ssid;
 		m_Pwd = m_config.password;
 		m_HostName = m_config.hostname;
+		m_staStartupGraceUntilMs = millis() + WIFI_STA_STARTUP_GRACE_MS;
+		m_staStartupGraceApplied = false;
+		m_firstStaPreflightResetPending = WIFI_ENABLE_FIRST_STA_PREFLIGHT_RESET;
 
 		WiFi.setHostname ( m_HostName );
 
 		// Try to connect
 		if ( !WiFiConnect() )
 		{
-			Error ( "Failed initial WiFi connect with stored credentials" );
+			const bool connectPending = m_staConnectInProgress;
+			WiFiDiagLog ( String ( "Initial WiFiConnect() pending/deferred. state=" ) + GetState() +
+			              ", status=" + WiFi.status() + " (" + WiFiStatusToString ( WiFi.status() ) +
+			              "), inProgress=" + ( connectPending ? "1" : "0" ) );
 			SetState ( Status::UNCONNECTED );
-			Info ( "Will keep retrying STA with backoff before entering AP mode" );
+			if ( connectPending )
+			{
+				Info ( "Initial WiFi connect started; waiting for async completion" );
+			}
+			else
+			{
+				Info ( "Initial WiFi connect deferred; retry/backoff loop will continue" );
+			}
 		}
 		else
 		{
+			WiFiDiagLog ( "Initial WiFiConnect() succeeded" );
 			Info ( "Successfully connected to WiFi" );
 			SetState ( Status::CONNECTED );
 		}
@@ -321,6 +425,7 @@ void WiFiService::LoadAndConnectFromStorage ()
 	{
 		m_hasStoredConfig = false;
 		ResetStaFailureTracking();
+		WiFiDiagLog ( "Config load failed or invalid; entering onboarding path" );
 		Info ( "No valid configuration found" );
 		if ( m_useOnboarding )
 		{
@@ -362,18 +467,18 @@ void WiFiService::StartAP ()
 		return;
 	}
 
-	// Solid blue = client connected to AP; flashing blue = waiting for client
+	// AP onboarding indicator: green when a client is connected, blue while awaiting a client.
 	m_pOnboardingPortal->setOnClientConnected (
 	    [ this ] ()
 	    {
 		    m_apClientConnected = true;
-		    SetLED ( MNRGBLEDBaseLib::eColour::DARK_BLUE, 0 );
+		    SetLED ( CONNECTED_COLOUR, 0 );
 	    } );
 	m_pOnboardingPortal->setOnClientDisconnected (
 	    [ this ] ()
 	    {
 		    m_apClientConnected = false;
-		    SetLED ( MNRGBLEDBaseLib::eColour::DARK_BLUE, WIFI_FLASHTIME );
+		    SetLED ( MNRGBLEDBaseLib::eColour::DARK_BLUE, 0 );
 	    } );
 
 	Info ( "AP started. IP: " + ToIPString ( m_pOnboardingPortal->apIP() ) );
@@ -389,6 +494,9 @@ void WiFiService::ResetStaFailureTracking ()
 	m_firstStaFailureMs = 0UL;
 	m_staConnectInProgress = false;
 	m_staConnectStartMs = 0UL;
+	m_staStartupGraceApplied = false;
+	m_staStartupGraceUntilMs = 0UL;
+	m_staStartupGraceLogged = false;
 }
 
 void WiFiService::NoteConnectFailure ( uint8_t status )
@@ -490,14 +598,93 @@ IPAddress WiFiService::GetMulticastAddress () const
  */
 bool WiFiService::WiFiConnect ()
 {
+	const uint32_t nowMs = millis();
+	const WiFiService::Status currentState = GetState();
+	static uint8_t s_lastEntryStatus = WL_NO_SHIELD;
+	static WiFiService::Status s_lastEntryState = WiFiService::Status::AP_MODE;
+	static bool s_lastEntryInProgress = true;
+	static uint8_t s_lastEntryAttempts = 0xFFU;
+	static uint32_t s_lastBackoffLogMs = 0UL;
+	static uint32_t s_lastNoShieldBackoffResetMs = 0UL;
+	static uint32_t s_lastNoShieldSeenMs = 0UL;
+	static uint32_t s_lastNoShieldDeferralLogMs = 0UL;
+	static bool s_forceHardResetNextAttempt = false;
+	static uint8_t s_cachedStatus = WL_IDLE_STATUS;
+	static uint32_t s_lastStatusPollMs = 0UL;
+	static bool s_noShieldQuarantine = false;
+	static uint32_t s_noShieldQuarantineUntilMs = 0UL;
+	static uint8_t s_noShieldRecoveryResets = 0U;
+	static uint8_t s_consecutiveStaTimeouts = 0U;
+
+	if ( m_connectedLedDeferred && GetState() == Status::CONNECTED &&
+	     static_cast<int32_t> ( millis() - m_processingLedHoldUntilMs ) >= 0 )
+	{
+		SetLED ( CONNECTED_COLOUR );
+		m_connectedLedDeferred = false;
+	}
+
+	auto GetThrottledStatus = [ & ] ( bool forcePoll ) -> uint8_t
+	{
+		if ( s_noShieldQuarantine && nowMs < s_noShieldQuarantineUntilMs )
+		{
+			s_cachedStatus = WL_NO_SHIELD;
+			return s_cachedStatus;
+		}
+
+		if ( s_noShieldQuarantine && nowMs >= s_noShieldQuarantineUntilMs )
+		{
+			// Avoid an immediate WiFi.status() poll right after NO_SHIELD quarantine expiry,
+			// because that call can stall in a wedged NINA state.
+			s_noShieldQuarantine = false;
+			s_cachedStatus = WL_IDLE_STATUS;
+			return s_cachedStatus;
+		}
+
+		if ( forcePoll || ( nowMs - s_lastStatusPollMs ) >= WIFI_STATUS_POLL_INTERVAL_MS )
+		{
+			s_cachedStatus = WiFi.status();
+			s_lastStatusPollMs = nowMs;
+			if ( s_cachedStatus != WL_NO_SHIELD )
+			{
+				s_noShieldQuarantine = false;
+			}
+		}
+
+		return s_cachedStatus;
+	};
+
+	// During the initial STA bring-up, avoid raw WiFi.status() polling until after
+	// preflight/reset/startup-grace has completed and we are ready to issue WiFi.begin().
+	// This avoids wedging inside WiFi.status() before the first begin attempt.
+	const bool inInitialStaPreBeginPhase = !m_staConnectInProgress && !m_staStartupGraceApplied &&
+	                                       ( m_reconnectAttempts == 0 ) && ( m_nextReconnectMs == 0 );
+	const bool inReconnectBackoffWindow =
+	    !m_staConnectInProgress && ( m_nextReconnectMs != 0UL ) && ( nowMs < m_nextReconnectMs );
+	const uint8_t currentStatus =
+	    ( inInitialStaPreBeginPhase || inReconnectBackoffWindow ) ? s_cachedStatus : GetThrottledStatus ( false );
+
+	const bool entryChanged = ( currentStatus != s_lastEntryStatus ) || ( currentState != s_lastEntryState ) ||
+	                          ( m_staConnectInProgress != s_lastEntryInProgress ) ||
+	                          ( m_reconnectAttempts != s_lastEntryAttempts );
+	if ( entryChanged )
+	{
+		WiFiDiagLog ( String ( "WiFiConnect() entry: state=" ) + currentState + ", wifiStatus=" + currentStatus + " (" +
+		              WiFiStatusToString ( currentStatus ) + "), inProgress=" + ( m_staConnectInProgress ? "1" : "0" ) +
+		              ", attempts=" + m_reconnectAttempts );
+		s_lastEntryStatus = currentStatus;
+		s_lastEntryState = currentState;
+		s_lastEntryInProgress = m_staConnectInProgress;
+		s_lastEntryAttempts = m_reconnectAttempts;
+	}
 	// In AP/onboarding mode do not attempt STA connection — it would call WiFi.begin()
 	// which tears down the AP beacon and destroys AP mode state.
 	if ( GetState() == Status::AP_MODE )
 	{
+		WiFiDiagLog ( "Skipping WiFiConnect() because AP_MODE is active" );
 		return false;
 	}
 
-	if ( IsConnected() )
+	if ( currentStatus == WL_CONNECTED )
 	{
 		const bool wasServiceConnected = ( GetState() == Status::CONNECTED );
 		const bool wasAttemptInProgress = m_staConnectInProgress;
@@ -511,6 +698,12 @@ bool WiFiService::WiFiConnect ()
 		if ( wasAttemptInProgress || !wasServiceConnected )
 		{
 			m_beginConnects++;
+		}
+
+		if ( wasAttemptInProgress || !wasServiceConnected )
+		{
+			WiFiDiagLog ( "WiFi connected. localIP=" + ToIPString ( WiFi.localIP() ) +
+			              ", beginConnects=" + m_beginConnects );
 		}
 
 		// Already up — reset counters so a future drop starts fresh backoff
@@ -543,9 +736,124 @@ bool WiFiService::WiFiConnect ()
 	// Start a new reconnect attempt once the backoff window allows it.
 	if ( !m_staConnectInProgress )
 	{
-		if ( m_nextReconnectMs != 0 && millis() < m_nextReconnectMs )
+		if ( currentStatus == WL_NO_SHIELD )
 		{
+			s_lastNoShieldSeenMs = nowMs;
+			if ( !s_noShieldQuarantine || nowMs >= s_noShieldQuarantineUntilMs )
+			{
+				if ( ( nowMs - s_lastNoShieldBackoffResetMs ) >= WIFI_NO_SHIELD_RECOVERY_COOLDOWN_MS )
+				{
+					WiFiDiagLog ( "NO_SHIELD observed pre-begin; forcing NINA reset and deferring connect" );
+					SpiDrv::end();
+					s_lastNoShieldBackoffResetMs = nowMs;
+				}
+				else
+				{
+					WiFiDiagLog ( "NO_SHIELD observed pre-begin; recent reset already performed, deferring connect" );
+				}
+				s_noShieldQuarantine = true;
+				s_noShieldQuarantineUntilMs = nowMs + WIFI_NO_SHIELD_RECOVERY_COOLDOWN_MS;
+				if ( s_noShieldRecoveryResets < WIFI_NO_SHIELD_MAX_RECOVERY_RESETS )
+				{
+					s_noShieldRecoveryResets++;
+				}
+				if ( s_noShieldRecoveryResets >= WIFI_NO_SHIELD_MAX_RECOVERY_RESETS )
+				{
+					WiFiDiagLogCritical ( "Persistent NO_SHIELD across recovery resets; triggering board reset" );
+					MN::Utils::ResetBoard ( F ( "Persistent NO_SHIELD" ) );
+				}
+			}
+
+			if ( ( nowMs - s_lastNoShieldDeferralLogMs ) >= WIFI_DIAG_ENTRY_LOG_INTERVAL_MS )
+			{
+				WiFiDiagLog ( String ( "NO_SHIELD quarantine active; next status poll in ms=" ) +
+				              ( s_noShieldQuarantineUntilMs - nowMs ) );
+				s_lastNoShieldDeferralLogMs = nowMs;
+			}
 			return false;
+		}
+
+		if ( s_lastNoShieldSeenMs != 0UL && ( nowMs - s_lastNoShieldSeenMs ) < WIFI_NO_SHIELD_STABLE_WINDOW_MS )
+		{
+			if ( ( nowMs - s_lastNoShieldDeferralLogMs ) >= WIFI_DIAG_ENTRY_LOG_INTERVAL_MS )
+			{
+				WiFiDiagLog ( String ( "Deferring WiFi.begin until NO_SHIELD clears for ms=" ) +
+				              ( WIFI_NO_SHIELD_STABLE_WINDOW_MS - ( nowMs - s_lastNoShieldSeenMs ) ) );
+				s_lastNoShieldDeferralLogMs = nowMs;
+			}
+			return false;
+		}
+
+		if ( !m_staStartupGraceApplied && m_reconnectAttempts == 0 && m_nextReconnectMs == 0 )
+		{
+			if ( m_staStartupGraceUntilMs == 0UL )
+			{
+				m_staStartupGraceUntilMs = nowMs + WIFI_STA_STARTUP_GRACE_MS;
+				m_staStartupGraceLogged = false;
+			}
+
+			if ( nowMs < m_staStartupGraceUntilMs )
+			{
+				if ( !m_staStartupGraceLogged )
+				{
+					WiFiDiagLog ( String ( "Startup grace active; deferring first WiFi.begin by ms=" ) +
+					              ( m_staStartupGraceUntilMs - nowMs ) );
+					m_staStartupGraceLogged = true;
+				}
+				return false;
+			}
+
+			if ( m_staStartupGraceLogged )
+			{
+				WiFiDiagLog ( "Startup grace complete; proceeding with first WiFi.begin" );
+				m_staStartupGraceLogged = false;
+			}
+
+			if ( m_firstStaPreflightResetPending )
+			{
+				WiFiDiagLog ( "Preflight NINA reset before first STA begin" );
+				SpiDrv::end();
+				m_firstStaPreflightResetPending = false;
+				// Leave initial-grace mode so reconnect flow performs NO_SHIELD quarantine
+				// and status-stability gating before the first WiFi.begin().
+				m_staStartupGraceApplied = true;
+				m_staStartupGraceUntilMs = 0UL;
+				m_staStartupGraceLogged = false;
+				s_cachedStatus = WL_NO_SHIELD;
+				s_noShieldQuarantine = true;
+				s_noShieldQuarantineUntilMs = nowMs + WIFI_POST_HARD_RESET_SETTLE_MS;
+				s_lastNoShieldSeenMs = nowMs;
+				return false;
+			}
+
+			m_staStartupGraceApplied = true;
+		}
+
+		if ( m_nextReconnectMs != 0 && nowMs < m_nextReconnectMs )
+		{
+			const uint32_t remainingBackoffMs = m_nextReconnectMs - nowMs;
+
+			if ( ( nowMs - s_lastBackoffLogMs ) >= WIFI_DIAG_BACKOFF_LOG_INTERVAL_MS )
+			{
+				WiFiDiagLog ( String ( "Backoff active; next reconnect in ms=" ) + remainingBackoffMs );
+				s_lastBackoffLogMs = nowMs;
+			}
+
+			if ( currentStatus == WL_NO_SHIELD &&
+			     ( nowMs - s_lastNoShieldBackoffResetMs ) >= WIFI_RECONNECT_BASE_DELAY_MS )
+			{
+				WiFiDiagLog ( "NO_SHIELD observed during backoff; forcing NINA hard reset" );
+				SpiDrv::end();
+				s_lastNoShieldBackoffResetMs = nowMs;
+			}
+
+			return false;
+		}
+
+		if ( m_nextReconnectMs != 0 && nowMs >= m_nextReconnectMs )
+		{
+			WiFiDiagLogCritical ( "Backoff elapsed; attempting reconnect now" );
+			m_nextReconnectMs = 0;
 		}
 
 		if ( m_reconnectAttempts >= WIFI_RECONNECT_MAX_ATTEMPTS )
@@ -554,31 +862,99 @@ bool WiFiService::WiFiConnect ()
 		}
 
 		Info ( "WiFi reconnect attempt " + String ( m_reconnectAttempts + 1 ) );
+		WiFiDiagLog ( String ( "Starting reconnect attempt " ) + ( m_reconnectAttempts + 1 ) + ", ssid='" +
+		              String ( m_SSID != nullptr ? m_SSID : "<null>" ) + "'" );
 
+		WiFiDiagLog ( "Calling WiFi.disconnect() before retry" );
 		WiFi.disconnect();
+		WiFiDiagLog ( "WiFi.disconnect() returned" );
 		// Perform a full hardware NINA reset every WIFI_HARD_RESET_EVERY attempts.
 		// WiFi.end() is a no-op on MKR WiFi 1010 — SpiDrv::end() asserts SLAVERESET
 		// and clears the SPI initialised flag so the next WiFi.begin() runs the full
 		// SpiDrv::begin() hardware reset sequence (750 ms boot delay included).
 		// Plain WiFi.disconnect()/WiFi.begin() is used for other attempts to avoid
 		// over-cycling the NINA module and triggering the stuck NO_SHIELD state.
-		if ( m_reconnectAttempts > 0 && ( m_reconnectAttempts % WIFI_HARD_RESET_EVERY == 0 ) )
+		if ( s_forceHardResetNextAttempt )
+		{
+			WiFiDiagLog ( "Forcing NINA hard reset before retry after previous timeout" );
+			SpiDrv::end();
+			s_forceHardResetNextAttempt = false;
+			m_nextReconnectMs = nowMs + WIFI_POST_HARD_RESET_SETTLE_MS;
+			WiFiDiagLog ( String ( "Deferring WiFi.begin after hard reset by ms=" ) + WIFI_POST_HARD_RESET_SETTLE_MS );
+			return false;
+		}
+		else if ( m_reconnectAttempts > 0 && ( m_reconnectAttempts % WIFI_HARD_RESET_EVERY == 0 ) )
 		{
 			Info ( "Hard resetting NINA module via SpiDrv::end()" );
+			WiFiDiagLog ( String ( "Performing NINA hard reset on attempt " ) + m_reconnectAttempts );
 			SpiDrv::end();
 		}
+		const uint32_t beginCallStartMs = millis();
+		WiFiDiagLogCritical ( "Calling WiFi.begin()" );
 		WiFi.begin ( m_SSID, m_Pwd );
+		const uint32_t beginCallDurationMs = millis() - beginCallStartMs;
 		m_staConnectInProgress = true;
-		m_staConnectStartMs = millis();
+		m_staConnectStartMs = beginCallStartMs;
 		m_lastConnectStatus = WL_IDLE_STATUS;
+
+		const uint8_t immediateStatus = GetThrottledStatus ( true );
+		WiFiDiagLogCritical ( String ( "WiFi.begin() issued after ms=" ) + beginCallDurationMs +
+		                      ", status=" + immediateStatus + " (" + WiFiStatusToString ( immediateStatus ) + ")" );
+		if ( immediateStatus == WL_CONNECTED )
+		{
+			CalcMyMulticastAddress ( m_multicastAddr );
+			Info ( "Connected to " + String ( m_SSID ) + " (immediate)" );
+			SetState ( WiFiService::Status::CONNECTED );
+			m_staConnectInProgress = false;
+			m_staConnectStartMs = 0UL;
+			m_reconnectAttempts = 0;
+			m_nextReconnectMs = 0;
+			ResetStaFailureTracking();
+			m_beginConnects++;
+			s_noShieldRecoveryResets = 0U;
+			WiFiDiagLog ( "Immediate WL_CONNECTED after WiFi.begin. localIP=" + ToIPString ( WiFi.localIP() ) );
+			return true;
+		}
+
 		return false;
 	}
 
-	uint8_t status = WiFi.status();
+	uint8_t status = GetThrottledStatus ( false );
 	if ( status != m_lastConnectStatus )
 	{
+		WiFiDiagLog ( String ( "WiFi status change: " ) + m_lastConnectStatus + "->" + status + " (" +
+		              WiFiStatusToString ( status ) + ")" );
 		m_lastConnectStatus = status;
 	}
+
+	if ( status == WL_NO_SHIELD )
+	{
+		WiFiDiagLog ( "NO_SHIELD detected during connect; aborting attempt early" );
+		m_staConnectInProgress = false;
+		m_staConnectStartMs = 0UL;
+
+		m_reconnectAttempts++;
+		if ( m_reconnectAttempts > WIFI_RECONNECT_MAX_ATTEMPTS )
+		{
+			m_reconnectAttempts = WIFI_RECONNECT_MAX_ATTEMPTS;
+		}
+		NoteConnectFailure ( status );
+		m_nextReconnectMs = millis() + WIFI_RECONNECT_BASE_DELAY_MS;
+
+		Info ( "NINA unresponsive (NO_SHIELD); forcing module hard reset" );
+		SpiDrv::end();
+		s_noShieldQuarantine = true;
+		s_noShieldQuarantineUntilMs = nowMs + WIFI_NO_SHIELD_RECOVERY_COOLDOWN_MS;
+		s_cachedStatus = WL_NO_SHIELD;
+		s_forceHardResetNextAttempt = false;
+		s_consecutiveStaTimeouts = 0U;
+
+		SetState ( WiFiService::Status::UNCONNECTED );
+		logWiFiError ( "WiFi connect attempt " + String ( m_reconnectAttempts ), status );
+		m_beginTimeouts++;
+		return false;
+	}
+
 	if ( status == WL_CONNECTED )
 	{
 		CalcMyMulticastAddress ( m_multicastAddr );
@@ -588,19 +964,78 @@ bool WiFiService::WiFiConnect ()
 		m_nextReconnectMs = 0;
 		ResetStaFailureTracking();
 		m_beginConnects++;
+		s_noShieldRecoveryResets = 0U;
+		s_consecutiveStaTimeouts = 0U;
+		WiFiDiagLog ( "Connected after async retry. localIP=" + ToIPString ( WiFi.localIP() ) +
+		              ", gateway=" + ToIPString ( WiFi.gatewayIP() ) + ", rssi=" + WiFi.RSSI() );
+		s_forceHardResetNextAttempt = false;
 		return true;
+	}
+
+	if ( status == WL_CONNECT_FAILED )
+	{
+		WiFiDiagLog ( "WL_CONNECT_FAILED detected; hard-resetting NINA before retry" );
+		m_staConnectInProgress = false;
+		m_staConnectStartMs = 0UL;
+		s_forceHardResetNextAttempt = false;
+		s_consecutiveStaTimeouts = 0U;
+
+		m_reconnectAttempts++;
+		if ( m_reconnectAttempts > WIFI_RECONNECT_MAX_ATTEMPTS )
+		{
+			m_reconnectAttempts = WIFI_RECONNECT_MAX_ATTEMPTS;
+		}
+		NoteConnectFailure ( status );
+
+		// WL_CONNECT_FAILED can leave NINA in a degraded state where immediate retries
+		// block for ~10 s and return WL_DISCONNECTED. Force a hardware reset and
+		// quarantine status polling briefly before the next retry attempt.
+		SpiDrv::end();
+		s_noShieldQuarantine = true;
+		s_noShieldQuarantineUntilMs = nowMs + WIFI_POST_HARD_RESET_SETTLE_MS;
+		s_cachedStatus = WL_NO_SHIELD;
+		s_lastNoShieldSeenMs = nowMs;
+		s_lastNoShieldBackoffResetMs = nowMs;
+
+		m_nextReconnectMs = millis() + WIFI_CONNECT_FAILED_RETRY_DELAY_MS;
+		WiFiDiagLog ( String ( "Scheduling WL_CONNECT_FAILED retry in ms=" ) + WIFI_CONNECT_FAILED_RETRY_DELAY_MS +
+		              ", attempts=" + m_reconnectAttempts + ", credFails=" + m_consecutiveCredentialFailures );
+
+		SetState ( WiFiService::Status::UNCONNECTED );
+		logWiFiError ( "WiFi connect attempt " + String ( m_reconnectAttempts ), status );
+		m_beginTimeouts++;
+		return false;
 	}
 
 	if ( ( millis() - m_staConnectStartMs ) < WIFI_CONNECT_TIMEOUT_MS )
 	{
 		return false;
 	}
+	WiFiDiagLog ( String ( "Connect timeout after ms=" ) + WIFI_CONNECT_TIMEOUT_MS + ", final status=" + status + " (" +
+	              WiFiStatusToString ( status ) + ")" );
 
 	m_staConnectInProgress = false;
 	m_staConnectStartMs = 0UL;
 
 	if ( status != WL_CONNECTED )
 	{
+		if ( s_consecutiveStaTimeouts < WIFI_RECONNECT_MAX_ATTEMPTS )
+		{
+			s_consecutiveStaTimeouts++;
+		}
+
+		s_forceHardResetNextAttempt = ( s_consecutiveStaTimeouts >= WIFI_TIMEOUTS_BEFORE_FORCED_HARD_RESET );
+		if ( s_forceHardResetNextAttempt )
+		{
+			WiFiDiagLog ( String ( "Consecutive timeout/disconnect failures=" ) + s_consecutiveStaTimeouts +
+			              "; next retry will hard reset NINA" );
+		}
+		else
+		{
+			WiFiDiagLog ( String ( "Consecutive timeout/disconnect failures=" ) + s_consecutiveStaTimeouts +
+			              "; next retry will use soft reconnect" );
+		}
+
 		m_reconnectAttempts++;
 		if ( m_reconnectAttempts > WIFI_RECONNECT_MAX_ATTEMPTS )
 		{
@@ -619,6 +1054,8 @@ bool WiFiService::WiFiConnect ()
 			backoffMs = WIFI_RECONNECT_MAX_DELAY_MS;
 		}
 		m_nextReconnectMs = millis() + backoffMs;
+		WiFiDiagLog ( String ( "Scheduling retry: attempts=" ) + m_reconnectAttempts + ", backoffMs=" + backoffMs +
+		              ", credFails=" + m_consecutiveCredentialFailures );
 
 		if ( status == WL_NO_SSID_AVAIL )
 		{
@@ -629,12 +1066,15 @@ bool WiFiService::WiFiConnect ()
 		// This prevents indefinite accumulation of firmware state corruption when WiFi is permanently unavailable
 		if ( ( millis() - m_firstStaFailureMs ) >= WIFI_FULL_RESET_TIMEOUT_MS )
 		{
+			WiFiDiagLog ( String ( "Triggering full board reset after ms=" ) + WIFI_FULL_RESET_TIMEOUT_MS +
+			              " of STA failures" );
 			Error ( F ( "WiFi unavailable for 15 minutes; performing full system reset" ) );
 			MN::Utils::ResetBoard ( F ( "WiFi unavailable timeout" ) );
 		}
 
 		if ( ShouldEnterAPMode() )
 		{
+			WiFiDiagLog ( "ShouldEnterAPMode() true: switching to onboarding AP" );
 			Info ( F ( "Repeated credential failures detected; entering AP onboarding mode" ) );
 			StartAP();
 			return false;
@@ -675,7 +1115,10 @@ String WiFiService::ToIPString ( const IPAddress& address )
  */
 bool WiFiService::IsConnected () const
 {
-	return WiFi.status() == WL_CONNECTED;
+	// Use service state instead of direct WiFi.status() polling.
+	// WiFi.status() can block when NINA firmware is unstable, so raw polling
+	// is centralized and throttled inside WiFiConnect().
+	return GetState() == WiFiService::Status::CONNECTED;
 }
 
 /**
@@ -807,8 +1250,9 @@ void UDPWiFiService::CheckUDP ()
 void UDPWiFiService::GetLocalTime ( String& result, time_t timeError )
 {
 	// WiFi.getTime() makes a blocking NTP call via NINA firmware.
-	// In AP mode there is no internet so it blocks for several seconds — skip it entirely.
-	if ( GetState() == Status::AP_MODE )
+	// In AP mode or while disconnected there is no internet so it can block for
+	// several seconds (or longer) and starve the main loop.
+	if ( GetState() == Status::AP_MODE || !IsConnected() )
 	{
 		return;
 	}
@@ -846,7 +1290,7 @@ void UDPWiFiService::GetLocalTime ( String& result, time_t timeError )
  */
 bool UDPWiFiService::GetUDPMessage ( String& RecvMessage )
 {
-	bool wasConnected = IsConnected();
+	const bool wasConnected = ( GetState() == Status::CONNECTED );
 	if ( WiFiConnect() )
 	{
 		if ( m_WiFiState == WiFiState::DISCONNECTED )

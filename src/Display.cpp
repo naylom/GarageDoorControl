@@ -262,13 +262,44 @@ void Display::DisplayStats ()
  */
 void Display::DisplayNWStatus ()
 {
-	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 0, F ( "SSID: " ) );
-	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 23, WiFi.SSID() );
-
 	if ( m_pUDPService == nullptr )
 	{
 		return;
 	}
+
+	const WiFiService::Status serviceState = m_pUDPService->GetState();
+	const bool wifiHardwareQueryable = ( serviceState == WiFiService::Status::CONNECTED );
+
+	const String ssidText = wifiHardwareQueryable ? String ( WiFi.SSID() ) : String ( "-" );
+	const String ipText = wifiHardwareQueryable ? m_pUDPService->ToIPString ( WiFi.localIP() ) : String ( "-" );
+	const String subnetText = wifiHardwareQueryable ? m_pUDPService->ToIPString ( WiFi.subnetMask() ) : String ( "-" );
+	const String gatewayText = wifiHardwareQueryable ? m_pUDPService->ToIPString ( WiFi.gatewayIP() ) : String ( "-" );
+	const String rssiText = wifiHardwareQueryable ? String ( WiFi.RSSI() ) : String ( "-" );
+	const String wifiStatusText = ( serviceState == WiFiService::Status::AP_MODE ) ? String ( "AP_MODE" )
+	                              : ( serviceState == WiFiService::Status::CONNECTED )
+	                                  ? m_pUDPService->WiFiStatusToString ( WL_CONNECTED )
+	                                  : m_pUDPService->WiFiStatusToString ( WL_DISCONNECTED );
+
+	String macText = "-";
+	if ( wifiHardwareQueryable )
+	{
+		byte bMac [ 6 ] = { 0 };
+		WiFi.macAddress ( bMac );
+		char s [ 18 ];
+		snprintf ( s,
+		           sizeof ( s ),
+		           "%02X:%02X:%02X:%02X:%02X:%02X",
+		           bMac [ 5 ],
+		           bMac [ 4 ],
+		           bMac [ 3 ],
+		           bMac [ 2 ],
+		           bMac [ 1 ],
+		           bMac [ 0 ] );
+		macText = s;
+	}
+
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 0, F ( "SSID: " ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine, 23, ssidText );
 
 	FixedIPList* pMulticastDestList = m_pUDPService->GetMulticastList();
 	if ( pMulticastDestList != nullptr )
@@ -307,22 +338,14 @@ void Display::DisplayNWStatus ()
 	                     NWPrintStartLine + 2,
 	                     0,
 	                     F ( "IP Address: " ) );
-	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
-	                     ansiVT220Logger::BG_BLACK,
-	                     NWPrintStartLine + 2,
-	                     23,
-	                     m_pUDPService->ToIPString ( WiFi.localIP() ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 2, 23, ipText );
 
 	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
 	                     ansiVT220Logger::BG_BLACK,
 	                     NWPrintStartLine + 3,
 	                     0,
 	                     F ( "Subnet Mask: " ) );
-	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
-	                     ansiVT220Logger::BG_BLACK,
-	                     NWPrintStartLine + 3,
-	                     23,
-	                     m_pUDPService->ToIPString ( WiFi.subnetMask() ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 3, 23, subnetText );
 
 	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
 	                     ansiVT220Logger::BG_BLACK,
@@ -386,41 +409,21 @@ void Display::DisplayNWStatus ()
 	                     NWPrintStartLine + 5,
 	                     0,
 	                     F ( "Mac address: " ) );
-	byte bMac [ 6 ] = { 0 };
-	WiFi.macAddress ( bMac );
-	char s [ 18 ];
-	snprintf ( s,
-	           sizeof ( s ),
-	           "%02X:%02X:%02X:%02X:%02X:%02X",
-	           bMac [ 5 ],
-	           bMac [ 4 ],
-	           bMac [ 3 ],
-	           bMac [ 2 ],
-	           bMac [ 1 ],
-	           bMac [ 0 ] );
-	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 23, s );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 5, 23, macText );
 
 	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
 	                     ansiVT220Logger::BG_BLACK,
 	                     NWPrintStartLine + 6,
 	                     0,
 	                     F ( "Gateway Address: " ) );
-	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
-	                     ansiVT220Logger::BG_BLACK,
-	                     NWPrintStartLine + 6,
-	                     23,
-	                     m_pUDPService->ToIPString ( WiFi.gatewayIP() ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 6, 23, gatewayText );
 
 	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
 	                     ansiVT220Logger::BG_BLACK,
 	                     NWPrintStartLine + 7,
 	                     0,
 	                     F ( "Signal strength (RSSI):" ) );
-	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN,
-	                     ansiVT220Logger::BG_BLACK,
-	                     NWPrintStartLine + 7,
-	                     23,
-	                     String ( WiFi.RSSI() ) );
+	m_logger.COLOUR_AT ( ansiVT220Logger::FG_CYAN, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 23, rssiText );
 	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE, ansiVT220Logger::BG_BLACK, NWPrintStartLine + 7, 30, F ( " dBm" ) );
 
 	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
@@ -433,7 +436,7 @@ void Display::DisplayNWStatus ()
 	                     ansiVT220Logger::BG_BLACK,
 	                     NWPrintStartLine + 8,
 	                     23,
-	                     m_pUDPService->WiFiStatusToString ( WiFi.status() ) );
+	                     wifiStatusText );
 
 	m_logger.COLOUR_AT ( ansiVT220Logger::FG_WHITE,
 	                     ansiVT220Logger::BG_BLACK,
@@ -444,5 +447,5 @@ void Display::DisplayNWStatus ()
 	                     ansiVT220Logger::BG_BLACK,
 	                     NWPrintStartLine + 8,
 	                     61,
-	                     String ( m_pUDPService->GetState() ) );
+	                     String ( serviceState ) );
 }

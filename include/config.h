@@ -11,13 +11,13 @@
 
 #include <Arduino.h>
 // V4 board - outside double garage uses different external RGB pins
-// constexpr pin_size_t RED_PIN = PIN_A4;
-// constexpr pin_size_t GREEN_PIN = PIN_A5;
-// constexpr pin_size_t BLUE_PIN = PIN_A6;
-// ─── External RGB LED pins ────────────────────────────────────────────────────
 constexpr pin_size_t RED_PIN = PIN_A4;
-constexpr pin_size_t GREEN_PIN = PIN_A3;
-constexpr pin_size_t BLUE_PIN = 10;
+constexpr pin_size_t GREEN_PIN = PIN_A5;
+constexpr pin_size_t BLUE_PIN = PIN_A6;
+// ─── External RGB LED pins ────────────────────────────────────────────────────
+// constexpr pin_size_t RED_PIN = PIN_A4;
+// constexpr pin_size_t GREEN_PIN = PIN_A3;
+// constexpr pin_size_t BLUE_PIN = 10;
 
 // ─── UAP garage door status input pins (must be interrupt-capable) ────────────
 #ifndef NOT_A_PIN
@@ -40,11 +40,24 @@ constexpr uint16_t TELNET_PORT = 0xFEEE;
 
 // ─── WiFi ─────────────────────────────────────────────────────────────────────
 constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 10000;
+constexpr uint32_t WIFI_STA_STARTUP_GRACE_MS = 2500UL;  // allow NINA to settle after boot before first STA begin
+constexpr bool WIFI_ENABLE_FIRST_STA_PREFLIGHT_RESET = false;
+constexpr uint32_t WIFI_DIAG_ENTRY_LOG_INTERVAL_MS = 500UL;
+constexpr uint32_t WIFI_DIAG_BACKOFF_LOG_INTERVAL_MS = 500UL;
+constexpr uint32_t WIFI_STATUS_POLL_INTERVAL_MS = 500UL;
+constexpr uint32_t WIFI_PROCESSING_LED_HOLD_MS = 500UL;
+constexpr uint32_t WIFI_NO_SHIELD_RECOVERY_COOLDOWN_MS = 5000UL;
+constexpr uint32_t WIFI_NO_SHIELD_STABLE_WINDOW_MS = 2000UL;
+constexpr uint8_t WIFI_NO_SHIELD_MAX_RECOVERY_RESETS = 3U;
+constexpr uint32_t WIFI_POST_HARD_RESET_SETTLE_MS = 1500UL;
 
 // ─── WiFi reconnection backoff ────────────────────────────────────────────────
 constexpr uint32_t WIFI_RECONNECT_BASE_DELAY_MS = 5000UL;  // 5 s initial backoff
 constexpr uint32_t WIFI_RECONNECT_MAX_DELAY_MS = 60000UL;  // 60 s maximum backoff
-constexpr uint8_t WIFI_RECONNECT_MAX_ATTEMPTS = 10;        // cap reconnect backoff after this many failures
+// Keep this aligned with base reconnect delay to avoid hammering NINA after auth failures.
+constexpr uint32_t WIFI_CONNECT_FAILED_RETRY_DELAY_MS = 5000UL;
+constexpr uint8_t WIFI_RECONNECT_MAX_ATTEMPTS = 10;  // cap reconnect backoff after this many failures
+constexpr uint8_t WIFI_TIMEOUTS_BEFORE_FORCED_HARD_RESET = 2U;
 
 // ─── WiFi onboarding policy ───────────────────────────────────────────────────
 constexpr uint32_t WIFI_AP_ENTRY_GRACE_MS = 10UL * 60UL * 1000UL;

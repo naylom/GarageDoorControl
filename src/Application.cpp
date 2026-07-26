@@ -23,7 +23,7 @@
 #include <WiFiUdp.h>
 
 // ─── Version string (extern'd by Display.cpp) ────────────────────────────────
-const char* VERSION = "2.0.5";
+const char* VERSION = "2.0.6";
 
 // ─── Logger (extern'd by Display.cpp) ────────────────────────────────────────
 #ifdef MNDEBUG
@@ -57,6 +57,98 @@ MNRGBLEDBaseLib* pMyLED = nullptr;
 // ─── Misc globals ─────────────────────────────────────────────────────────────
 unsigned long ulLastClientReq = 0UL;
 
+namespace
+{
+constexpr unsigned long APP_DIAG_SERIAL_WAIT_MS = 200UL;
+constexpr bool APP_ENABLE_SERIAL_DIAGNOSTICS = false;
+constexpr bool APP_ENABLE_LOGGER_OUTPUT = true;
+constexpr bool APP_ENABLE_LED_LOOP_UPDATE = true;
+constexpr bool APP_ENABLE_BUILTIN_NINA_LED = true;
+bool s_appDiagSerialReady = false;
+
+void AppDiagEnsureSerial ()
+{
+	if ( s_appDiagSerialReady )
+	{
+		return;
+	}
+
+	Serial.begin ( BAUD_RATE );
+	unsigned long startMs = millis();
+	while ( !Serial && ( millis() - startMs ) < APP_DIAG_SERIAL_WAIT_MS )
+	{
+		delay ( 10 );
+	}
+	s_appDiagSerialReady = true;
+}
+
+void AppDiagLog ( const String& msg )
+{
+	if ( !APP_ENABLE_SERIAL_DIAGNOSTICS )
+	{
+		return;
+	}
+
+	AppDiagEnsureSerial();
+	Serial.println ( "[TEMP_APP_DIAG] " + msg );
+}
+
+void AppDiagLogCritical ( const String& msg )
+{
+	AppDiagLog ( msg );
+}
+
+String AppDiagResetCause ()
+{
+#if defined( ARDUINO_ARCH_SAMD )
+	const uint8_t resetCause = PM->RCAUSE.reg;
+	String result = String ( "0x" ) + String ( resetCause, HEX ) + " (";
+	bool hasAnyFlag = false;
+
+	if ( ( resetCause & PM_RCAUSE_POR ) != 0U )
+	{
+		result += "POR";
+		hasAnyFlag = true;
+	}
+	if ( ( resetCause & PM_RCAUSE_BOD12 ) != 0U )
+	{
+		result += hasAnyFlag ? ",BOD12" : "BOD12";
+		hasAnyFlag = true;
+	}
+	if ( ( resetCause & PM_RCAUSE_BOD33 ) != 0U )
+	{
+		result += hasAnyFlag ? ",BOD33" : "BOD33";
+		hasAnyFlag = true;
+	}
+	if ( ( resetCause & PM_RCAUSE_EXT ) != 0U )
+	{
+		result += hasAnyFlag ? ",EXT" : "EXT";
+		hasAnyFlag = true;
+	}
+	if ( ( resetCause & PM_RCAUSE_WDT ) != 0U )
+	{
+		result += hasAnyFlag ? ",WDT" : "WDT";
+		hasAnyFlag = true;
+	}
+	if ( ( resetCause & PM_RCAUSE_SYST ) != 0U )
+	{
+		result += hasAnyFlag ? ",SYST" : "SYST";
+		hasAnyFlag = true;
+	}
+
+	if ( !hasAnyFlag )
+	{
+		result += "NONE";
+	}
+
+	result += ")";
+	return result;
+#else
+	return "unsupported";
+#endif
+}
+}  // namespace
+
 // ─── Application implementation ───────────────────────────────────────────────
 
 /**
@@ -67,7 +159,10 @@ Application::Application ()
 {
 	// Initialise the external LED object during global init so it exists before
 	// begin() drives its pins low (matches original global-variable behaviour).
-	pMyLED = new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 180, 120 );
+	// Assuming the fwd voltages for the led are 1.99 for Red, 2.88 for Green, 2.97 for Blue
+	// and the resistor for each channel is 68 ohms for Blue and 100 for Green and 270 for Red
+	// The max values are set to 255, 255, 255 to avoid overdriving the LED and causing colour distortion.
+	pMyLED = new CRGBLED ( RED_PIN, GREEN_PIN, BLUE_PIN, 255, 255, 255 );
 }
 
 /**
@@ -79,16 +174,25 @@ Application::Application ()
  */
 void Application::begin ()
 {
+	AppDiagLogCritical ( "begin(): entry" );
+	AppDiagLogCritical ( "begin(): reset cause=" + AppDiagResetCause() );
+
 	// Drive external LED pins low immediately — before any other peripheral
 	// initialisation.  SAMD21 pins default to floating inputs; without this,
 	// SPI/I2C/timer ISR activity induces noise on the pins causing visible
 	// colour glitching on the external LED during startup.
 	pMyLED->SetLEDColour ( MNRGBLEDBaseLib::eColour::BLACK, 0 );
 
-	MyLogger.LogStart();
-	MyLogger.ClearScreen();
+	if ( APP_ENABLE_LOGGER_OUTPUT )
+	{
+		MyLogger.LogStart();
+		MyLogger.ClearScreen();
+	}
 
-	//TheMKR_RGB_LED.Invert();  // Only if required!
+	if ( APP_ENABLE_BUILTIN_NINA_LED )
+	{
+		TheMKR_RGB_LED.Invert();  // Only if required!
+	}
 
 	pMyUDPService = new UDPWiFiService();
 
@@ -107,12 +211,17 @@ void Application::begin ()
 	apSSID += macStr;
 	Info ( F ( "Starting WiFi with onboarding support" ) );
 	Info ( "AP SSID will be: " + apSSID );
-	if ( !pMyUDPService->Begin ( Application::processUDPMsg, apSSID.c_str(), nullptr, &TheMKR_RGB_LED ) )
+	AppDiagLogCritical ( "begin(): calling UDPWiFiService::Begin" );
+	MNRGBLEDBaseLib* pBuiltinLedForWifi =
+	    APP_ENABLE_BUILTIN_NINA_LED ? static_cast<MNRGBLEDBaseLib*> ( &TheMKR_RGB_LED ) : nullptr;
+	if ( !pMyUDPService->Begin ( Application::processUDPMsg, apSSID.c_str(), nullptr, pBuiltinLedForWifi ) )
 	{
 		Error ( F ( "WiFi initialization failed" ) );
 	}
+	AppDiagLog ( "begin(): UDPWiFiService::Begin returned" );
 
 	{
+		AppDiagLog ( "begin(): sensor init block start" );
 		ConfigStorage::begin();
 		GarageConfig cfg = {};
 		cfg.altitudeCompensation = 131.0f;  // default matches OnboardingServer
@@ -133,33 +242,58 @@ void Application::begin ()
 			delete pBME280Sensor;
 			pBME280Sensor = nullptr;
 		}
-		DisplaylastInfoErrorMsg();
+		AppDiagLog ( "begin(): sensor init block end" );
+		if ( APP_ENABLE_LOGGER_OUTPUT )
+		{
+			DisplaylastInfoErrorMsg();
+		}
 	}
 
 	{
-		auto* pDoor = new HormannUAP1WithSwitch ( OPEN_DOOR_OUTPUT_PIN,
-		                                          CLOSE_DOOR_OUTPUT_PIN,
-		                                          STOP_DOOR_OUTPUT_PIN,
-		                                          TURN_LIGHT_ON_OUTPUT_PIN,
-		                                          DOOR_IS_OPEN_STATUS_PIN,
-		                                          DOOR_IS_CLOSED_STATUS_PIN,
-		                                          LIGHT_IS_ON_STATUS_PIN,
-		                                          DOOR_SWITCH_INPUT_PIN );
-		if ( pDoor->IsPresent() )
+		AppDiagLog ( "begin(): door init block start" );
+		const bool doorPinsConfigured =
+		    ( DOOR_IS_OPEN_STATUS_PIN != NOT_A_PIN ) && ( DOOR_IS_CLOSED_STATUS_PIN != NOT_A_PIN );
+		if ( !doorPinsConfigured )
 		{
-			pGarageDoor = pDoor;
-			setLED();
+			Info ( F ( "Door pins not configured; skipping door init" ) );
+			AppDiagLog ( "begin(): door init skipped (pins not configured)" );
 		}
 		else
 		{
-			Info ( F ( "No Hormann UAP1 garage door detected" ) );
-			delete pDoor;
+			auto* pDoor = new HormannUAP1WithSwitch ( OPEN_DOOR_OUTPUT_PIN,
+			                                          CLOSE_DOOR_OUTPUT_PIN,
+			                                          STOP_DOOR_OUTPUT_PIN,
+			                                          TURN_LIGHT_ON_OUTPUT_PIN,
+			                                          DOOR_IS_OPEN_STATUS_PIN,
+			                                          DOOR_IS_CLOSED_STATUS_PIN,
+			                                          LIGHT_IS_ON_STATUS_PIN,
+			                                          DOOR_SWITCH_INPUT_PIN );
+			if ( pDoor->IsPresent() )
+			{
+				pGarageDoor = pDoor;
+				setLED();
+			}
+			else
+			{
+				Info ( F ( "No Hormann UAP1 garage door detected" ) );
+				delete pDoor;
+			}
 		}
+		AppDiagLog ( "begin(): door init block end" );
 	}
 
+	AppDiagLog ( "begin(): creating protocol/display" );
 	pMyProtocol = new GarageMessageProtocol ( pGarageDoor, pBME280Sensor, EnvironmentResults, *pMyUDPService );
 
-	pMyDisplay = new Display ( MyLogger, pMyUDPService, VERSION, pGarageDoor, pBME280Sensor );
+	if ( APP_ENABLE_LOGGER_OUTPUT )
+	{
+		pMyDisplay = new Display ( MyLogger, pMyUDPService, VERSION, pGarageDoor, pBME280Sensor );
+	}
+	else
+	{
+		pMyDisplay = nullptr;
+	}
+	AppDiagLog ( "begin(): exit" );
 }
 
 /**
@@ -271,15 +405,18 @@ void Application::setLED ()
 	    255.0 - ( ( abs ( constrainedHumidity - HUMIDITY_MID ) * 255.0 ) / ( ( HUMIDITY_MAX - HUMIDITY_MIN ) / 2.0 ) );
 	pMyLED->SetLEDColour ( RGB ( red, green, blue ), Flashtime );
 
-	MyLogger.AT ( 3, 41, "Red   :" );
-	MyLogger.AT ( 4, 41, "Green :" );
-	MyLogger.AT ( 5, 41, "Blue  :" );
-	MyLogger.ClearPartofLine ( 3, 48, 3 );
-	MyLogger.ClearPartofLine ( 4, 48, 3 );
-	MyLogger.ClearPartofLine ( 5, 48, 3 );
-	MyLogger.AT ( 3, 48, String ( red ) );
-	MyLogger.AT ( 4, 48, String ( green ) );
-	MyLogger.AT ( 5, 48, String ( blue ) );
+	if ( APP_ENABLE_LOGGER_OUTPUT )
+	{
+		MyLogger.AT ( 3, 41, "Red   :" );
+		MyLogger.AT ( 4, 41, "Green :" );
+		MyLogger.AT ( 5, 41, "Blue  :" );
+		MyLogger.ClearPartofLine ( 3, 48, 3 );
+		MyLogger.ClearPartofLine ( 4, 48, 3 );
+		MyLogger.ClearPartofLine ( 5, 48, 3 );
+		MyLogger.AT ( 3, 48, String ( red ) );
+		MyLogger.AT ( 4, 48, String ( green ) );
+		MyLogger.AT ( 5, 48, String ( blue ) );
+	}
 }
 
 // ─── loop ─────────────────────────────────────────────────────────────────────
@@ -295,6 +432,9 @@ void Application::loop ()
 {
 	static unsigned long ulLastSensorTime = millis() - SENSOR_READ_INTERVAL_MS;
 	static unsigned long ulLastDisplayTime = 0UL;
+	static unsigned long ulLastLoopDiagTime = 0UL;
+	static bool s_loggedAfterCheckUDPThisWindow = true;
+	static bool s_loggedLoopTailThisWindow = true;
 
 	static IGarageDoor::State LastDoorState = IGarageDoor::State::Unknown;
 	static bool LastLightState = false;
@@ -304,25 +444,48 @@ void Application::loop ()
 	{
 		LastLightState = !pGarageDoor->IsLit();
 	}
-	// set LED — noInterrupts() prevents Flash() ISR racing against analogWrite()
-	// on the external LED's PWM registers, causing visible intensity flicker.
-	noInterrupts();
-	setLED();
-	interrupts();
+	// TEMP isolation: bypass LED update path to rule out interrupt/LED side effects
+	// while diagnosing reconnect freezes.
+	if ( APP_ENABLE_LED_LOOP_UPDATE )
+	{
+		// set LED — noInterrupts() prevents Flash() ISR racing against analogWrite()
+		// on the external LED's PWM registers, causing visible intensity flicker.
+		noInterrupts();
+		setLED();
+		interrupts();
+	}
 
 	// Process onboarding if in AP mode
 	pMyUDPService->ProcessOnboarding();
 
+	if ( millis() - ulLastLoopDiagTime > 2000UL )
+	{
+		ulLastLoopDiagTime = millis();
+		s_loggedAfterCheckUDPThisWindow = false;
+		s_loggedLoopTailThisWindow = false;
+		AppDiagLog ( String ( "loop(): heartbeat ms=" ) + ulLastLoopDiagTime +
+		             ", wifiState=" + static_cast<int> ( pMyUDPService->GetState() ) );
+		AppDiagLog ( "loop(): before CheckUDP" );
+	}
+
 	// See if we have any udp requests to action
 	pMyUDPService->CheckUDP();
 
-	if ( pBME280Sensor != nullptr && pMyUDPService->GetState() != WiFiService::Status::AP_MODE &&
+	if ( !s_loggedAfterCheckUDPThisWindow )
+	{
+		AppDiagLog ( "loop(): after CheckUDP" );
+		s_loggedAfterCheckUDPThisWindow = true;
+	}
+
+	if ( pBME280Sensor != nullptr && pMyUDPService->GetState() == WiFiService::Status::CONNECTED &&
 	     millis() - ulLastSensorTime > SENSOR_READ_INTERVAL_MS )
 	{
+		AppDiagLog ( "loop(): before sensor Read" );
 		if ( pBME280Sensor->Read ( EnvironmentResults ) )
 		{
 			multicastMsg ( UDPWiFiService::ReqMsgType::TEMPDATA );
 		}
+		AppDiagLog ( "loop(): after sensor Read" );
 		ulLastSensorTime = millis();
 	}
 
@@ -355,6 +518,17 @@ void Application::loop ()
 				SwitchPressedCount = LatestSwitchPressedCount;
 			}
 		}
+	}
+
+	if ( !s_loggedLoopTailThisWindow )
+	{
+		AppDiagLog ( "loop(): tail complete" );
+		s_loggedLoopTailThisWindow = true;
+	}
+
+	if ( pMyUDPService != nullptr && pMyUDPService->GetState() != WiFiService::Status::CONNECTED )
+	{
+		delay ( 1 );
 	}
 }
 

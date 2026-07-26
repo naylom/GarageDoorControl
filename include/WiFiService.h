@@ -83,6 +83,10 @@ protected:
 	uint32_t m_firstStaFailureMs = 0UL;
 	bool m_staConnectInProgress = false;
 	uint32_t m_staConnectStartMs = 0UL;
+	uint32_t m_staStartupGraceUntilMs = 0UL;
+	bool m_staStartupGraceApplied = false;
+	bool m_staStartupGraceLogged = false;
+	bool m_firstStaPreflightResetPending = false;
 	uint8_t m_disconnectMissCount = 0;              // consecutive non-WL_CONNECTED polls while in CONNECTED state
 	unsigned long m_disconnectFirstMissTime = 0UL;  // millis() when the first miss in the current window occurred
 	bool m_apClientConnected = false;
@@ -98,6 +102,11 @@ private:
 	IPAddress m_multicastAddr = 0UL;
 	bool m_isConnected = false;
 	MNRGBLEDBaseLib* m_pLED = nullptr;
+	bool m_lastLedValid = false;
+	RGBType m_lastLedColour = MNRGBLEDBaseLib::eColour::BLACK;
+	uint8_t m_lastLedFlashTime = 0U;
+	uint32_t m_processingLedHoldUntilMs = 0UL;
+	bool m_connectedLedDeferred = false;
 };
 
 class UDPWiFiService : public WiFiService

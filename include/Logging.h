@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <WiFiNINA.h>
 /*
-t
+
 Logging.h
 
 Arduino macros and function definitions for logging

@@ -266,7 +266,7 @@ bool SerialLogger::CanDetectClientConnect ()
  */
 bool CTelnet::isConnected ()
 {
-	return WiFi.status() == WL_CONNECTED ? true : false;
+	return m_myClient.connected();
 }
 
 /**
